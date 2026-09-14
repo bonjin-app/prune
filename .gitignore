@@ -1,0 +1,20 @@
+# Node
+node_modules/
+dist/
+dist-ssr/
+*.local
+coverage/
+
+# Rust
+target/
+src-tauri/target/
+src-tauri/gen/schemas/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.log
+.env
+.env.*
