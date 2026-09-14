@@ -47,9 +47,14 @@ jobs:
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: ". -> target"
+      # `tauri::generate_context!` reads tauri.conf.json and needs the frontend output to
+      # exist. The IPC tests use Tauri's mock context, so an empty placeholder is enough.
+      - name: Stub frontend dist
+        shell: bash
+        run: mkdir -p dist && echo "<!doctype html><title>ci</title>" > dist/index.html
       - run: cargo fmt --all --check
-      - run: cargo clippy -p prune-core --all-targets -- -D warnings
-      - run: cargo test -p prune-core
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
 
   build:
     name: Build (${{ matrix.name }})

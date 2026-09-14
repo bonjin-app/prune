@@ -242,6 +242,12 @@ Long-running work uses `tauri::async_runtime::spawn_blocking`; the UI thread is 
 - Integration (`tests/pipeline.rs`): a `SandboxPlatform` points `KnownPaths` at a temp dir with
   fake caches, projects, trash, and protected data; the full scan → plan → execute → log flow is
   verified, including tamper resistance (a forged path into `.ssh` is blocked).
+- IPC (`src-tauri/tests/ipc.rs`): the real `#[tauri::command]` functions run on Tauri's mock
+  runtime, covering argument deserialization, managed state, the async runtime and the JSON
+  responses. One test drives a full disk scan → drill-down → preview → execute → operation log
+  cycle inside a temp directory; others assert that unknown ids, bad roots and paths outside the
+  user's directories are refused. This is why the commands are generic over `Runtime` and why
+  command registration lives in `register_commands`, separate from `run`.
 - Frontend: vitest for formatting helpers; the mock backend enables UI testing.
 
 Never use real system paths in tests.
@@ -258,7 +264,17 @@ Never use real system paths in tests.
 | 6 Uninstaller       | apps + related data                                                     | planned                                                    |
 | 7 Monitor / Startup | monitor done; startup items planned                                     | partial                                                    |
 
-## 10. Known limitations
+## 10. Deferred: Docker
+
+Spec §27 asks for Docker cleanup. Meaningful Docker reclamation (images, containers, volumes,
+build cache) lives inside Docker's own VM disk image, so it cannot go through the file-deletion
+pipeline: it needs `docker system df` / `docker system prune`, which is a different kind of
+operation with different failure modes. Deleting `Docker.raw` directly would be a factory reset,
+not a cleanup, so it is deliberately not offered as a checkbox next to caches. The feature is
+deferred until it can be designed and verified as a command-based provider with its own
+confirmation step.
+
+## 10b. Known limitations
 
 - macOS: `~/.Trash` and Safari's cache are TCC-protected. Prune reports them as skipped until
   the user grants Full Disk Access; we do not prompt for it yet.

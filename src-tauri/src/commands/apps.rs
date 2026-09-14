@@ -4,7 +4,7 @@ use std::sync::Arc;
 use prune_core::apps::{self, AppDetail, AppsProgress};
 use prune_core::models::{ScanSession, ScanStatus};
 use prune_core::platform::ApplicationInfo;
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, Runtime, State};
 
 use crate::error::{CommandError, CommandResult};
 use crate::events;
@@ -14,8 +14,8 @@ use crate::AppState;
 /// Lists applications immediately (without sizes) and measures them in the background.
 /// Emits `prune://apps-progress` per measured app and `prune://apps-completed` with the full list.
 #[tauri::command]
-pub fn apps_start_scan(
-    app: AppHandle,
+pub fn apps_start_scan<R: Runtime>(
+    app: AppHandle<R>,
     state: State<'_, AppState>,
 ) -> CommandResult<Vec<ApplicationInfo>> {
     let list = state.engine.applications()?;

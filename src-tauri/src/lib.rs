@@ -21,6 +21,37 @@ pub mod events {
     pub const APPS_COMPLETED: &str = "prune://apps-completed";
 }
 
+/// Registers every IPC command on a builder.
+///
+/// Split out of [`run`] so the integration tests can build the same command surface on
+/// Tauri's mock runtime and exercise the real IPC path.
+pub fn register_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
+    builder.invoke_handler(tauri::generate_handler![
+        commands::app_get_meta,
+        commands::system_get_info,
+        commands::system_get_snapshot,
+        commands::system_list_processes,
+        commands::cleaner_list_providers,
+        commands::cleaner_start_scan,
+        commands::cleaner_cancel_scan,
+        commands::cleaner_get_scan,
+        commands::cleaner_preview,
+        commands::cleaner_execute,
+        commands::disk_start_scan,
+        commands::disk_cancel_scan,
+        commands::disk_get_summary,
+        commands::disk_get_node,
+        commands::disk_large_files,
+        commands::apps_start_scan,
+        commands::apps_get_detail,
+        commands::apps_run_uninstaller,
+        commands::startup_list,
+        commands::startup_set_enabled,
+        commands::ops_list,
+        commands::fs_reveal,
+    ])
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tracing_subscriber::fmt()
@@ -32,7 +63,7 @@ pub fn run() {
         .with_target(false)
         .init();
 
-    tauri::Builder::default()
+    register_commands(tauri::Builder::default())
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
             let state = AppState::new(&data_dir)?;
@@ -40,30 +71,6 @@ pub fn run() {
             tracing::info!(version = env!("CARGO_PKG_VERSION"), "Prune started");
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
-            commands::app_get_meta,
-            commands::system_get_info,
-            commands::system_get_snapshot,
-            commands::system_list_processes,
-            commands::cleaner_list_providers,
-            commands::cleaner_start_scan,
-            commands::cleaner_cancel_scan,
-            commands::cleaner_get_scan,
-            commands::cleaner_preview,
-            commands::cleaner_execute,
-            commands::disk_start_scan,
-            commands::disk_cancel_scan,
-            commands::disk_get_summary,
-            commands::disk_get_node,
-            commands::disk_large_files,
-            commands::apps_start_scan,
-            commands::apps_get_detail,
-            commands::apps_run_uninstaller,
-            commands::startup_list,
-            commands::startup_set_enabled,
-            commands::ops_list,
-            commands::fs_reveal,
-        ])
         .run(tauri::generate_context!())
         .expect("error while running Prune");
 }

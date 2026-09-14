@@ -19,4 +19,5 @@ All notable changes to Prune are documented here. The format follows
 - Monitor: CPU per core, memory, swap, disks, top processes (read-only).
 - Preview (dry run) → confirm → remove → operation log pipeline with `Move to Trash` / `Delete permanently` modes.
 - Command palette (⌘K / Ctrl+K).
+- IPC integration tests on Tauri's mock runtime covering the real command surface, including a full disk scan → preview → execute → operation log cycle.
 - Read-only CLI prototypes: `cargo run -p prune-core --example scan`, `--example disk`, `--example apps`, `--example startup`.

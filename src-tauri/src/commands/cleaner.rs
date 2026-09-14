@@ -5,7 +5,7 @@ use prune_core::models::{
     CleanupPlan, CleanupResult, DeleteMode, ProviderInfo, ScanProgress, ScanSession, ScanStatus,
 };
 use prune_core::scan::ScanRequest;
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, Runtime, State};
 
 use crate::error::{CommandError, CommandResult};
 use crate::events;
@@ -20,8 +20,8 @@ pub fn cleaner_list_providers(state: State<'_, AppState>) -> CommandResult<Vec<P
 /// Starts a scan on a worker thread and returns its id immediately.
 /// Progress arrives via `prune://scan-progress`; the finished session via `prune://scan-completed`.
 #[tauri::command]
-pub fn cleaner_start_scan(
-    app: AppHandle,
+pub fn cleaner_start_scan<R: Runtime>(
+    app: AppHandle<R>,
     state: State<'_, AppState>,
     provider_ids: Option<Vec<String>>,
 ) -> CommandResult<String> {
@@ -115,8 +115,8 @@ pub fn cleaner_preview(
 /// Executes a previously previewed plan. The plan id is the only input: paths never cross IPC
 /// in this direction. A plan can be executed once.
 #[tauri::command]
-pub async fn cleaner_execute(
-    app: AppHandle,
+pub async fn cleaner_execute<R: Runtime>(
+    app: AppHandle<R>,
     state: State<'_, AppState>,
     plan_id: String,
 ) -> CommandResult<CleanupResult> {

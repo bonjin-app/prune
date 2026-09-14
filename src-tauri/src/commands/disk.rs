@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use prune_core::analyzer::{self, DiskNodeView, DiskProgress, DiskSummary, LargeFile};
 use prune_core::models::{ScanSession, ScanStatus};
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, Runtime, State};
 
 use crate::error::{CommandError, CommandResult};
 use crate::events;
@@ -14,8 +14,8 @@ use crate::AppState;
 /// Starts a read-only disk analysis of `root` (defaults to the home directory).
 /// Emits `prune://disk-progress` and `prune://disk-completed` (a `DiskSummary`).
 #[tauri::command]
-pub fn disk_start_scan(
-    app: AppHandle,
+pub fn disk_start_scan<R: Runtime>(
+    app: AppHandle<R>,
     state: State<'_, AppState>,
     root: Option<String>,
 ) -> CommandResult<String> {

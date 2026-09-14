@@ -150,10 +150,16 @@ impl DiskAnalysis {
     }
 
     /// Node view for `path` (defaults to the root). `None` if the path was not scanned.
+    ///
+    /// The scan canonicalizes its root, so a caller-supplied path that goes through a symlink
+    /// (`/var/...` vs `/private/var/...` on macOS) is canonicalized before the lookup.
     pub fn node(&self, path: Option<&Path>) -> Option<DiskNodeView> {
         let idx = match path {
             None => 0,
-            Some(p) => *self.index.get(p)?,
+            Some(p) => match self.index.get(p) {
+                Some(i) => *i,
+                None => *self.index.get(&std::fs::canonicalize(p).ok()?)?,
+            },
         };
         let mut children: Vec<DiskNode> = self.nodes[idx]
             .children
@@ -557,6 +563,8 @@ mod tests {
         assert_eq!(view.children[0].size_bytes, 6500);
         assert_eq!(view.children[1].name, "c");
 
+        // A path that reaches the same directory through a symlink resolves too: the scan
+        // canonicalizes its root, so plain lookups would otherwise miss on macOS temp dirs.
         let b = analysis.node(Some(&root.join("a/b"))).unwrap();
         assert_eq!(b.node.size_bytes, 1500);
         assert_eq!(b.breadcrumbs.len(), 2);
