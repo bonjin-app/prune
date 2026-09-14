@@ -34,13 +34,14 @@ fn main() {
     println!("home: {}", known.home.display());
     println!("project roots: {:?}\n", known.project_roots);
 
+    // Optional provider filter, e.g. `--example scan -- pnpm_store npm_cache`.
+    let only: Vec<String> = std::env::args().skip(1).collect();
+    let request = ScanRequest {
+        provider_ids: (!only.is_empty()).then_some(only),
+    };
+
     let start = std::time::Instant::now();
-    let session = engine.scan(
-        "cli",
-        &ScanRequest::default(),
-        Arc::new(AtomicBool::new(false)),
-        &|_| {},
-    );
+    let session = engine.scan("cli", &request, Arc::new(AtomicBool::new(false)), &|_| {});
 
     for r in &session.results {
         if r.targets.is_empty() && r.issues.is_empty() {

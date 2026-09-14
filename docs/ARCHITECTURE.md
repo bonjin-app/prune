@@ -129,6 +129,13 @@ folders.
 - Cancellation is an `Arc<AtomicBool>` checked every 64 entries during traversal.
 - Sizes are logical (`metadata.len()`), hard links counted once per `(dev, ino)`, symlinks not
   followed. This matches Finder's reported size.
+- Sizing one tree is itself parallel. `fs::dir_stats` descends up to four levels until it has at
+  least 32 independent subtrees, then walks them with rayon; the directories and files it passes
+  on the way are counted during the descent. Two consequences worth remembering when editing it:
+  the descent must honour cancellation and emit progress (a wide, shallow tree can be consumed
+  entirely before any subtree walk starts), and every file — including those found during the
+  descent — must go through the shared inode set, or a file and a hard link to it elsewhere are
+  both counted. Both cases are covered by tests.
 - Non-fatal errors (permission denied, vanished files) become `ScanIssue`s and are shown, not
   hidden.
 
@@ -281,5 +288,6 @@ confirmation step.
 - Windows: Recycle Bin size is not path-based and is not reported yet.
 - Sizes are logical bytes, not on-disk blocks (APFS clones and compression make "space freed"
   slightly lower than shown).
-- Very large hard-link farms (pnpm store) take tens of seconds to size; a parallel walker is
-  planned.
+- A full scan of this developer machine (6.1M files, 504 GB reclaimable) takes about 2 minutes,
+  dominated by the project-artifact walk. Individual providers are parallel; the remaining cost
+  is filesystem metadata throughput.
