@@ -32,7 +32,12 @@ export function CommandPalette() {
     providers.filter((p) => cats.includes(p.category)).map((p) => p.id);
 
   return (
-    <Dialog open={open} onClose={() => setOpen(false)} className="max-w-[520px]">
+    <Dialog
+      open={open}
+      onClose={() => setOpen(false)}
+      className="max-w-[520px]"
+      label="Command palette"
+    >
       <Command label="Command palette" className="text-[13px]">
         <div className="flex items-center gap-2 border-b border-line px-3">
           <Command.Input

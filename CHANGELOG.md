@@ -21,5 +21,6 @@ All notable changes to Prune are documented here. The format follows
 - Command palette (⌘K / Ctrl+K) and ⌘/Ctrl + digit shortcuts for every view.
 - Permission awareness on macOS: locations the OS hides (Trash, Safari data, Mail, Messages) are detected and reported with a banner and a shortcut to the Full Disk Access settings, instead of silently shrinking every scan total.
 - Directory sizing is split across threads: the tree is divided into at least 32 independent subtrees (descending up to four levels to find them) and walked in parallel, with hard links still counted once through a sharded inode set. On a 12-core machine a 622k-file pnpm store drops from ~50s to ~20s and a 368k-file Gradle cache from 38s to 23s, with byte-identical results.
+- Frontend tests for the selection, preview, execute and cleanup-bookkeeping logic in every store, plus component tests asserting that a protected target can never be selected and that dialogs trap and restore focus.
 - IPC integration tests on Tauri's mock runtime covering the real command surface, including a full disk scan → preview → execute → operation log cycle.
 - Read-only CLI prototypes: `cargo run -p prune-core --example scan`, `--example disk`, `--example apps`, `--example startup`.

@@ -268,7 +268,11 @@ Long-running work uses `tauri::async_runtime::spawn_blocking`; the UI thread is 
   cycle inside a temp directory; others assert that unknown ids, bad roots and paths outside the
   user's directories are refused. This is why the commands are generic over `Runtime` and why
   command registration lives in `register_commands`, separate from `run`.
-- Frontend: vitest for formatting helpers; the mock backend enables UI testing.
+- Frontend (vitest + Testing Library): every store's logic — selection, recommendations scoped
+  by category, stale-event rejection, preview arguments, and the bookkeeping that removes cleaned
+  targets from the session, the disk analysis and the app detail. Component tests cover the two
+  behaviours a user's data depends on: a protected target cannot be selected by any route, and a
+  dialog traps Tab and restores focus to whatever opened it.
 
 Never use real system paths in tests.
 

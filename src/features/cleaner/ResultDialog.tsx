@@ -12,7 +12,7 @@ export function ResultDialog() {
   if (!result) return null;
   const ok = result.status === "success";
   return (
-    <Dialog open onClose={dismiss} className="max-w-[460px]">
+    <Dialog open onClose={dismiss} className="max-w-[460px]" label="Cleanup result">
       <div className="px-5 pt-6 pb-4 text-center">
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft text-accent">
           {ok ? <CheckCircle2 size={26} /> : <XCircle size={26} className="text-warn" />}

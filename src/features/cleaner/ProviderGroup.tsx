@@ -29,8 +29,18 @@ export function ProviderGroup({ result }: { result: ScanResult }) {
   return (
     <section className="overflow-hidden rounded-lg border border-line bg-surface">
       <header
+        role="button"
+        tabIndex={0}
+        aria-expanded={open}
+        aria-label={`${open ? "Collapse" : "Expand"} ${result.providerName}`}
         className="flex cursor-default items-center gap-2.5 px-3 py-2.5 hover:bg-surface-2/60"
         onClick={() => setOpen((o) => !o)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setOpen((o) => !o);
+          }
+        }}
       >
         <Checkbox
           checked={all}

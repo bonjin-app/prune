@@ -22,7 +22,12 @@ export function PreviewDialog() {
   const pct = progress && progress.total > 0 ? (progress.done / progress.total) * 100 : 0;
 
   return (
-    <Dialog open onClose={() => !executing && closePreview()} closeOnBackdrop={!executing}>
+    <Dialog
+      open
+      onClose={() => !executing && closePreview()}
+      closeOnBackdrop={!executing}
+      label="Preview cleanup"
+    >
       <div className="px-5 pt-5 pb-4">
         <div className="flex items-start gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent">
