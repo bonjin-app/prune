@@ -65,6 +65,26 @@ impl PruneEngine {
         self.registry.infos(&self.known)
     }
 
+    /// Installed applications without sizes.
+    pub fn applications(&self) -> Result<Vec<crate::platform::ApplicationInfo>> {
+        crate::apps::list(self.platform.as_ref(), &self.known)
+    }
+
+    /// Application bundle plus leftovers, measured and risk-classified.
+    pub fn app_detail(
+        &self,
+        app: &crate::platform::ApplicationInfo,
+        cancel: &AtomicBool,
+    ) -> crate::apps::AppDetail {
+        crate::apps::detail(
+            self.platform.as_ref(),
+            &self.known,
+            &self.policy,
+            app,
+            cancel,
+        )
+    }
+
     /// Blocking scan; run on a worker thread.
     pub fn scan(
         &self,

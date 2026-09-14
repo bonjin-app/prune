@@ -47,6 +47,7 @@ impl PlatformService for SandboxPlatform {
                 home.join("Documents"),
             ],
             trees: vec![home.join(".ssh"), home.join("Library/Keychains")],
+            app_bundle_roots: vec![],
         }
     }
 }

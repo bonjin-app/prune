@@ -31,14 +31,15 @@ prune/
 │   │   │   └── developer/     tool caches (declarative) + project artifact walker
 │   │   ├── scan/              parallel runner, progress, cancel, overlap de-dup
 │   │   ├── analyzer/          disk analyzer: directory tree, large files, extensions
+│   │   ├── apps/              uninstaller: app detail + leftovers as cleanup targets
 │   │   ├── ops/               OperationLog (JSONL)
 │   │   ├── platform/          PlatformService trait; macos/, windows/, generic/
 │   │   └── system/            SystemMonitor (sysinfo)
-│   ├── examples/{scan,disk}.rs read-only CLI prototypes
+│   ├── examples/{scan,disk,apps}.rs read-only CLI prototypes
 │   └── tests/pipeline.rs      end-to-end against a sandboxed fake home
 ├── src-tauri/                 Tauri shell
-│   ├── src/commands/          app, system, cleaner, disk, ops, fs
-│   ├── src/state.rs           AppState: engine, monitor, ops, scans, plans, disks
+│   ├── src/commands/          app, system, cleaner, disk, apps, ops, fs
+│   ├── src/state.rs           AppState: engine, monitor, ops, scans, plans, disks, apps
 │   ├── tauri.conf.json        window, CSP, bundle
 │   └── capabilities/          core permissions only (no shell / fs / http plugins)
 └── src/                       React UI
@@ -150,6 +151,36 @@ risk `Medium`, or `Protected` when the policy refuses the path) so `cleaner_prev
 `cleaner_execute` handle them with no special casing. After an execution the Tauri layer calls
 `DiskAnalysis::forget_removed` so folder sizes and the large-file list reflect reality.
 
+## 5c. Uninstaller
+
+`platform::applications` lists installed software: `.app` bundles under `/Applications`
+(one level of subfolders) and `~/Applications` on macOS, the `Uninstall` registry keys on
+Windows. Sizes are measured in parallel afterwards and streamed to the UI, so the list appears
+instantly.
+
+`platform::app_related_paths` returns the existing locations an application writes outside its
+bundle. macOS matches on the bundle identifier (`~/Library/Caches/<id>`, `Containers`, `WebKit`,
+`HTTPStorages`, `Application Scripts`, and `Preferences` / `Saved Application State` entries
+prefixed with the id) **and** on folder names, using both the bundle file name and
+`CFBundleName` — Electron apps store data under the latter (`~/Library/Application Support/Code`
+for Visual Studio Code). Names shorter than three characters are ignored so generic folders are
+never swept in. Windows matches `%LOCALAPPDATA%` / `%APPDATA%` folders named after the
+application and its publisher.
+
+Each location becomes a `CleanupTarget` with a risk derived from `AppDataKind` (caches and logs
+`Safe`, preferences `Low`, the bundle and application data `Medium`). The detail is registered as
+a scan session `app:<id>`, so `cleaner_preview` / `cleaner_execute` remove it with no special
+casing. Apple and Microsoft system applications are listed, but their bundle is forced to
+`Protected` — only their leftovers can be removed. On Windows `apps_run_uninstaller` launches the
+vendor's own uninstaller; Prune never runs it silently.
+
+### The `.app` bundle exception in the safety policy
+
+`/Applications` is a protected tree, yet uninstalling must be possible. `ProtectedPaths` gained
+`app_bundle_roots`, and a path passes validation when it is a directory ending in `.app` whose
+**parent is exactly** one of those roots. `/Applications` itself, `/Applications/Utilities`,
+nested bundles and anything _inside_ a bundle stay refused.
+
 ## 6. Tauri layer
 
 Command naming: `<domain>_<verb>_<object>` in `snake_case`.
@@ -165,7 +196,8 @@ Command naming: `<domain>_<verb>_<object>` in `snake_case`.
 | `fs_reveal`                                                         | reveal a path in Finder / Explorer (read-only) |
 
 Events: `prune://scan-progress`, `prune://scan-completed`, `prune://cleanup-progress`,
-`prune://disk-progress`, `prune://disk-completed`.
+`prune://disk-progress`, `prune://disk-completed`, `prune://apps-progress`,
+`prune://apps-completed`.
 
 Errors cross IPC as `{ code, message }` (`CommandError`), with stable codes from
 `PruneError::code()`.

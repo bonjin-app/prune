@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { backend, errorMessage } from "@/lib/tauri";
+import { useApps } from "./apps";
 import { useDisk } from "./disk";
 import type {
   Category,
@@ -190,6 +191,9 @@ export const useScan = create<ScanState>((set, get) => ({
       });
       if (scanId === useDisk.getState().scanId || plan.scanId === useDisk.getState().scanId) {
         void useDisk.getState().forgetRemoved([...removed]);
+      }
+      if (plan.scanId.startsWith("app:")) {
+        void useApps.getState().forgetRemoved([...removed]);
       }
     } catch (e) {
       set({ executing: false, error: errorMessage(e) });

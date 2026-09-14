@@ -1,13 +1,27 @@
 use std::path::PathBuf;
 
-use super::{existing, existing_project_roots, KnownPaths, PlatformService, ProtectedPaths};
+use super::{
+    existing, existing_project_roots, AppDataKind, ApplicationInfo, KnownPaths, PlatformService,
+    ProtectedPaths, RelatedPath,
+};
 use crate::models::Platform;
+use crate::Result;
+
+mod apps;
 
 pub struct MacosPlatform;
 
 impl PlatformService for MacosPlatform {
     fn platform(&self) -> Platform {
         Platform::Macos
+    }
+
+    fn applications(&self, known: &KnownPaths) -> Result<Vec<ApplicationInfo>> {
+        Ok(apps::list(known))
+    }
+
+    fn app_related_paths(&self, app: &ApplicationInfo, known: &KnownPaths) -> Vec<RelatedPath> {
+        apps::related_paths(app, known)
     }
 
     fn known_paths(&self) -> KnownPaths {
@@ -97,9 +111,9 @@ impl PlatformService for MacosPlatform {
                 lib.join("Application Support/AddressBook"),
                 lib.join("Application Support/CloudDocs"),
                 lib.join("Application Support/iCloud"),
-                lib.join("Preferences"),
                 lib.join("Developer/Xcode/UserData"),
             ],
+            app_bundle_roots: vec![PathBuf::from("/Applications"), home.join("Applications")],
         }
     }
 }

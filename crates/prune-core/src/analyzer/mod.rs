@@ -399,6 +399,7 @@ pub fn analyze(
         }
 
         total_files += 1;
+        #[cfg_attr(not(unix), allow(unused_mut))]
         let mut size = meta.len();
         #[cfg(unix)]
         {
@@ -542,6 +543,7 @@ mod tests {
             allowed_roots: vec![root.clone()],
             exact: vec![],
             trees: vec![root.join("c")],
+            app_bundle_roots: vec![],
         });
         let cancel = AtomicBool::new(false);
         let analysis = analyze("t", &root, &policy, &cancel, &|_| {});

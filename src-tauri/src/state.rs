@@ -6,6 +6,7 @@ use std::sync::{Arc, Mutex};
 use prune_core::analyzer::DiskAnalysis;
 use prune_core::models::{CleanupPlan, ScanSession};
 use prune_core::ops::OperationLog;
+use prune_core::platform::ApplicationInfo;
 use prune_core::system::SystemMonitor;
 use prune_core::PruneEngine;
 
@@ -22,6 +23,13 @@ pub struct DiskEntry {
     pub analysis: Option<DiskAnalysis>,
 }
 
+/// Cached application list (Uninstaller).
+#[derive(Default)]
+pub struct AppsState {
+    pub scan_id: Option<String>,
+    pub list: Vec<ApplicationInfo>,
+}
+
 /// Process-wide state managed by Tauri.
 pub struct AppState {
     pub engine: Arc<PruneEngine>,
@@ -30,6 +38,7 @@ pub struct AppState {
     pub scans: Mutex<HashMap<String, ScanEntry>>,
     pub plans: Mutex<HashMap<String, CleanupPlan>>,
     pub disks: Mutex<HashMap<String, DiskEntry>>,
+    pub apps: Mutex<AppsState>,
 }
 
 impl AppState {
@@ -44,6 +53,7 @@ impl AppState {
             scans: Mutex::new(HashMap::new()),
             plans: Mutex::new(HashMap::new()),
             disks: Mutex::new(HashMap::new()),
+            apps: Mutex::new(AppsState::default()),
         })
     }
 }

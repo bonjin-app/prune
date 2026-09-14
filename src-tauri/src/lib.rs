@@ -17,6 +17,8 @@ pub mod events {
     pub const CLEANUP_PROGRESS: &str = "prune://cleanup-progress";
     pub const DISK_PROGRESS: &str = "prune://disk-progress";
     pub const DISK_COMPLETED: &str = "prune://disk-completed";
+    pub const APPS_PROGRESS: &str = "prune://apps-progress";
+    pub const APPS_COMPLETED: &str = "prune://apps-completed";
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -54,6 +56,9 @@ pub fn run() {
             commands::disk_get_summary,
             commands::disk_get_node,
             commands::disk_large_files,
+            commands::apps_start_scan,
+            commands::apps_get_detail,
+            commands::apps_run_uninstaller,
             commands::ops_list,
             commands::fs_reveal,
         ])

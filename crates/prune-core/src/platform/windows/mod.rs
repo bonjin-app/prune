@@ -1,7 +1,13 @@
 use std::path::PathBuf;
 
-use super::{existing, existing_project_roots, KnownPaths, PlatformService, ProtectedPaths};
+use super::{
+    existing, existing_project_roots, AppDataKind, ApplicationInfo, KnownPaths, PlatformService,
+    ProtectedPaths, RelatedPath,
+};
 use crate::models::Platform;
+use crate::Result;
+
+mod apps;
 
 pub struct WindowsPlatform;
 
@@ -14,6 +20,14 @@ fn env_path(name: &str) -> Option<PathBuf> {
 impl PlatformService for WindowsPlatform {
     fn platform(&self) -> Platform {
         Platform::Windows
+    }
+
+    fn applications(&self, known: &KnownPaths) -> Result<Vec<ApplicationInfo>> {
+        apps::list(known)
+    }
+
+    fn app_related_paths(&self, app: &ApplicationInfo, known: &KnownPaths) -> Vec<RelatedPath> {
+        apps::related_paths(app, known)
     }
 
     fn known_paths(&self) -> KnownPaths {
@@ -94,6 +108,7 @@ impl PlatformService for WindowsPlatform {
                 local.join("Packages"),
                 home.join("OneDrive"),
             ],
+            app_bundle_roots: vec![],
         }
     }
 }

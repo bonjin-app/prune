@@ -11,6 +11,8 @@ pnpm dev                                  # UI in browser with mock backend
 pnpm typecheck && pnpm lint && pnpm test  # frontend checks
 cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
 cargo run -p prune-core --example scan --release   # read-only real scan
+cargo run -p prune-core --example disk --release -- ~/Projects
+cargo run -p prune-core --example apps --release -- "Visual Studio Code"
 ```
 
 ## Hard rules

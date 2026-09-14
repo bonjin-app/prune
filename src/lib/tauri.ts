@@ -8,7 +8,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
+  AppDetail,
+  ApplicationInfo,
   AppMeta,
+  AppsProgress,
   CleanupPlan,
   CleanupProgress,
   CleanupResult,
@@ -35,6 +38,8 @@ export const EVENTS = {
   cleanupProgress: "prune://cleanup-progress",
   diskProgress: "prune://disk-progress",
   diskCompleted: "prune://disk-completed",
+  appsProgress: "prune://apps-progress",
+  appsCompleted: "prune://apps-completed",
 } as const;
 
 export interface EventMap {
@@ -43,6 +48,8 @@ export interface EventMap {
   [EVENTS.cleanupProgress]: CleanupProgress;
   [EVENTS.diskProgress]: DiskProgress;
   [EVENTS.diskCompleted]: DiskSummary;
+  [EVENTS.appsProgress]: AppsProgress;
+  [EVENTS.appsCompleted]: ApplicationInfo[];
 }
 
 export interface Backend {
@@ -61,6 +68,9 @@ export interface Backend {
   diskGetSummary(scanId: string): Promise<DiskSummary>;
   diskGetNode(scanId: string, path?: string): Promise<DiskNodeView>;
   diskLargeFiles(scanId: string, minBytes: number, limit?: number): Promise<LargeFile[]>;
+  appsStartScan(): Promise<ApplicationInfo[]>;
+  appsGetDetail(appId: string): Promise<AppDetail>;
+  appsRunUninstaller(appId: string): Promise<void>;
   opsList(limit?: number): Promise<OperationRecord[]>;
   fsReveal(path: string): Promise<void>;
   on<K extends keyof EventMap>(event: K, cb: (payload: EventMap[K]) => void): Promise<UnlistenFn>;
@@ -84,6 +94,9 @@ const tauriBackend: Backend = {
   diskGetNode: (scanId, path) => invoke<DiskNodeView>("disk_get_node", { scanId, path }),
   diskLargeFiles: (scanId, minBytes, limit) =>
     invoke<LargeFile[]>("disk_large_files", { scanId, minBytes, limit }),
+  appsStartScan: () => invoke<ApplicationInfo[]>("apps_start_scan"),
+  appsGetDetail: (appId) => invoke<AppDetail>("apps_get_detail", { appId }),
+  appsRunUninstaller: (appId) => invoke<void>("apps_run_uninstaller", { appId }),
   opsList: (limit) => invoke<OperationRecord[]>("ops_list", { limit }),
   fsReveal: (path) => invoke<void>("fs_reveal", { path }),
   on: (event, cb) => listen<EventMap[typeof event]>(event, (e) => cb(e.payload)),

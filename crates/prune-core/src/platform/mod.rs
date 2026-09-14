@@ -46,17 +46,109 @@ pub struct ProtectedPaths {
     pub exact: Vec<PathBuf>,
     /// Whole trees that must never be touched, including all descendants.
     pub trees: Vec<PathBuf>,
+    /// Directories whose *direct* `.app` children may be removed (macOS `/Applications`,
+    /// `~/Applications`) even though they are outside `allowed_roots` or inside a protected
+    /// tree. Only the bundle itself qualifies, never the directory or anything inside a bundle.
+    pub app_bundle_roots: Vec<PathBuf>,
 }
 
 /// Installed application (Phase 6 – Uninstaller).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ApplicationInfo {
+    /// Stable id derived from the path (macOS) or registry key (Windows).
+    pub id: String,
     pub name: String,
+    /// Bundle path (macOS) or install location (Windows, may be empty).
     pub path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
+    /// `CFBundleIdentifier` on macOS; the registry key name on Windows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bundle_id: Option<String>,
-    pub size_bytes: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publisher: Option<String>,
+    /// `None` until measured.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size_bytes: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub modified_at: Option<chrono::DateTime<chrono::Utc>>,
+    /// Where the entry came from: `applications`, `user_applications`, `registry`.
+    pub source: String,
+    /// Apple / Microsoft system component. Listed but never removable.
+    pub is_system: bool,
+    /// Windows: the vendor uninstaller command line. `None` on macOS.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub uninstall_command: Option<String>,
+}
+
+/// Kind of data an application leaves behind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AppDataKind {
+    Application,
+    Caches,
+    ApplicationSupport,
+    Preferences,
+    Logs,
+    Containers,
+    SavedState,
+    WebKit,
+    HttpStorages,
+    LaunchAgents,
+    ApplicationScripts,
+    CrashReports,
+    LocalAppData,
+    RoamingAppData,
+}
+
+impl AppDataKind {
+    pub fn label(self) -> &'static str {
+        match self {
+            AppDataKind::Application => "Application",
+            AppDataKind::Caches => "Caches",
+            AppDataKind::ApplicationSupport => "Application Support",
+            AppDataKind::Preferences => "Preferences",
+            AppDataKind::Logs => "Logs",
+            AppDataKind::Containers => "Containers",
+            AppDataKind::SavedState => "Saved State",
+            AppDataKind::WebKit => "WebKit Storage",
+            AppDataKind::HttpStorages => "HTTP Storage",
+            AppDataKind::LaunchAgents => "Launch Agents",
+            AppDataKind::ApplicationScripts => "Application Scripts",
+            AppDataKind::CrashReports => "Crash Reports",
+            AppDataKind::LocalAppData => "Local App Data",
+            AppDataKind::RoamingAppData => "Roaming App Data",
+        }
+    }
+
+    /// Default risk of removing this kind of data.
+    pub fn risk(self) -> crate::models::RiskLevel {
+        use crate::models::RiskLevel::*;
+        match self {
+            AppDataKind::Application => Medium,
+            AppDataKind::Caches
+            | AppDataKind::Logs
+            | AppDataKind::SavedState
+            | AppDataKind::WebKit
+            | AppDataKind::HttpStorages
+            | AppDataKind::CrashReports => Safe,
+            AppDataKind::Preferences => Low,
+            AppDataKind::ApplicationSupport
+            | AppDataKind::Containers
+            | AppDataKind::LaunchAgents
+            | AppDataKind::ApplicationScripts
+            | AppDataKind::LocalAppData
+            | AppDataKind::RoamingAppData => Medium,
+        }
+    }
+}
+
+/// A candidate location of application data. Only existing paths are returned.
+#[derive(Debug, Clone)]
+pub struct RelatedPath {
+    pub kind: AppDataKind,
+    pub path: PathBuf,
 }
 
 /// Login / startup item (Phase 7 – Startup Manager).
@@ -75,9 +167,15 @@ pub trait PlatformService: Send + Sync {
     fn platform(&self) -> Platform;
     fn known_paths(&self) -> KnownPaths;
     fn protected_paths(&self, known: &KnownPaths) -> ProtectedPaths;
-    /// Phase 6. Default implementation reports "not implemented".
-    fn applications(&self) -> Result<Vec<ApplicationInfo>> {
+    /// Installed applications without sizes (fast). Default: not implemented.
+    fn applications(&self, known: &KnownPaths) -> Result<Vec<ApplicationInfo>> {
+        let _ = known;
         Err(crate::PruneError::NotImplemented("applications"))
+    }
+    /// Existing locations where `app` keeps data outside its bundle / install dir.
+    fn app_related_paths(&self, app: &ApplicationInfo, known: &KnownPaths) -> Vec<RelatedPath> {
+        let _ = (app, known);
+        Vec::new()
     }
     /// Phase 7. Default implementation reports "not implemented".
     fn startup_items(&self) -> Result<Vec<StartupItem>> {

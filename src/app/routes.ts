@@ -36,7 +36,7 @@ export const ROUTES: Route[] = [
     label: "Uninstaller",
     icon: PackageMinus,
     phase: 6,
-    ready: false,
+    ready: true,
     shortcut: "3",
   },
   { id: "disk", label: "Disk", icon: HardDrive, phase: 5, ready: true, shortcut: "4" },

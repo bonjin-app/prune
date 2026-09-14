@@ -105,6 +105,7 @@ pnpm tauri dev          # desktop app with hot reload
 pnpm dev                # UI only, in the browser, against a mock backend
 cargo run -p prune-core --example scan --release   # read-only cleanup scan in the terminal
 cargo run -p prune-core --example disk --release -- ~/Projects   # read-only disk analysis
+cargo run -p prune-core --example apps --release -- "Visual Studio Code"   # read-only app leftovers
 ```
 
 Checks:

@@ -4,6 +4,8 @@
  */
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import type {
+  AppDetail,
+  ApplicationInfo,
   CleanupPlan,
   CleanupResult,
   CleanupTarget,
@@ -286,6 +288,133 @@ function fakeResults(providerIds?: string[]): ScanResult[] {
 
 const sessions = new Map<string, ScanSession>();
 const diskScans = new Map<string, { root: string; cancelled: boolean }>();
+
+const MOCK_APPS: ApplicationInfo[] = [
+  {
+    id: "app-vscode",
+    name: "Visual Studio Code",
+    path: "/Applications/Visual Studio Code.app",
+    version: "1.104.0",
+    bundleId: "com.microsoft.VSCode",
+    source: "applications",
+    isSystem: false,
+  },
+  {
+    id: "app-docker",
+    name: "Docker",
+    path: "/Applications/Docker.app",
+    version: "4.44.1",
+    bundleId: "com.docker.docker",
+    source: "applications",
+    isSystem: false,
+  },
+  {
+    id: "app-xcode",
+    name: "Xcode",
+    path: "/Applications/Xcode.app",
+    version: "26.0",
+    bundleId: "com.apple.dt.Xcode",
+    source: "applications",
+    isSystem: true,
+  },
+  {
+    id: "app-slack",
+    name: "Slack",
+    path: "/Applications/Slack.app",
+    version: "4.45.64",
+    bundleId: "com.tinyspeck.slackmacgap",
+    source: "applications",
+    isSystem: false,
+  },
+  {
+    id: "app-spotify",
+    name: "Spotify",
+    path: "/Applications/Spotify.app",
+    version: "1.2.70",
+    bundleId: "com.spotify.client",
+    source: "applications",
+    isSystem: false,
+  },
+  {
+    id: "app-figma",
+    name: "Figma",
+    path: `${HOME}/Applications/Figma.app`,
+    version: "125.3",
+    bundleId: "com.figma.Desktop",
+    source: "user_applications",
+    isSystem: false,
+  },
+  {
+    id: "app-safari",
+    name: "Safari",
+    path: "/Applications/Safari.app",
+    version: "26.0",
+    bundleId: "com.apple.Safari",
+    source: "applications",
+    isSystem: true,
+  },
+];
+const MOCK_APP_SIZES: Record<string, number> = {
+  "app-vscode": 620e6,
+  "app-docker": 1.9e9,
+  "app-xcode": 31e9,
+  "app-slack": 410e6,
+  "app-spotify": 380e6,
+  "app-figma": 290e6,
+  "app-safari": 30e6,
+};
+
+function mockAppDetail(app: ApplicationInfo): AppDetail {
+  const lib = `${HOME}/Library`;
+  const bid = app.bundleId ?? app.name;
+  const t = (
+    kind: AppDetail["items"][number]["kind"],
+    label: string,
+    path: string,
+    size: number,
+    risk: CleanupTarget["risk"],
+  ) => ({
+    kind,
+    kindLabel: label,
+    target: {
+      id: `${app.id}:${kind}`,
+      providerId: "uninstaller",
+      path,
+      kind: "directory" as const,
+      sizeBytes: size,
+      fileCount: Math.max(1, Math.round(size / 60_000)),
+      risk,
+      label: path.split("/").pop() ?? path,
+      description: label,
+      permanentOnly: false,
+      modifiedAt: new Date(Date.now() - 5 * 86400e3).toISOString(),
+    },
+  });
+  const size = MOCK_APP_SIZES[app.id] ?? 200e6;
+  const items = [
+    t("application", "Application", app.path, size, app.isSystem ? "protected" : "medium"),
+    t("caches", "Caches", `${lib}/Caches/${bid}`, size * 0.6, "safe"),
+    t(
+      "application_support",
+      "Application Support",
+      `${lib}/Application Support/${app.name === "Visual Studio Code" ? "Code" : bid}`,
+      size * 0.9,
+      "medium",
+    ),
+    t("preferences", "Preferences", `${lib}/Preferences/${bid}.plist`, 12e3, "low"),
+    t(
+      "saved_state",
+      "Saved State",
+      `${lib}/Saved Application State/${bid}.savedState`,
+      240e3,
+      "safe",
+    ),
+    t("web_kit", "WebKit Storage", `${lib}/WebKit/${bid}`, 8e6, "safe"),
+    t("logs", "Logs", `${lib}/Logs/${app.name}`, 30e6, "safe"),
+  ];
+  const totalBytes = items.reduce((a, i) => a + i.target.sizeBytes, 0);
+  return { app: { ...app, sizeBytes: size }, items, totalBytes, leftoverBytes: totalBytes - size };
+}
 
 function mockLargeFiles(root: string): LargeFile[] {
   const gb = 1e9;
@@ -770,6 +899,60 @@ export const mockBackend: Backend = {
     return mockLargeFiles(d.root)
       .filter((f) => f.sizeBytes >= minBytes && removed.has(f.targetId))
       .slice(0, limit);
+  },
+  async appsStartScan() {
+    const id = `apps-${Date.now()}`;
+    MOCK_APPS.forEach((a, i) => {
+      setTimeout(
+        () => {
+          emit("prune://apps-progress", {
+            scanId: id,
+            done: i + 1,
+            total: MOCK_APPS.length,
+            app: { ...a, sizeBytes: MOCK_APP_SIZES[a.id] },
+          });
+          if (i === MOCK_APPS.length - 1)
+            emit(
+              "prune://apps-completed",
+              MOCK_APPS.map((x) => ({ ...x, sizeBytes: MOCK_APP_SIZES[x.id] })),
+            );
+        },
+        150 * (i + 1),
+      );
+    });
+    return MOCK_APPS;
+  },
+  async appsGetDetail(appId) {
+    const app = MOCK_APPS.find((a) => a.id === appId);
+    if (!app) throw { code: "unknown_app", message: appId };
+    await new Promise((r) => setTimeout(r, 250));
+    const detail = mockAppDetail(app);
+    const sid = `app:${appId}`;
+    const targets = detail.items.map((i) => i.target);
+    sessions.set(sid, {
+      id: sid,
+      status: "completed",
+      startedAt: new Date().toISOString(),
+      finishedAt: new Date().toISOString(),
+      results: [
+        {
+          providerId: "uninstaller",
+          providerName: `Uninstall ${app.name}`,
+          category: "applications",
+          targets,
+          totalBytes: detail.totalBytes,
+          totalFiles: targets.length,
+          durationMs: 0,
+          issues: [],
+        },
+      ],
+      totalBytes: detail.totalBytes,
+      totalFiles: targets.length,
+    });
+    return detail;
+  },
+  async appsRunUninstaller() {
+    throw { code: "not_implemented", message: "vendor uninstallers exist only on Windows" };
   },
   async opsList(limit = 50) {
     return ops.slice(0, limit);

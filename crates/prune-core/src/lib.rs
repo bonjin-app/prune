@@ -26,6 +26,7 @@
 //! scan, which are resolved to paths inside the engine and validated again right before removal.
 
 pub mod analyzer;
+pub mod apps;
 pub mod engine;
 pub mod error;
 pub mod fs;

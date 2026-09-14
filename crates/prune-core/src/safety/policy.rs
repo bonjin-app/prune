@@ -21,6 +21,7 @@ pub struct SafetyPolicy {
     allowed_roots: Vec<PathBuf>,
     exact: Vec<PathBuf>,
     trees: Vec<PathBuf>,
+    app_bundle_roots: Vec<PathBuf>,
 }
 
 impl SafetyPolicy {
@@ -36,6 +37,7 @@ impl SafetyPolicy {
             allowed_roots: norm(protected.allowed_roots),
             exact: norm(protected.exact),
             trees: norm(protected.trees),
+            app_bundle_roots: norm(protected.app_bundle_roots),
         }
     }
 
@@ -47,6 +49,9 @@ impl SafetyPolicy {
     /// 3. must be inside one of the allowed roots, and not *be* an allowed root
     /// 4. must not be an exact-protected path or an ancestor of one
     /// 5. must not be inside a protected tree
+    ///
+    /// Exception: a `.app` bundle directly inside one of the `app_bundle_roots` passes after
+    /// rule 2, so user-installed applications can be uninstalled.
     pub fn validate(&self, path: &Path) -> Result<ValidatedPath> {
         if !path.is_absolute() {
             return Err(PruneError::safety(path, "path must be absolute"));
@@ -72,6 +77,12 @@ impl SafetyPolicy {
         let _ = meta;
 
         let normalized = normalize_existing(path)?;
+
+        // Application bundles directly inside an app root (e.g. `/Applications/Foo.app`) are
+        // removable even though `/Applications` itself is a protected tree.
+        if self.is_app_bundle(&normalized) {
+            return Ok(ValidatedPath { normalized });
+        }
 
         let inside_allowed = self
             .allowed_roots
@@ -103,6 +114,15 @@ impl SafetyPolicy {
         }
 
         Ok(ValidatedPath { normalized })
+    }
+
+    fn is_app_bundle(&self, normalized: &Path) -> bool {
+        let Some(parent) = normalized.parent() else {
+            return false;
+        };
+        normalized.extension().is_some_and(|e| e == "app")
+            && self.app_bundle_roots.iter().any(|root| root == parent)
+            && std::fs::symlink_metadata(normalized).is_ok_and(|m| m.is_dir())
     }
 
     /// `true` when the path would be refused. Convenience for risk classification.
@@ -171,6 +191,7 @@ mod tests {
             allowed_roots: vec![home.clone()],
             exact: vec![home.clone(), home.join("Library"), home.join("Documents")],
             trees: vec![home.join(".ssh"), root.join("system")],
+            app_bundle_roots: vec![],
         });
         (dir, policy)
     }
@@ -223,6 +244,25 @@ mod tests {
         let (dir, policy) = sandbox();
         std::fs::create_dir_all(dir.path().join("elsewhere/x")).unwrap();
         assert!(policy.validate(&dir.path().join("elsewhere/x")).is_err());
+    }
+
+    #[test]
+    fn app_bundle_rule_allows_only_direct_app_children() {
+        let dir = tempfile::tempdir().unwrap();
+        let apps = dir.path().join("Applications");
+        std::fs::create_dir_all(apps.join("Foo.app/Contents")).unwrap();
+        std::fs::create_dir_all(apps.join("Utilities/Bar.app")).unwrap();
+        let policy = SafetyPolicy::from_protected(ProtectedPaths {
+            allowed_roots: vec![dir.path().join("home")],
+            exact: vec![],
+            trees: vec![apps.clone()],
+            app_bundle_roots: vec![apps.clone()],
+        });
+        assert!(policy.validate(&apps.join("Foo.app")).is_ok());
+        assert!(policy.validate(&apps).is_err());
+        assert!(policy.validate(&apps.join("Foo.app/Contents")).is_err());
+        assert!(policy.validate(&apps.join("Utilities")).is_err());
+        assert!(policy.validate(&apps.join("Utilities/Bar.app")).is_err());
     }
 
     #[test]

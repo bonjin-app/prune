@@ -14,7 +14,8 @@ export type Category =
   | "trash"
   | "developer_files"
   | "old_installers"
-  | "large_files";
+  | "large_files"
+  | "applications";
 
 export type DeleteMode = "trash" | "permanent";
 
@@ -222,6 +223,7 @@ export const CATEGORY_LABEL: Record<Category, string> = {
   developer_files: "Developer Files",
   old_installers: "Old Installers",
   large_files: "Large Files",
+  applications: "Applications",
 };
 
 export const RISK_LABEL: Record<RiskLevel, string> = {
@@ -301,4 +303,56 @@ export interface DiskSummary {
   issueCount: number;
   topExtensions: ExtensionStat[];
   startedAt: string;
+}
+
+// ---- Uninstaller (crates/prune-core/src/apps, platform::ApplicationInfo) ----
+
+export interface ApplicationInfo {
+  id: string;
+  name: string;
+  path: string;
+  version?: string;
+  bundleId?: string;
+  publisher?: string;
+  sizeBytes?: number;
+  modifiedAt?: string;
+  source: string;
+  isSystem: boolean;
+  uninstallCommand?: string;
+}
+
+export type AppDataKind =
+  | "application"
+  | "caches"
+  | "application_support"
+  | "preferences"
+  | "logs"
+  | "containers"
+  | "saved_state"
+  | "web_kit"
+  | "http_storages"
+  | "launch_agents"
+  | "application_scripts"
+  | "crash_reports"
+  | "local_app_data"
+  | "roaming_app_data";
+
+export interface AppDataItem {
+  kind: AppDataKind;
+  kindLabel: string;
+  target: CleanupTarget;
+}
+
+export interface AppDetail {
+  app: ApplicationInfo;
+  items: AppDataItem[];
+  totalBytes: number;
+  leftoverBytes: number;
+}
+
+export interface AppsProgress {
+  scanId: string;
+  done: number;
+  total: number;
+  app: ApplicationInfo;
 }

@@ -53,6 +53,7 @@ impl PlatformService for GenericPlatform {
                 home.join(".ssh"),
                 home.join(".gnupg"),
             ],
+            app_bundle_roots: vec![],
         }
     }
 }

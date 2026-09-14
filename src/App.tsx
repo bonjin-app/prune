@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Shell } from "./app/Shell";
 import { CommandPalette } from "./features/palette/CommandPalette";
+import { bindAppsEvents } from "./stores/apps";
 import { bindDiskEvents } from "./stores/disk";
 import { bindScanEvents, useScan } from "./stores/scan";
 import { useSystem } from "./stores/system";
@@ -17,6 +18,7 @@ export default function App() {
     const unbinders: (() => void)[] = [];
     void bindScanEvents().then((u) => unbinders.push(u));
     void bindDiskEvents().then((u) => unbinders.push(u));
+    void bindAppsEvents().then((u) => unbinders.push(u));
     return () => unbinders.forEach((u) => u());
   }, [loadStatic, loadProviders]);
 
