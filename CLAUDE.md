@@ -13,6 +13,7 @@ cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
 cargo run -p prune-core --example scan --release   # read-only real scan
 cargo run -p prune-core --example disk --release -- ~/Projects
 cargo run -p prune-core --example apps --release -- "Visual Studio Code"
+cargo run -p prune-core --example startup --release
 ```
 
 ## Hard rules

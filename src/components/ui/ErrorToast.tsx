@@ -2,6 +2,7 @@ import { AlertTriangle, X } from "lucide-react";
 import { useApps } from "@/stores/apps";
 import { useDisk } from "@/stores/disk";
 import { useScan } from "@/stores/scan";
+import { useStartup } from "@/stores/startup";
 import { useSystem } from "@/stores/system";
 
 export function ErrorToast() {
@@ -12,7 +13,9 @@ export function ErrorToast() {
   const clearDisk = useDisk((s) => s.clearError);
   const appsError = useApps((s) => s.error);
   const clearApps = useApps((s) => s.clearError);
-  const message = scanError ?? diskError ?? appsError ?? systemError;
+  const startupError = useStartup((s) => s.error);
+  const clearStartup = useStartup((s) => s.clearError);
+  const message = scanError ?? diskError ?? appsError ?? startupError ?? systemError;
   if (!message) return null;
   return (
     <div className="fade-in fixed right-4 bottom-4 z-50 flex max-w-[420px] items-start gap-2.5 rounded-lg border border-danger/30 bg-surface px-3 py-2.5 shadow-lg">
@@ -27,6 +30,7 @@ export function ErrorToast() {
           clearScan();
           clearDisk();
           clearApps();
+          clearStartup();
           useSystem.setState({ error: null });
         }}
         className="rounded p-0.5 text-fg-faint hover:text-fg"

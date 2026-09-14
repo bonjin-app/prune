@@ -151,15 +151,57 @@ pub struct RelatedPath {
     pub path: PathBuf,
 }
 
-/// Login / startup item (Phase 7 – Startup Manager).
+/// Who a startup item belongs to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StartupScope {
+    /// Runs for this user only, and can be changed without administrator rights.
+    User,
+    /// Installed for every user. Changing it needs administrator rights, so Prune shows it
+    /// read-only rather than asking for a password.
+    System,
+}
+
+/// When an item actually runs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StartupTrigger {
+    /// Starts at login / boot.
+    AtLogin,
+    /// Restarted whenever it exits.
+    KeepAlive,
+    /// Runs on a timer.
+    Scheduled,
+    /// Only starts when something asks for it (sockets, file watches, XPC).
+    OnDemand,
+}
+
+/// A program that starts by itself (Phase 7 – Startup Manager).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StartupItem {
+    /// Stable id derived from the source and the item's location.
     pub id: String,
+    /// Human-readable name.
     pub name: String,
+    /// launchd label (macOS) or registry value name (Windows).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    /// The plist, shortcut or registry key that defines the item.
     pub path: String,
+    /// The program that gets executed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<String>,
     pub enabled: bool,
+    /// `launch_agent`, `launch_daemon`, `registry_run`, `startup_folder`.
     pub source: String,
+    pub scope: StartupScope,
+    pub trigger: StartupTrigger,
+    /// Whether Prune can change this item without administrator rights.
+    pub can_toggle: bool,
+    /// Why it cannot be toggled, when `can_toggle` is false.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
 }
 
 /// The contract every supported OS implements.
@@ -177,9 +219,15 @@ pub trait PlatformService: Send + Sync {
         let _ = (app, known);
         Vec::new()
     }
-    /// Phase 7. Default implementation reports "not implemented".
-    fn startup_items(&self) -> Result<Vec<StartupItem>> {
+    /// Programs that start by themselves. Default: not implemented.
+    fn startup_items(&self, known: &KnownPaths) -> Result<Vec<StartupItem>> {
+        let _ = known;
         Err(crate::PruneError::NotImplemented("startup_items"))
+    }
+    /// Enable or disable a startup item. Never deletes anything; the change is reversible.
+    fn set_startup_enabled(&self, item: &StartupItem, enabled: bool) -> Result<()> {
+        let _ = (item, enabled);
+        Err(crate::PruneError::NotImplemented("set_startup_enabled"))
     }
 }
 

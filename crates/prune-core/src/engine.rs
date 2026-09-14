@@ -70,6 +70,20 @@ impl PruneEngine {
         crate::apps::list(self.platform.as_ref(), &self.known)
     }
 
+    /// Programs that start by themselves.
+    pub fn startup_items(&self) -> Result<Vec<crate::platform::StartupItem>> {
+        self.platform.startup_items(&self.known)
+    }
+
+    /// Enable or disable a startup item. Reversible; nothing is deleted.
+    pub fn set_startup_enabled(
+        &self,
+        item: &crate::platform::StartupItem,
+        enabled: bool,
+    ) -> Result<()> {
+        self.platform.set_startup_enabled(item, enabled)
+    }
+
     /// Application bundle plus leftovers, measured and risk-classified.
     pub fn app_detail(
         &self,

@@ -59,6 +59,8 @@ pub fn run() {
             commands::apps_start_scan,
             commands::apps_get_detail,
             commands::apps_run_uninstaller,
+            commands::startup_list,
+            commands::startup_set_enabled,
             commands::ops_list,
             commands::fs_reveal,
         ])

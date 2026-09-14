@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use prune_core::analyzer::DiskAnalysis;
 use prune_core::models::{CleanupPlan, ScanSession};
 use prune_core::ops::OperationLog;
-use prune_core::platform::ApplicationInfo;
+use prune_core::platform::{ApplicationInfo, StartupItem};
 use prune_core::system::SystemMonitor;
 use prune_core::PruneEngine;
 
@@ -39,6 +39,7 @@ pub struct AppState {
     pub plans: Mutex<HashMap<String, CleanupPlan>>,
     pub disks: Mutex<HashMap<String, DiskEntry>>,
     pub apps: Mutex<AppsState>,
+    pub startup: Mutex<Vec<StartupItem>>,
 }
 
 impl AppState {
@@ -54,6 +55,7 @@ impl AppState {
             plans: Mutex::new(HashMap::new()),
             disks: Mutex::new(HashMap::new()),
             apps: Mutex::new(AppsState::default()),
+            startup: Mutex::new(Vec::new()),
         })
     }
 }

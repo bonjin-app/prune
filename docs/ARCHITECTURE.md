@@ -35,11 +35,11 @@ prune/
 │   │   ├── ops/               OperationLog (JSONL)
 │   │   ├── platform/          PlatformService trait; macos/, windows/, generic/
 │   │   └── system/            SystemMonitor (sysinfo)
-│   ├── examples/{scan,disk,apps}.rs read-only CLI prototypes
+│   ├── examples/{scan,disk,apps,startup}.rs  read-only CLI prototypes
 │   └── tests/pipeline.rs      end-to-end against a sandboxed fake home
 ├── src-tauri/                 Tauri shell
-│   ├── src/commands/          app, system, cleaner, disk, apps, ops, fs
-│   ├── src/state.rs           AppState: engine, monitor, ops, scans, plans, disks, apps
+│   ├── src/commands/          app, system, cleaner, disk, apps, startup, ops, fs
+│   ├── src/state.rs           AppState: engine, monitor, ops, scans, plans, disks, apps, startup
 │   ├── tauri.conf.json        window, CSP, bundle
 │   └── capabilities/          core permissions only (no shell / fs / http plugins)
 └── src/                       React UI
@@ -180,6 +180,27 @@ vendor's own uninstaller; Prune never runs it silently.
 `app_bundle_roots`, and a path passes validation when it is a directory ending in `.app` whose
 **parent is exactly** one of those roots. `/Applications` itself, `/Applications/Utilities`,
 nested bundles and anything _inside_ a bundle stay refused.
+
+## 5d. Startup manager
+
+macOS reads `~/Library/LaunchAgents`, `/Library/LaunchAgents` and `/Library/LaunchDaemons`.
+The plist supplies the label, the program and the trigger (`RunAtLoad`, `KeepAlive`,
+`StartInterval` → at login / always running / scheduled / on demand), but the _effective_ state
+comes from launchd's per-user override database, read with
+`launchctl print-disabled gui/<uid>`. Toggling runs `launchctl enable|disable`, which writes
+only to that database: the plist is never edited, nothing is deleted, running processes are not
+killed, and the change applies at the next login. Applications registered through
+`SMAppService` (macOS Login Items) live in a SIP-protected database and are deliberately not
+reported rather than shown with a state Prune cannot verify.
+
+Windows reads the `Run` keys (HKCU, HKLM, and the WOW6432Node mirror) and the per-user and
+common Start Menu `Startup` folders. The enabled flag and the toggle both use
+`StartupApproved`, the same per-user database Task Manager writes: the original `Run` value or
+shortcut is untouched.
+
+Items installed for all users (system launch agents and daemons, HKLM keys, the common Startup
+folder) need administrator rights, so they are listed with `can_toggle: false` and a reason
+instead of prompting for a password.
 
 ## 6. Tauri layer
 

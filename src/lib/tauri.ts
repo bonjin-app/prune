@@ -25,6 +25,7 @@ import type {
   ProviderInfo,
   ScanProgress,
   ScanSession,
+  StartupItem,
   SystemInfo,
   SystemSnapshot,
 } from "@/types/models";
@@ -71,6 +72,8 @@ export interface Backend {
   appsStartScan(): Promise<ApplicationInfo[]>;
   appsGetDetail(appId: string): Promise<AppDetail>;
   appsRunUninstaller(appId: string): Promise<void>;
+  startupList(): Promise<StartupItem[]>;
+  startupSetEnabled(itemId: string, enabled: boolean): Promise<StartupItem>;
   opsList(limit?: number): Promise<OperationRecord[]>;
   fsReveal(path: string): Promise<void>;
   on<K extends keyof EventMap>(event: K, cb: (payload: EventMap[K]) => void): Promise<UnlistenFn>;
@@ -97,6 +100,9 @@ const tauriBackend: Backend = {
   appsStartScan: () => invoke<ApplicationInfo[]>("apps_start_scan"),
   appsGetDetail: (appId) => invoke<AppDetail>("apps_get_detail", { appId }),
   appsRunUninstaller: (appId) => invoke<void>("apps_run_uninstaller", { appId }),
+  startupList: () => invoke<StartupItem[]>("startup_list"),
+  startupSetEnabled: (itemId, enabled) =>
+    invoke<StartupItem>("startup_set_enabled", { itemId, enabled }),
   opsList: (limit) => invoke<OperationRecord[]>("ops_list", { limit }),
   fsReveal: (path) => invoke<void>("fs_reveal", { path }),
   on: (event, cb) => listen<EventMap[typeof event]>(event, (e) => cb(e.payload)),

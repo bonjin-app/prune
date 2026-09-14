@@ -15,7 +15,8 @@ All notable changes to Prune are documented here. The format follows
 - Developer: npm, pnpm, Yarn, Bun, pip, uv, Gradle, Maven, Cargo, Go, NuGet, CocoaPods, Homebrew, Xcode DerivedData / Archives / Device Support, Simulator caches, and a project artifact finder (`node_modules`, `target/`, `build/`, `dist/`, Python caches, virtualenvs, …) (Phase 4, initial).
 - Disk analyzer: single-pass directory tree with drill-down, largest files with size filters, file type statistics, cancellable; large files feed the same preview → remove pipeline (Phase 5).
 - Uninstaller: application discovery (macOS `.app` bundles, Windows uninstall registry), leftover data matched by bundle identifier and bundle name, sizes measured in parallel, and removal through the same preview pipeline. System applications are listed with a protected bundle so only their leftovers can go (Phase 6).
+- Startup manager: launch agents and daemons on macOS (with launchd's override database deciding the real state), `Run` registry keys and Start Menu Startup folders on Windows. Toggling is reversible and writes only to the override database / `StartupApproved`; nothing is deleted and items shared by all users stay read-only (Phase 7).
 - Monitor: CPU per core, memory, swap, disks, top processes (read-only).
 - Preview (dry run) → confirm → remove → operation log pipeline with `Move to Trash` / `Delete permanently` modes.
 - Command palette (⌘K / Ctrl+K).
-- Read-only CLI prototypes: `cargo run -p prune-core --example scan`, `--example disk`, `--example apps`.
+- Read-only CLI prototypes: `cargo run -p prune-core --example scan`, `--example disk`, `--example apps`, `--example startup`.

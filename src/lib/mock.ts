@@ -17,6 +17,7 @@ import type {
   ProviderInfo,
   ScanResult,
   ScanSession,
+  StartupItem,
 } from "@/types/models";
 import type { Backend, EventMap } from "./tauri";
 
@@ -288,6 +289,83 @@ function fakeResults(providerIds?: string[]): ScanResult[] {
 
 const sessions = new Map<string, ScanSession>();
 const diskScans = new Map<string, { root: string; cancelled: boolean }>();
+
+const MOCK_STARTUP: StartupItem[] = [
+  {
+    id: "su-docker",
+    name: "Docker Desktop",
+    label: "com.docker.helper",
+    path: `${HOME}/Library/LaunchAgents/com.docker.helper.plist`,
+    command:
+      "/Applications/Docker.app/Contents/MacOS/Docker Desktop.app/Contents/MacOS/Docker Desktop",
+    enabled: true,
+    source: "launch_agent",
+    scope: "user",
+    trigger: "at_login",
+    canToggle: true,
+  },
+  {
+    id: "su-drive",
+    name: "Google Drive",
+    label: "com.google.drivefs",
+    path: `${HOME}/Library/LaunchAgents/com.google.drivefs.plist`,
+    command: "/Applications/Google Drive.app/Contents/MacOS/Google Drive",
+    enabled: true,
+    source: "launch_agent",
+    scope: "user",
+    trigger: "at_login",
+    canToggle: true,
+  },
+  {
+    id: "su-keystone",
+    name: "Keystone Agent",
+    label: "com.google.keystone.agent",
+    path: `${HOME}/Library/LaunchAgents/com.google.keystone.agent.plist`,
+    command: `${HOME}/Library/Google/GoogleSoftwareUpdate/GoogleSoftwareUpdate.bundle/Contents/MacOS/GoogleSoftwareUpdateAgent`,
+    enabled: true,
+    source: "launch_agent",
+    scope: "user",
+    trigger: "scheduled",
+    canToggle: true,
+  },
+  {
+    id: "su-spotify",
+    name: "Spotify Web Helper",
+    label: "com.spotify.webhelper",
+    path: `${HOME}/Library/LaunchAgents/com.spotify.webhelper.plist`,
+    command: "/Applications/Spotify.app/Contents/MacOS/Spotify --autostart",
+    enabled: false,
+    source: "launch_agent",
+    scope: "user",
+    trigger: "at_login",
+    canToggle: true,
+  },
+  {
+    id: "su-adobe",
+    name: "Adobe Updater",
+    label: "com.adobe.updater",
+    path: `${HOME}/Library/LaunchAgents/com.adobe.updater.plist`,
+    command: "/Library/Application Support/Adobe/Updater/Adobe Updater",
+    enabled: true,
+    source: "launch_agent",
+    scope: "user",
+    trigger: "keep_alive",
+    canToggle: true,
+  },
+  {
+    id: "su-vendor",
+    name: "Vendor Daemon",
+    label: "com.vendor.daemon",
+    path: "/Library/LaunchDaemons/com.vendor.daemon.plist",
+    command: "/usr/local/bin/vendord",
+    enabled: true,
+    source: "launch_daemon",
+    scope: "system",
+    trigger: "keep_alive",
+    canToggle: false,
+    reason: "Installed for all users; change it with administrator rights.",
+  },
+];
 
 const MOCK_APPS: ApplicationInfo[] = [
   {
@@ -953,6 +1031,18 @@ export const mockBackend: Backend = {
   },
   async appsRunUninstaller() {
     throw { code: "not_implemented", message: "vendor uninstallers exist only on Windows" };
+  },
+  async startupList() {
+    await new Promise((r) => setTimeout(r, 200));
+    return MOCK_STARTUP;
+  },
+  async startupSetEnabled(itemId, enabled) {
+    const item = MOCK_STARTUP.find((i) => i.id === itemId);
+    if (!item) throw { code: "unknown_startup_item", message: itemId };
+    if (!item.canToggle) throw { code: "other", message: item.reason ?? "cannot be changed" };
+    await new Promise((r) => setTimeout(r, 150));
+    item.enabled = enabled;
+    return item;
   },
   async opsList(limit = 50) {
     return ops.slice(0, limit);

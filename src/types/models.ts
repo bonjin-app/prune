@@ -356,3 +356,37 @@ export interface AppsProgress {
   total: number;
   app: ApplicationInfo;
 }
+
+// ---- Startup manager (crates/prune-core/src/platform::StartupItem) ----
+
+export type StartupScope = "user" | "system";
+
+export type StartupTrigger = "at_login" | "keep_alive" | "scheduled" | "on_demand";
+
+export interface StartupItem {
+  id: string;
+  name: string;
+  label?: string;
+  path: string;
+  command?: string;
+  enabled: boolean;
+  source: string;
+  scope: StartupScope;
+  trigger: StartupTrigger;
+  canToggle: boolean;
+  reason?: string;
+}
+
+export const STARTUP_TRIGGER_LABEL: Record<StartupTrigger, string> = {
+  at_login: "At login",
+  keep_alive: "Always running",
+  scheduled: "On a schedule",
+  on_demand: "On demand",
+};
+
+export const STARTUP_SOURCE_LABEL: Record<string, string> = {
+  launch_agent: "Launch agent",
+  launch_daemon: "Launch daemon",
+  registry_run: "Registry",
+  startup_folder: "Startup folder",
+};
