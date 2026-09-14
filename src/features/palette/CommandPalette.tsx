@@ -98,9 +98,7 @@ export function CommandPalette() {
             {[...ROUTES, SETTINGS_ROUTE].map((r) => (
               <Item key={r.id} onSelect={run(() => setView(r.id))}>
                 <r.icon size={14} /> {r.label}
-                {!r.ready && (
-                  <span className="ml-auto text-[11px] text-fg-faint">Phase {r.phase}</span>
-                )}
+                <span className="ml-auto text-[11px] text-fg-faint">⌘{r.shortcut}</span>
               </Item>
             ))}
           </Command.Group>

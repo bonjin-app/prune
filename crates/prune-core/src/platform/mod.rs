@@ -12,6 +12,8 @@ use crate::Result;
 
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub mod generic;
+pub mod startup_approved;
+
 #[cfg(target_os = "macos")]
 pub mod macos;
 #[cfg(target_os = "windows")]
@@ -176,6 +178,42 @@ pub enum StartupTrigger {
     OnDemand,
 }
 
+/// Whether a permission has been granted to the running process.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PermissionState {
+    Granted,
+    Denied,
+    /// The OS has no such permission, so nothing is missing.
+    NotApplicable,
+}
+
+/// What the running process is and is not allowed to read.
+///
+/// Without this, a scan silently under-reports: macOS refuses `~/.Trash`, Safari's data and a
+/// few other locations to processes without Full Disk Access, and the user sees a smaller
+/// number with no explanation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Permissions {
+    pub full_disk_access: PermissionState,
+    /// Human-readable names of locations that were refused, for the UI to list.
+    pub blocked: Vec<String>,
+    /// Short instruction for granting it, or `None` when nothing is missing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub how_to_grant: Option<String>,
+}
+
+impl Permissions {
+    pub fn not_applicable() -> Self {
+        Self {
+            full_disk_access: PermissionState::NotApplicable,
+            blocked: Vec::new(),
+            how_to_grant: None,
+        }
+    }
+}
+
 /// A program that starts by itself (Phase 7 – Startup Manager).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -218,6 +256,15 @@ pub trait PlatformService: Send + Sync {
     fn app_related_paths(&self, app: &ApplicationInfo, known: &KnownPaths) -> Vec<RelatedPath> {
         let _ = (app, known);
         Vec::new()
+    }
+    /// What the process may read. Cheap: a few `read_dir` probes.
+    fn permissions(&self, known: &KnownPaths) -> Permissions {
+        let _ = known;
+        Permissions::not_applicable()
+    }
+    /// Opens the OS settings pane where the missing permission is granted.
+    fn open_privacy_settings(&self) -> Result<()> {
+        Err(crate::PruneError::NotImplemented("open_privacy_settings"))
     }
     /// Programs that start by themselves. Default: not implemented.
     fn startup_items(&self, known: &KnownPaths) -> Result<Vec<StartupItem>> {

@@ -21,6 +21,7 @@ import type {
   DiskSummary,
   LargeFile,
   OperationRecord,
+  Permissions,
   ProcessInfo,
   ProviderInfo,
   ScanProgress,
@@ -55,6 +56,8 @@ export interface EventMap {
 
 export interface Backend {
   appGetMeta(): Promise<AppMeta>;
+  appGetPermissions(): Promise<Permissions>;
+  appOpenPrivacySettings(): Promise<void>;
   systemGetInfo(): Promise<SystemInfo>;
   systemGetSnapshot(): Promise<SystemSnapshot>;
   systemListProcesses(limit?: number): Promise<ProcessInfo[]>;
@@ -81,6 +84,8 @@ export interface Backend {
 
 const tauriBackend: Backend = {
   appGetMeta: () => invoke<AppMeta>("app_get_meta"),
+  appGetPermissions: () => invoke<Permissions>("app_get_permissions"),
+  appOpenPrivacySettings: () => invoke<void>("app_open_privacy_settings"),
   systemGetInfo: () => invoke<SystemInfo>("system_get_info"),
   systemGetSnapshot: () => invoke<SystemSnapshot>("system_get_snapshot"),
   systemListProcesses: (limit) => invoke<ProcessInfo[]>("system_list_processes", { limit }),

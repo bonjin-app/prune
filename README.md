@@ -77,7 +77,36 @@ Protected   never removable through Prune
 
 ## Screenshots
 
-_Coming with the first release._
+<p align="center">
+  <img src="docs/screenshots/dashboard.png" width="880" alt="Dashboard: storage, memory and CPU with reclaimable space by category" />
+</p>
+
+<table>
+  <tr>
+    <td width="50%">
+      <img src="docs/screenshots/developer.png" alt="Developer: package manager caches and project artifacts with risk levels" /><br />
+      <sub><b>Developer</b> — tool caches and project artifacts, each with a risk level</sub>
+    </td>
+    <td width="50%">
+      <img src="docs/screenshots/disk.png" alt="Disk: largest files with size filters" /><br />
+      <sub><b>Disk</b> — folder sizes, largest files, file types</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <img src="docs/screenshots/uninstaller.png" alt="Uninstaller: an application with its caches, preferences and containers" /><br />
+      <sub><b>Uninstaller</b> — the app plus everything it left behind</sub>
+    </td>
+    <td width="50%">
+      <img src="docs/screenshots/monitor.png" alt="Monitor: per-core CPU, memory, disks and top processes" /><br />
+      <sub><b>Monitor</b> — per-core CPU, memory, disks, processes</sub>
+    </td>
+  </tr>
+</table>
+
+<sub>Captured from `pnpm dev`, which runs the interface against built-in sample data so the
+screenshots do not expose a real machine. The numbers shown are made up; everything else is the
+real interface.</sub>
 
 ## Supported Platforms
 

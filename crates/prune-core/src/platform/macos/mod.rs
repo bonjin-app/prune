@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
 use super::{
-    existing, existing_project_roots, AppDataKind, ApplicationInfo, KnownPaths, PlatformService,
-    ProtectedPaths, RelatedPath, StartupItem,
+    existing, existing_project_roots, AppDataKind, ApplicationInfo, KnownPaths, PermissionState,
+    Permissions, PlatformService, ProtectedPaths, RelatedPath, StartupItem,
 };
 use crate::models::Platform;
 use crate::Result;
@@ -23,6 +23,53 @@ impl PlatformService for MacosPlatform {
 
     fn app_related_paths(&self, app: &ApplicationInfo, known: &KnownPaths) -> Vec<RelatedPath> {
         apps::related_paths(app, known)
+    }
+
+    fn permissions(&self, known: &KnownPaths) -> Permissions {
+        // macOS refuses these to any process without Full Disk Access. Probing is a plain
+        // `read_dir`; it never prompts and never reads any content.
+        let probes: [(&str, PathBuf); 4] = [
+            ("Trash", known.home.join(".Trash")),
+            ("Safari data", known.home.join("Library/Safari")),
+            ("Mail", known.home.join("Library/Mail")),
+            ("Messages", known.home.join("Library/Messages")),
+        ];
+        let blocked: Vec<String> = probes
+            .iter()
+            .filter(|(_, path)| {
+                matches!(
+                    std::fs::read_dir(path),
+                    Err(ref e) if e.kind() == std::io::ErrorKind::PermissionDenied
+                )
+            })
+            .map(|(name, _)| (*name).to_string())
+            .collect();
+
+        if blocked.is_empty() {
+            Permissions {
+                full_disk_access: PermissionState::Granted,
+                blocked,
+                how_to_grant: None,
+            }
+        } else {
+            Permissions {
+                full_disk_access: PermissionState::Denied,
+                blocked,
+                how_to_grant: Some(
+                    "System Settings → Privacy & Security → Full Disk Access, then add Prune and \
+                     restart it."
+                        .into(),
+                ),
+            }
+        }
+    }
+
+    fn open_privacy_settings(&self) -> Result<()> {
+        std::process::Command::new("open")
+            .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")
+            .spawn()
+            .map_err(|e| crate::PruneError::io("open", e))?;
+        Ok(())
     }
 
     fn startup_items(&self, known: &KnownPaths) -> Result<Vec<StartupItem>> {

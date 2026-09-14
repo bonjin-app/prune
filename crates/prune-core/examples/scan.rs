@@ -31,6 +31,14 @@ fn main() {
     let engine = PruneEngine::new();
     let known = engine.known_paths();
     println!("Prune {} — read-only scan", prune_core::VERSION);
+    let permissions = engine.permissions();
+    if !permissions.blocked.is_empty() {
+        println!(
+            "note: cannot read {} — {}",
+            permissions.blocked.join(", "),
+            permissions.how_to_grant.clone().unwrap_or_default()
+        );
+    }
     println!("home: {}", known.home.display());
     println!("project roots: {:?}\n", known.project_roots);
 

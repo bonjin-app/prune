@@ -390,3 +390,14 @@ export const STARTUP_SOURCE_LABEL: Record<string, string> = {
   registry_run: "Registry",
   startup_folder: "Startup folder",
 };
+
+// ---- Permissions (crates/prune-core/src/platform::Permissions) ----
+
+export type PermissionState = "granted" | "denied" | "not_applicable";
+
+export interface Permissions {
+  fullDiskAccess: PermissionState;
+  /** Locations that were refused, by readable name. */
+  blocked: string[];
+  howToGrant?: string;
+}

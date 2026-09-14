@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Meter } from "@/components/ui/Meter";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { PermissionBanner } from "@/components/ui/PermissionBanner";
 import { formatBytes, formatDuration, formatPercent, formatRelative } from "@/lib/format";
 import { useScan } from "@/stores/scan";
 import { startSnapshotPolling, useSystem } from "@/stores/system";
@@ -54,6 +55,8 @@ export function DashboardView() {
             : undefined
         }
       />
+
+      <PermissionBanner />
 
       <div className="grid grid-cols-3 gap-3 px-7">
         <MetricCard

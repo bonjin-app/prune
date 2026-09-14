@@ -29,9 +29,13 @@ function NavItem({ route }: { route: Route }) {
         className={cn(active ? "text-accent" : "text-fg-faint group-hover:text-fg-muted")}
       />
       <span className="flex-1 truncate">{route.label}</span>
-      {!route.ready && (
+      {!route.ready ? (
         <span className="rounded-sm border border-line px-1 text-[10px] leading-4 text-fg-faint">
           soon
+        </span>
+      ) : (
+        <span className="text-[10px] text-fg-faint opacity-0 transition-opacity group-hover:opacity-100">
+          ⌘{route.shortcut}
         </span>
       )}
     </button>

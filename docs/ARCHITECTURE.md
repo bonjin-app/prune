@@ -209,6 +209,19 @@ Items installed for all users (system launch agents and daemons, HKLM keys, the 
 folder) need administrator rights, so they are listed with `can_toggle: false` and a reason
 instead of prompting for a password.
 
+## 5e. Permissions
+
+macOS refuses `~/.Trash`, `~/Library/Safari`, `~/Library/Mail` and `~/Library/Messages` to any
+process without Full Disk Access. A scan that hits them records an issue and moves on, which
+means the reported total is quietly smaller than the truth — unacceptable for a tool whose whole
+value is an accurate number.
+
+`PlatformService::permissions` probes those four locations with a plain `read_dir` (no prompt,
+no content read) and reports which are blocked plus how to grant access.
+`open_privacy_settings` opens the relevant pane. The UI shows a dismissible banner on the
+dashboard and above every scan, and Settings lists the state. Windows has no equivalent gate, so
+it reports `NotApplicable`.
+
 ## 6. Tauri layer
 
 Command naming: `<domain>_<verb>_<object>` in `snake_case`.
@@ -283,8 +296,8 @@ confirmation step.
 
 ## 10b. Known limitations
 
-- macOS: `~/.Trash` and Safari's cache are TCC-protected. Prune reports them as skipped until
-  the user grants Full Disk Access; we do not prompt for it yet.
+- macOS: `~/.Trash`, Safari, Mail and Messages are TCC-protected. Prune detects this and says so
+  (see §5e), but cannot read them until the user grants Full Disk Access and restarts the app.
 - Windows: Recycle Bin size is not path-based and is not reported yet.
 - Sizes are logical bytes, not on-disk blocks (APFS clones and compression make "space freed"
   slightly lower than shown).

@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { ROUTES, SETTINGS_ROUTE } from "./app/routes";
 import { Shell } from "./app/Shell";
 import { CommandPalette } from "./features/palette/CommandPalette";
 import { bindAppsEvents } from "./stores/apps";
@@ -24,9 +25,19 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey) return;
+      const key = e.key.toLowerCase();
+      if (key === "k") {
         e.preventDefault();
         setPaletteOpen(!useUi.getState().paletteOpen);
+        return;
+      }
+      // Cmd/Ctrl + digit jumps between views; Cmd/Ctrl + comma opens Settings.
+      const route = [...ROUTES, SETTINGS_ROUTE].find((r) => r.shortcut === e.key);
+      if (route) {
+        e.preventDefault();
+        useUi.getState().setPaletteOpen(false);
+        useUi.getState().setView(route.id);
       }
     };
     window.addEventListener("keydown", onKey);

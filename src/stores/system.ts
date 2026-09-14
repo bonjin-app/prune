@@ -1,10 +1,11 @@
 import { create } from "zustand";
 import { backend, errorMessage } from "@/lib/tauri";
-import type { AppMeta, ProcessInfo, SystemInfo, SystemSnapshot } from "@/types/models";
+import type { AppMeta, Permissions, ProcessInfo, SystemInfo, SystemSnapshot } from "@/types/models";
 
 interface SystemState {
   meta: AppMeta | null;
   info: SystemInfo | null;
+  permissions: Permissions | null;
   snapshot: SystemSnapshot | null;
   processes: ProcessInfo[];
   error: string | null;
@@ -16,13 +17,18 @@ interface SystemState {
 export const useSystem = create<SystemState>((set) => ({
   meta: null,
   info: null,
+  permissions: null,
   snapshot: null,
   processes: [],
   error: null,
   loadStatic: async () => {
     try {
-      const [meta, info] = await Promise.all([backend.appGetMeta(), backend.systemGetInfo()]);
-      set({ meta, info, error: null });
+      const [meta, info, permissions] = await Promise.all([
+        backend.appGetMeta(),
+        backend.systemGetInfo(),
+        backend.appGetPermissions(),
+      ]);
+      set({ meta, info, permissions, error: null });
     } catch (e) {
       set({ error: errorMessage(e) });
     }

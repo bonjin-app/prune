@@ -10,7 +10,7 @@ use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_READ, KEY_WRITE};
 use winreg::RegKey;
 
 use crate::models::CleanupTarget;
-use crate::platform::{KnownPaths, StartupItem, StartupScope, StartupTrigger};
+use crate::platform::{startup_approved, KnownPaths, StartupItem, StartupScope, StartupTrigger};
 use crate::{PruneError, Result};
 
 const RUN: &str = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
@@ -20,14 +20,14 @@ const APPROVED_RUN: &str =
 const APPROVED_FOLDER: &str =
     r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\StartupFolder";
 
-/// `StartupApproved` stores 12 bytes whose first byte is the state: even means enabled,
-/// odd (3, 9, …) means the user disabled it.
+/// Reads one entry's state from `StartupApproved`. The byte format lives in
+/// [`startup_approved`], which is unit-tested on every platform.
 fn approved_state(hive: winreg::HKEY, subkey: &str, name: &str) -> Option<bool> {
     let key = RegKey::predef(hive)
         .open_subkey_with_flags(subkey, KEY_READ)
         .ok()?;
     let value = key.get_raw_value(name).ok()?;
-    value.bytes.first().map(|b| b % 2 == 0)
+    startup_approved::is_enabled(&value.bytes)
 }
 
 fn write_approved(subkey: &str, name: &str, enabled: bool) -> Result<()> {
@@ -35,19 +35,8 @@ fn write_approved(subkey: &str, name: &str, enabled: bool) -> Result<()> {
     let (key, _) = hkcu
         .create_subkey_with_flags(subkey, KEY_READ | KEY_WRITE)
         .map_err(|e| PruneError::Other(format!("cannot open {subkey}: {e}")))?;
-    let mut bytes = key
-        .get_raw_value(name)
-        .map(|v| v.bytes)
-        .unwrap_or_else(|_| vec![0u8; 12]);
-    if bytes.len() < 12 {
-        bytes.resize(12, 0);
-    }
-    bytes[0] = if enabled { 2 } else { 3 };
-    // The trailing 8 bytes are the timestamp of the change; zeroing them is what Task Manager
-    // does for a freshly enabled entry and Windows accepts it.
-    for b in bytes.iter_mut().skip(4) {
-        *b = 0;
-    }
+    let existing = key.get_raw_value(name).map(|v| v.bytes).ok();
+    let bytes = startup_approved::with_state(existing.as_deref(), enabled);
     let value = winreg::RegValue {
         bytes,
         vtype: winreg::enums::RegType::REG_BINARY,

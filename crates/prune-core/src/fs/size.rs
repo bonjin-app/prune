@@ -10,6 +10,7 @@
 
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+#[cfg(unix)]
 use std::sync::Mutex;
 
 use rayon::prelude::*;
@@ -267,6 +268,7 @@ struct InodeSet {
     shards: Vec<Mutex<std::collections::HashSet<(u64, u64)>>>,
 }
 
+#[cfg(unix)]
 const SHARDS: usize = 64;
 
 impl InodeSet {

@@ -70,6 +70,16 @@ impl PruneEngine {
         crate::apps::list(self.platform.as_ref(), &self.known)
     }
 
+    /// What Prune is allowed to read on this machine.
+    pub fn permissions(&self) -> crate::platform::Permissions {
+        self.platform.permissions(&self.known)
+    }
+
+    /// Opens the OS privacy settings so the user can grant the missing permission.
+    pub fn open_privacy_settings(&self) -> Result<()> {
+        self.platform.open_privacy_settings()
+    }
+
     /// Programs that start by themselves.
     pub fn startup_items(&self) -> Result<Vec<crate::platform::StartupItem>> {
         self.platform.startup_items(&self.known)

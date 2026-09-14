@@ -28,6 +28,8 @@ pub mod events {
 pub fn register_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
     builder.invoke_handler(tauri::generate_handler![
         commands::app_get_meta,
+        commands::app_get_permissions,
+        commands::app_open_privacy_settings,
         commands::system_get_info,
         commands::system_get_snapshot,
         commands::system_list_processes,

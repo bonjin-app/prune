@@ -16,6 +16,7 @@ export function SettingsView() {
   const setMode = useScan((s) => s.setDeleteMode);
   const meta = useSystem((s) => s.meta);
   const info = useSystem((s) => s.info);
+  const permissions = useSystem((s) => s.permissions);
   const [ops, setOps] = useState<OperationRecord[]>([]);
 
   useEffect(() => {
@@ -124,6 +125,14 @@ export function SettingsView() {
             <dd>{info ? `${info.osName} ${info.osVersion} · ${info.arch}` : "—"}</dd>
             <dt className="text-fg-muted">Home</dt>
             <dd className="font-mono text-[11.5px]">{info?.homeDir ?? "—"}</dd>
+            <dt className="text-fg-muted">Full Disk Access</dt>
+            <dd>
+              {permissions?.fullDiskAccess === "granted"
+                ? "Granted"
+                : permissions?.fullDiskAccess === "denied"
+                  ? `Not granted — ${permissions.blocked.join(", ")} are hidden from scans`
+                  : "Not required on this platform"}
+            </dd>
             <dt className="text-fg-muted">Privacy</dt>
             <dd>100% local. No account, no telemetry, no network access.</dd>
             <dt className="text-fg-muted">Source</dt>

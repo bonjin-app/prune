@@ -613,6 +613,17 @@ export const mockBackend: Backend = {
       operationLogPath: `${HOME}/Library/Application Support/app.bonjin.prune/operations.jsonl`,
     };
   },
+  async appGetPermissions() {
+    return {
+      fullDiskAccess: "denied" as const,
+      blocked: ["Trash", "Safari data"],
+      howToGrant:
+        "System Settings → Privacy & Security → Full Disk Access, then add Prune and restart it.",
+    };
+  },
+  async appOpenPrivacySettings() {
+    console.info("[mock] open privacy settings");
+  },
   async systemGetInfo() {
     return {
       platform: "macos",

@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Ban, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { PermissionBanner } from "@/components/ui/PermissionBanner";
 import { formatBytes } from "@/lib/format";
 import { selectedTargets, sumBytes, useScan } from "@/stores/scan";
 import type { Category, ProviderInfo } from "@/types/models";
@@ -103,6 +104,8 @@ export function CleanerWorkspace({
           </Button>
         )}
       </div>
+
+      <PermissionBanner />
 
       {scanning && <ScanProgressBar providerIds={scopedIds} />}
 
