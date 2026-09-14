@@ -39,7 +39,7 @@ export const ROUTES: Route[] = [
     ready: false,
     shortcut: "3",
   },
-  { id: "disk", label: "Disk", icon: HardDrive, phase: 5, ready: false, shortcut: "4" },
+  { id: "disk", label: "Disk", icon: HardDrive, phase: 5, ready: true, shortcut: "4" },
   { id: "developer", label: "Developer", icon: Code2, phase: 4, ready: true, shortcut: "5" },
   { id: "monitor", label: "Monitor", icon: Activity, phase: 7, ready: true, shortcut: "6" },
   { id: "startup", label: "Startup", icon: Power, phase: 7, ready: false, shortcut: "7" },

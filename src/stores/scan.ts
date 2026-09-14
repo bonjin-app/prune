@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { backend, errorMessage } from "@/lib/tauri";
+import { useDisk } from "./disk";
 import type {
   Category,
   CleanupPlan,
@@ -187,8 +188,9 @@ export const useScan = create<ScanState>((set, get) => ({
         const selected = new Set([...s.selected].filter((id) => !removed.has(id)));
         return { result, executing: false, plan: null, cleanupProgress: null, session, selected };
       });
-      // The backend drops the scan after execution; keep the id only for display.
-      void scanId;
+      if (scanId === useDisk.getState().scanId || plan.scanId === useDisk.getState().scanId) {
+        void useDisk.getState().forgetRemoved([...removed]);
+      }
     } catch (e) {
       set({ executing: false, error: errorMessage(e) });
     }

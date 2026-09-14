@@ -13,6 +13,10 @@ import type {
   CleanupProgress,
   CleanupResult,
   DeleteMode,
+  DiskNodeView,
+  DiskProgress,
+  DiskSummary,
+  LargeFile,
   OperationRecord,
   ProcessInfo,
   ProviderInfo,
@@ -29,12 +33,16 @@ export const EVENTS = {
   scanProgress: "prune://scan-progress",
   scanCompleted: "prune://scan-completed",
   cleanupProgress: "prune://cleanup-progress",
+  diskProgress: "prune://disk-progress",
+  diskCompleted: "prune://disk-completed",
 } as const;
 
 export interface EventMap {
   [EVENTS.scanProgress]: ScanProgress;
   [EVENTS.scanCompleted]: ScanSession;
   [EVENTS.cleanupProgress]: CleanupProgress;
+  [EVENTS.diskProgress]: DiskProgress;
+  [EVENTS.diskCompleted]: DiskSummary;
 }
 
 export interface Backend {
@@ -48,6 +56,11 @@ export interface Backend {
   cleanerGetScan(scanId: string): Promise<ScanSession>;
   cleanerPreview(scanId: string, targetIds: string[], mode: DeleteMode): Promise<CleanupPlan>;
   cleanerExecute(planId: string): Promise<CleanupResult>;
+  diskStartScan(root?: string): Promise<string>;
+  diskCancelScan(scanId: string): Promise<void>;
+  diskGetSummary(scanId: string): Promise<DiskSummary>;
+  diskGetNode(scanId: string, path?: string): Promise<DiskNodeView>;
+  diskLargeFiles(scanId: string, minBytes: number, limit?: number): Promise<LargeFile[]>;
   opsList(limit?: number): Promise<OperationRecord[]>;
   fsReveal(path: string): Promise<void>;
   on<K extends keyof EventMap>(event: K, cb: (payload: EventMap[K]) => void): Promise<UnlistenFn>;
@@ -65,6 +78,12 @@ const tauriBackend: Backend = {
   cleanerPreview: (scanId, targetIds, mode) =>
     invoke<CleanupPlan>("cleaner_preview", { scanId, targetIds, mode }),
   cleanerExecute: (planId) => invoke<CleanupResult>("cleaner_execute", { planId }),
+  diskStartScan: (root) => invoke<string>("disk_start_scan", { root }),
+  diskCancelScan: (scanId) => invoke<void>("disk_cancel_scan", { scanId }),
+  diskGetSummary: (scanId) => invoke<DiskSummary>("disk_get_summary", { scanId }),
+  diskGetNode: (scanId, path) => invoke<DiskNodeView>("disk_get_node", { scanId, path }),
+  diskLargeFiles: (scanId, minBytes, limit) =>
+    invoke<LargeFile[]>("disk_large_files", { scanId, minBytes, limit }),
   opsList: (limit) => invoke<OperationRecord[]>("ops_list", { limit }),
   fsReveal: (path) => invoke<void>("fs_reveal", { path }),
   on: (event, cb) => listen<EventMap[typeof event]>(event, (e) => cb(e.payload)),

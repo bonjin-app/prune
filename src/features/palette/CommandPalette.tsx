@@ -1,9 +1,10 @@
 import { Command } from "cmdk";
-import { Moon, RefreshCw, Sun, SunMoon } from "lucide-react";
+import { HardDrive, Moon, RefreshCw, Sun, SunMoon } from "lucide-react";
 import { useCallback } from "react";
 import { Dialog } from "@/components/ui/Dialog";
 import { Kbd } from "@/components/ui/Kbd";
 import { ROUTES, SETTINGS_ROUTE } from "@/app/routes";
+import { useDisk } from "@/stores/disk";
 import { useScan } from "@/stores/scan";
 import { useUi } from "@/stores/ui";
 import { CLEANER_CATEGORIES, DEVELOPER_CATEGORIES } from "@/types/models";
@@ -16,6 +17,8 @@ export function CommandPalette() {
   const providers = useScan((s) => s.providers);
   const startScan = useScan((s) => s.startScan);
   const scanning = useScan((s) => s.scanning);
+  const startDisk = useDisk((s) => s.startScan);
+  const diskScanning = useDisk((s) => s.scanning);
 
   const run = useCallback(
     (fn: () => void) => () => {
@@ -69,6 +72,25 @@ export function CommandPalette() {
               disabled={scanning}
             >
               <RefreshCw size={14} /> Scan everything
+            </Item>
+            <Item
+              onSelect={run(() => {
+                setView("disk");
+                void startDisk();
+              })}
+              disabled={diskScanning}
+            >
+              <HardDrive size={14} /> Analyze disk usage
+            </Item>
+            <Item
+              onSelect={run(() => {
+                setView("disk");
+                useDisk.getState().setTab("large");
+                if (!useDisk.getState().summary) void startDisk();
+              })}
+              disabled={diskScanning}
+            >
+              <HardDrive size={14} /> Find large files
             </Item>
           </Command.Group>
 

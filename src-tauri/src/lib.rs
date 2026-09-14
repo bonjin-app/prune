@@ -15,6 +15,8 @@ pub mod events {
     pub const SCAN_PROGRESS: &str = "prune://scan-progress";
     pub const SCAN_COMPLETED: &str = "prune://scan-completed";
     pub const CLEANUP_PROGRESS: &str = "prune://cleanup-progress";
+    pub const DISK_PROGRESS: &str = "prune://disk-progress";
+    pub const DISK_COMPLETED: &str = "prune://disk-completed";
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -47,6 +49,11 @@ pub fn run() {
             commands::cleaner_get_scan,
             commands::cleaner_preview,
             commands::cleaner_execute,
+            commands::disk_start_scan,
+            commands::disk_cancel_scan,
+            commands::disk_get_summary,
+            commands::disk_get_node,
+            commands::disk_large_files,
             commands::ops_list,
             commands::fs_reveal,
         ])

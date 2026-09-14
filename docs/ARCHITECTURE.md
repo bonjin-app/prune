@@ -30,14 +30,15 @@ prune/
 │   │   │   ├── browser/       Chromium family, Firefox
 │   │   │   └── developer/     tool caches (declarative) + project artifact walker
 │   │   ├── scan/              parallel runner, progress, cancel, overlap de-dup
+│   │   ├── analyzer/          disk analyzer: directory tree, large files, extensions
 │   │   ├── ops/               OperationLog (JSONL)
 │   │   ├── platform/          PlatformService trait; macos/, windows/, generic/
 │   │   └── system/            SystemMonitor (sysinfo)
-│   ├── examples/scan.rs       read-only CLI prototype
+│   ├── examples/{scan,disk}.rs read-only CLI prototypes
 │   └── tests/pipeline.rs      end-to-end against a sandboxed fake home
 ├── src-tauri/                 Tauri shell
-│   ├── src/commands/          app, system, cleaner, ops, fs
-│   ├── src/state.rs           AppState: engine, monitor, ops, scans, plans
+│   ├── src/commands/          app, system, cleaner, disk, ops, fs
+│   ├── src/state.rs           AppState: engine, monitor, ops, scans, plans, disks
 │   ├── tauri.conf.json        window, CSP, bundle
 │   └── capabilities/          core permissions only (no shell / fs / http plugins)
 └── src/                       React UI
@@ -130,6 +131,25 @@ folders.
 - Non-fatal errors (permission denied, vanished files) become `ScanIssue`s and are shown, not
   hidden.
 
+## 5b. Disk analyzer
+
+`analyzer::analyze` walks a root once (DFS via `walkdir`) and keeps:
+
+- every **directory** as a node (name, path, size, files, dirs, own-file bytes, children) —
+  files are not stored, so memory stays proportional to the directory count;
+- the **largest files** in a bounded min-heap (2000 entries);
+- **per-extension** byte/count totals (top 40).
+
+Sizes propagate to all ancestors on every file (depth is small), hard links count once, symlinks
+are not followed. Scanning `/` skips other mounts and APFS firmlink mirrors (`/Volumes`,
+`/System/Volumes`) to avoid double counting.
+
+The analysis stays in `AppState.disks` for drill-down queries (`disk_get_node`). Large files are
+also registered as a synthetic `ScanSession` (provider `large_files`, category `LargeFiles`,
+risk `Medium`, or `Protected` when the policy refuses the path) so `cleaner_preview` /
+`cleaner_execute` handle them with no special casing. After an execution the Tauri layer calls
+`DiskAnalysis::forget_removed` so folder sizes and the large-file list reflect reality.
+
 ## 6. Tauri layer
 
 Command naming: `<domain>_<verb>_<object>` in `snake_case`.
@@ -144,7 +164,8 @@ Command naming: `<domain>_<verb>_<object>` in `snake_case`.
 | `ops_list`                                                          | operation log                                  |
 | `fs_reveal`                                                         | reveal a path in Finder / Explorer (read-only) |
 
-Events: `prune://scan-progress`, `prune://scan-completed`, `prune://cleanup-progress`.
+Events: `prune://scan-progress`, `prune://scan-completed`, `prune://cleanup-progress`,
+`prune://disk-progress`, `prune://disk-completed`.
 
 Errors cross IPC as `{ code, message }` (`CommandError`), with stable codes from
 `PruneError::code()`.

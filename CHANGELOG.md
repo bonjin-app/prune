@@ -13,7 +13,8 @@ All notable changes to Prune are documented here. The format follows
 - Dashboard with live storage / memory / CPU and potential cleanup summary (Phase 2).
 - Cleaner: application caches, logs, temporary files, Trash, old installers, Chromium-family and Firefox caches (Phase 3).
 - Developer: npm, pnpm, Yarn, Bun, pip, uv, Gradle, Maven, Cargo, Go, NuGet, CocoaPods, Homebrew, Xcode DerivedData / Archives / Device Support, Simulator caches, and a project artifact finder (`node_modules`, `target/`, `build/`, `dist/`, Python caches, virtualenvs, …) (Phase 4, initial).
+- Disk analyzer: single-pass directory tree with drill-down, largest files with size filters, file type statistics, cancellable; large files feed the same preview → remove pipeline (Phase 5).
 - Monitor: CPU per core, memory, swap, disks, top processes (read-only).
 - Preview (dry run) → confirm → remove → operation log pipeline with `Move to Trash` / `Delete permanently` modes.
 - Command palette (⌘K / Ctrl+K).
-- Read-only CLI prototype: `cargo run -p prune-core --example scan`.
+- Read-only CLI prototypes: `cargo run -p prune-core --example scan`, `--example disk`.

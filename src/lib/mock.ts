@@ -7,6 +7,10 @@ import type {
   CleanupPlan,
   CleanupResult,
   CleanupTarget,
+  DiskNode,
+  DiskNodeView,
+  DiskSummary,
+  LargeFile,
   OperationRecord,
   ProviderInfo,
   ScanResult,
@@ -281,6 +285,111 @@ function fakeResults(providerIds?: string[]): ScanResult[] {
 }
 
 const sessions = new Map<string, ScanSession>();
+const diskScans = new Map<string, { root: string; cancelled: boolean }>();
+
+function mockLargeFiles(root: string): LargeFile[] {
+  const gb = 1e9;
+  const mk = (
+    rel: string,
+    size: number,
+    ext: string,
+    risk: LargeFile["risk"] = "medium",
+  ): LargeFile => ({
+    targetId: `lf-${rel.replace(/[^a-z0-9]/gi, "_")}`,
+    path: `${root}/${rel}`,
+    name: rel.split("/").pop() ?? rel,
+    sizeBytes: size,
+    modifiedAt: new Date(Date.now() - 12 * 86400e3).toISOString(),
+    extension: ext,
+    risk,
+  });
+  return [
+    mk("Virtual Machines/Windows 11.utm/Data/disk.qcow2", 12.4 * gb, "qcow2"),
+    mk(
+      "Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw",
+      8.2 * gb,
+      "raw",
+      "protected",
+    ),
+    mk(
+      "Library/Developer/Xcode/Archives/2026-08-27/Prune.xcarchive/dSYMs/all.dSYM",
+      6.8 * gb,
+      "dsym",
+    ),
+    mk("Movies/screen-recording-2026-07-01.mov", 4.2 * gb, "mov"),
+    mk("Downloads/dataset-v3.zip", 3.8 * gb, "zip"),
+    mk("Downloads/Xcode_26.xip", 3.1 * gb, "xip"),
+    mk("Projects/ml/checkpoints/model-final.safetensors", 2.6 * gb, "safetensors"),
+    mk("Downloads/ubuntu-24.04-live-server-arm64.iso", 1.9 * gb, "iso"),
+    mk("Library/Caches/com.apple.dt.Xcode/Downloads/ios-simulator.dmg", 1.2 * gb, "dmg"),
+    mk(
+      "Pictures/Photos Library.photoslibrary/database/Photos.sqlite",
+      620e6,
+      "sqlite",
+      "protected",
+    ),
+    mk("Documents/thesis/figures/render.blend", 340e6, "blend"),
+  ];
+}
+
+function mockNode(root: string, path: string): DiskNodeView {
+  const node = (
+    name: string,
+    p: string,
+    size: number,
+    files: number,
+    dirs: number,
+    childDirs = 4,
+    own = 0,
+  ): DiskNode => ({
+    name,
+    path: p,
+    sizeBytes: size,
+    fileCount: files,
+    dirCount: dirs,
+    childDirs,
+    ownFileBytes: own,
+  });
+  const rel = path === root ? "" : path.slice(root.length + 1);
+  const crumbs: DiskNode[] = [];
+  let acc = root;
+  if (rel) {
+    crumbs.push(node(root.split("/").pop() ?? root, root, 382e9, 1_204_000, 88_000));
+    const parts = rel.split("/");
+    for (let i = 0; i < parts.length - 1; i++) {
+      acc = `${acc}/${parts[i]}`;
+      crumbs.push(node(parts[i] ?? "", acc, 184e9 / (i + 1), 500_000, 30_000));
+    }
+  }
+  const depth = rel ? rel.split("/").length : 0;
+  const scale = 1 / (depth + 1);
+  const children =
+    depth > 3
+      ? []
+      : [
+          node("Projects", `${path}/Projects`, 184e9 * scale, 820_000, 40_000),
+          node("Library", `${path}/Library`, 96e9 * scale, 300_000, 32_000),
+          node("Downloads", `${path}/Downloads`, 42e9 * scale, 1_200, 40),
+          node("Movies", `${path}/Movies`, 22e9 * scale, 140, 6),
+          node("Documents", `${path}/Documents`, 22e9 * scale, 50_000, 4_000),
+          node("Pictures", `${path}/Pictures`, 9e9 * scale, 30_000, 300),
+          node(".cache", `${path}/.cache`, 4e9 * scale, 3_000, 200),
+        ];
+  const size = children.reduce((a, c) => a + c.sizeBytes, 0) + 3e9 * scale;
+  return {
+    node: node(
+      path.split("/").pop() ?? path,
+      path,
+      size,
+      1_204_000 * scale,
+      88_000 * scale,
+      children.length,
+      3e9 * scale,
+    ),
+    children,
+    breadcrumbs: crumbs,
+  };
+}
 const plans = new Map<string, CleanupPlan>();
 const ops: OperationRecord[] = [];
 let cpu = 18;
@@ -526,6 +635,141 @@ export const mockBackend: Backend = {
       providers: [...new Set(plan.targets.map((t) => t.providerId))],
     });
     return result;
+  },
+  async diskStartScan(root) {
+    const id = `disk-${Date.now()}`;
+    const base = root && root.trim() ? root.trim() : HOME;
+    diskScans.set(id, { root: base, cancelled: false });
+    const total = 382e9;
+    for (let s = 1; s <= 6; s++) {
+      setTimeout(() => {
+        const d = diskScans.get(id);
+        if (!d || d.cancelled) return;
+        emit("prune://disk-progress", {
+          scanId: id,
+          files: Math.round((1_204_000 * s) / 6),
+          bytes: Math.round((total * s) / 6),
+          dirs: Math.round((88_000 * s) / 6),
+          currentPath: `${base}/Library/Developer/Xcode/DerivedData/item-${s}`,
+        });
+      }, 180 * s);
+    }
+    setTimeout(
+      () => {
+        const d = diskScans.get(id);
+        if (!d || d.cancelled) return;
+        const summary: DiskSummary = {
+          scanId: id,
+          root: base,
+          status: "completed",
+          totalBytes: total,
+          fileCount: 1_204_000,
+          dirCount: 88_000,
+          durationMs: 1200,
+          largeFileCount: mockLargeFiles(base).length,
+          issueCount: 2,
+          topExtensions: [
+            { extension: "(none)", bytes: 96e9, count: 402_000 },
+            { extension: "o", bytes: 61e9, count: 210_000 },
+            { extension: "dmg", bytes: 24e9, count: 60 },
+            { extension: "mov", bytes: 22e9, count: 140 },
+            { extension: "js", bytes: 18e9, count: 380_000 },
+            { extension: "png", bytes: 9e9, count: 88_000 },
+            { extension: "zip", bytes: 7e9, count: 900 },
+            { extension: "json", bytes: 5e9, count: 120_000 },
+          ],
+          startedAt: new Date().toISOString(),
+        };
+        // register large files as a session so cleanerPreview works
+        const targets = mockLargeFiles(base).map((f): CleanupTarget => ({
+          id: f.targetId,
+          providerId: "large_files",
+          path: f.path,
+          kind: "file",
+          sizeBytes: f.sizeBytes,
+          fileCount: 1,
+          risk: f.risk,
+          label: f.name,
+          description: f.extension,
+          modifiedAt: f.modifiedAt,
+          permanentOnly: false,
+        }));
+        sessions.set(id, {
+          id,
+          status: "completed",
+          startedAt: summary.startedAt,
+          finishedAt: summary.startedAt,
+          results: [
+            {
+              providerId: "large_files",
+              providerName: "Large Files",
+              category: "large_files",
+              targets,
+              totalBytes: targets.reduce((a, t) => a + t.sizeBytes, 0),
+              totalFiles: targets.length,
+              durationMs: 0,
+              issues: [],
+            },
+          ],
+          totalBytes: 0,
+          totalFiles: 0,
+        });
+        emit("prune://disk-completed", summary);
+      },
+      180 * 6 + 300,
+    );
+    return id;
+  },
+  async diskCancelScan(scanId) {
+    const d = diskScans.get(scanId);
+    if (d) {
+      d.cancelled = true;
+      emit("prune://disk-completed", {
+        scanId,
+        root: d.root,
+        status: "cancelled",
+        totalBytes: 120e9,
+        fileCount: 300_000,
+        dirCount: 20_000,
+        durationMs: 400,
+        largeFileCount: 0,
+        issueCount: 0,
+        topExtensions: [],
+        startedAt: new Date().toISOString(),
+      });
+    }
+  },
+  async diskGetSummary(scanId) {
+    const d = diskScans.get(scanId);
+    if (!d) throw { code: "unknown_scan", message: scanId };
+    return {
+      scanId,
+      root: d.root,
+      status: "completed",
+      totalBytes: 382e9,
+      fileCount: 1_204_000,
+      dirCount: 88_000,
+      durationMs: 1200,
+      largeFileCount: mockLargeFiles(d.root).length,
+      issueCount: 2,
+      topExtensions: [],
+      startedAt: new Date().toISOString(),
+    };
+  },
+  async diskGetNode(scanId, path) {
+    const d = diskScans.get(scanId);
+    if (!d) throw { code: "unknown_scan", message: scanId };
+    return mockNode(d.root, path ?? d.root);
+  },
+  async diskLargeFiles(scanId, minBytes, limit = 200) {
+    const d = diskScans.get(scanId);
+    if (!d) throw { code: "unknown_scan", message: scanId };
+    const removed = new Set(
+      sessions.get(scanId)?.results.flatMap((r) => r.targets.map((t) => t.id)) ?? [],
+    );
+    return mockLargeFiles(d.root)
+      .filter((f) => f.sizeBytes >= minBytes && removed.has(f.targetId))
+      .slice(0, limit);
   },
   async opsList(limit = 50) {
     return ops.slice(0, limit);

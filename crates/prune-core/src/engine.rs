@@ -239,11 +239,28 @@ impl PruneEngine {
             [] => "Cleanup".to_string(),
             [one] => format!(
                 "Clean {}",
-                self.registry.get(one).map(|p| p.name()).unwrap_or(one)
+                self.registry
+                    .get(one)
+                    .map(|p| p.name().to_string())
+                    .unwrap_or_else(|| humanize(one))
             ),
             many => format!("Clean {} categories", many.len()),
         }
     }
+}
+
+/// `large_files` → `Large Files`.
+fn humanize(id: &str) -> String {
+    id.split('_')
+        .map(|w| {
+            let mut c = w.chars();
+            match c.next() {
+                Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+                None => String::new(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 impl Default for PruneEngine {

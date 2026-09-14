@@ -1,8 +1,9 @@
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 
+use prune_core::analyzer::DiskAnalysis;
 use prune_core::models::{CleanupPlan, ScanSession};
 use prune_core::ops::OperationLog;
 use prune_core::system::SystemMonitor;
@@ -14,6 +15,13 @@ pub struct ScanEntry {
     pub session: Option<ScanSession>,
 }
 
+/// Bookkeeping for a disk analysis.
+pub struct DiskEntry {
+    pub cancel: Arc<AtomicBool>,
+    pub root: PathBuf,
+    pub analysis: Option<DiskAnalysis>,
+}
+
 /// Process-wide state managed by Tauri.
 pub struct AppState {
     pub engine: Arc<PruneEngine>,
@@ -21,6 +29,7 @@ pub struct AppState {
     pub ops: Arc<OperationLog>,
     pub scans: Mutex<HashMap<String, ScanEntry>>,
     pub plans: Mutex<HashMap<String, CleanupPlan>>,
+    pub disks: Mutex<HashMap<String, DiskEntry>>,
 }
 
 impl AppState {
@@ -34,6 +43,7 @@ impl AppState {
             ops: Arc::new(ops),
             scans: Mutex::new(HashMap::new()),
             plans: Mutex::new(HashMap::new()),
+            disks: Mutex::new(HashMap::new()),
         })
     }
 }

@@ -126,6 +126,8 @@ pub async fn cleaner_execute(
         .unwrap()
         .remove(&plan_id)
         .ok_or_else(|| CommandError::new("unknown_plan", plan_id.clone()))?;
+    let scan_id = plan.scan_id.clone();
+    let plan_target_ids: Vec<String> = plan.targets.iter().map(|t| t.id.clone()).collect();
     let engine = state.engine.clone();
     let ops = state.ops.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
@@ -137,12 +139,26 @@ pub async fn cleaner_execute(
     .await
     .map_err(|e| CommandError::new("join", e.to_string()))??;
 
-    // Drop the scan the plan came from: its sizes are stale now.
-    state.scans.lock().unwrap().retain(|_, e| {
-        e.session
-            .as_ref()
-            .map(|s| s.id != result.plan_id)
-            .unwrap_or(true)
-    });
+    // Forget removed targets so the stored session (and any disk analysis) reflects reality.
+    let failed: std::collections::HashSet<&str> =
+        result.failed.iter().map(|f| f.target_id.as_str()).collect();
+    let removed: Vec<String> = plan_target_ids
+        .into_iter()
+        .filter(|id| !failed.contains(id.as_str()))
+        .collect();
+    if let Some(entry) = state.scans.lock().unwrap().get_mut(&scan_id) {
+        if let Some(session) = entry.session.as_mut() {
+            for r in &mut session.results {
+                r.targets.retain(|t| !removed.contains(&t.id));
+                r.recompute_totals();
+            }
+            session.recompute_totals();
+        }
+    }
+    if let Some(entry) = state.disks.lock().unwrap().get_mut(&scan_id) {
+        if let Some(analysis) = entry.analysis.as_mut() {
+            analysis.forget_removed(&removed);
+        }
+    }
     Ok(result)
 }

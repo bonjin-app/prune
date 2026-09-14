@@ -103,7 +103,8 @@ Prerequisites: Rust stable, Node 20+, pnpm, and the
 pnpm install
 pnpm tauri dev          # desktop app with hot reload
 pnpm dev                # UI only, in the browser, against a mock backend
-cargo run -p prune-core --example scan --release   # read-only scan in the terminal
+cargo run -p prune-core --example scan --release   # read-only cleanup scan in the terminal
+cargo run -p prune-core --example disk --release -- ~/Projects   # read-only disk analysis
 ```
 
 Checks:

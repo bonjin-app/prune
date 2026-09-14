@@ -41,6 +41,7 @@ pub enum Category {
     Trash,
     DeveloperFiles,
     OldInstallers,
+    LargeFiles,
 }
 
 impl Category {
@@ -54,6 +55,7 @@ impl Category {
             Category::Trash => "Trash",
             Category::DeveloperFiles => "Developer Files",
             Category::OldInstallers => "Old Installers",
+            Category::LargeFiles => "Large Files",
         }
     }
 }

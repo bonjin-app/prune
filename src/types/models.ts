@@ -13,7 +13,8 @@ export type Category =
   | "temporary_files"
   | "trash"
   | "developer_files"
-  | "old_installers";
+  | "old_installers"
+  | "large_files";
 
 export type DeleteMode = "trash" | "permanent";
 
@@ -220,6 +221,7 @@ export const CATEGORY_LABEL: Record<Category, string> = {
   trash: "Trash",
   developer_files: "Developer Files",
   old_installers: "Old Installers",
+  large_files: "Large Files",
 };
 
 export const RISK_LABEL: Record<RiskLevel, string> = {
@@ -242,3 +244,61 @@ export const CLEANER_CATEGORIES: Category[] = [
 ];
 
 export const DEVELOPER_CATEGORIES: Category[] = ["developer_files"];
+
+// ---- Disk analyzer (crates/prune-core/src/analyzer) ----
+
+export interface DiskNode {
+  name: string;
+  path: string;
+  sizeBytes: number;
+  fileCount: number;
+  dirCount: number;
+  childDirs: number;
+  ownFileBytes: number;
+}
+
+export interface DiskNodeView {
+  node: DiskNode;
+  children: DiskNode[];
+  breadcrumbs: DiskNode[];
+}
+
+export interface LargeFile {
+  targetId: string;
+  path: string;
+  name: string;
+  sizeBytes: number;
+  modifiedAt?: string;
+  extension: string;
+  risk: RiskLevel;
+}
+
+export interface ExtensionStat {
+  extension: string;
+  bytes: number;
+  count: number;
+}
+
+export type DiskScanStatus = "running" | "completed" | "cancelled";
+
+export interface DiskProgress {
+  scanId: string;
+  files: number;
+  bytes: number;
+  dirs: number;
+  currentPath?: string;
+}
+
+export interface DiskSummary {
+  scanId: string;
+  root: string;
+  status: DiskScanStatus;
+  totalBytes: number;
+  fileCount: number;
+  dirCount: number;
+  durationMs: number;
+  largeFileCount: number;
+  issueCount: number;
+  topExtensions: ExtensionStat[];
+  startedAt: string;
+}

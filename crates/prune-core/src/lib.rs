@@ -25,6 +25,7 @@
 //! Callers never hand raw paths to the deletion layer. They pass *target ids* produced by a
 //! scan, which are resolved to paths inside the engine and validated again right before removal.
 
+pub mod analyzer;
 pub mod engine;
 pub mod error;
 pub mod fs;

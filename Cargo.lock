@@ -2476,6 +2476,7 @@ dependencies = [
 name = "prune"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "prune-core",
  "serde",
  "serde_json",
