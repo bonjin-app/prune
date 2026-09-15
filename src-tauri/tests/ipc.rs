@@ -244,9 +244,17 @@ fn disk_scan_and_reveal_reject_bad_paths() {
     .unwrap_err();
     assert_eq!(err["code"], "invalid_path");
 
-    // Revealing something outside the user's own directories is refused.
-    let err = invoke(&webview, "fs_reveal", json!({ "path": "/etc/hosts" })).unwrap_err();
-    assert_eq!(err["code"], "invalid_path");
+    // Revealing something outside the user's own directories is refused — including by the
+    // other name macOS has for the same file, which a plain prefix check would have allowed.
+    for path in ["/etc/hosts", "/private/etc/hosts", "/usr/bin"] {
+        match invoke(&webview, "fs_reveal", json!({ "path": path })) {
+            Err(err) => assert_eq!(err["code"], "invalid_path", "{path}"),
+            Ok(_) => panic!("{path} should not be revealable"),
+        }
+    }
+
+    // The accepting case is covered in prune-core, where it can be checked without opening a
+    // file manager window on whoever is running the tests.
 }
 
 #[test]
@@ -311,4 +319,39 @@ fn settings_refuse_folders_prune_could_never_clean() {
         json!({ "roots": [] }),
     );
     assert_eq!(view["projectRootsConfigured"], false);
+}
+
+#[test]
+fn only_the_most_recent_scans_are_kept_in_memory() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("workspace");
+    write(&root.join("f.bin"), 100);
+    let (_app, webview) = build_app(&dir.path().join("appdata"));
+
+    // A disk analysis holds a node per directory, so keeping every one of them for the life of
+    // the process is a slow leak. Run more than fit and check the oldest is gone.
+    let mut ids = Vec::new();
+    for _ in 0..5 {
+        let id = ok(
+            &webview,
+            "disk_start_scan",
+            json!({ "root": root.to_string_lossy() }),
+        );
+        let id = id.as_str().unwrap().to_string();
+        wait_for(&webview, "disk_get_summary", json!({ "scanId": id }));
+        ids.push(id);
+    }
+
+    let newest = ids.last().unwrap();
+    assert!(
+        invoke(&webview, "disk_get_summary", json!({ "scanId": newest })).is_ok(),
+        "the scan being shown must still be there"
+    );
+
+    let oldest = &ids[0];
+    let err = invoke(&webview, "disk_get_summary", json!({ "scanId": oldest })).unwrap_err();
+    assert_eq!(
+        err["code"], "unknown_scan",
+        "the oldest analysis should have been released"
+    );
 }

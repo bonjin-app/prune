@@ -28,6 +28,11 @@ export function ResultDialog() {
           {result.removedTargets === 1 ? "" : "s"}{" "}
           {result.mode === "trash" ? "moved to the Trash" : "deleted permanently"}.
         </p>
+        {result.logError && (
+          <p className="mt-3 text-[12px] text-warn">
+            The cleanup happened, but it could not be added to the operation log: {result.logError}
+          </p>
+        )}
         {result.failed.length > 0 && (
           <div className="mt-4 max-h-[160px] overflow-y-auto rounded-md border border-line text-left text-[11.5px]">
             {result.failed.map((f) => (

@@ -261,7 +261,7 @@ impl PruneEngine {
             (0, _) => CleanupStatus::Failed,
             _ => CleanupStatus::Partial,
         };
-        let result = CleanupResult {
+        let mut result = CleanupResult {
             operation_id: uuid::Uuid::new_v4().to_string(),
             plan_id: plan.id.clone(),
             mode: plan.mode,
@@ -272,6 +272,7 @@ impl PruneEngine {
             removed_files,
             removed_bytes,
             failed,
+            log_error: None,
         };
 
         if let Some(log) = log {
@@ -280,7 +281,7 @@ impl PruneEngine {
             providers.sort();
             providers.dedup();
             let title = self.title_for(&providers);
-            log.append(&OperationRecord {
+            let written = log.append(&OperationRecord {
                 id: result.operation_id.clone(),
                 at: result.finished_at,
                 title,
@@ -291,7 +292,14 @@ impl PruneEngine {
                 removed_bytes,
                 failed_count: result.failed.len(),
                 providers,
-            })?;
+            });
+            // The files are already gone. Failing here would report a successful cleanup as an
+            // error and leave the user unsure whether to run it again, so the problem is
+            // carried in the result instead.
+            if let Err(e) = written {
+                tracing::warn!(error = %e, "could not write the operation log");
+                result.log_error = Some(e.to_string());
+            }
         }
         Ok(result)
     }

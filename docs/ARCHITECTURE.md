@@ -69,6 +69,11 @@ Delete               PruneEngine::execute       re-validates each path, then fs:
 Operation Log        OperationLog::append       JSONL in the app data dir
 ```
 
+An operation-log failure never fails a cleanup. By the time the log is written the files are
+gone; returning an error there would tell the user the opposite of what happened and invite them
+to run it again. `CleanupResult::log_error` carries the problem instead, and the result dialog
+shows it.
+
 ### SafetyPolicy rules (in order)
 
 1. Absolute path, no `.` / `..` components, not a filesystem root.
@@ -310,6 +315,11 @@ Command naming: `<domain>_<verb>_<object>` in `snake_case`.
 Events: `prune://scan-progress`, `prune://scan-completed`, `prune://cleanup-progress`,
 `prune://disk-progress`, `prune://disk-completed`, `prune://apps-progress`,
 `prune://apps-completed`.
+
+Long-lived results are bounded. `Recent<T>` keeps only the newest few scan sessions, plans and
+disk analyses: an analysis holds one node per directory, so keeping every one of them for the
+life of the process was a slow leak. Asking for an evicted scan returns `unknown_scan`, which
+the UI already handles.
 
 Errors cross IPC as `{ code, message }` (`CommandError`), with stable codes from
 `PruneError::code()`.

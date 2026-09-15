@@ -127,6 +127,8 @@ export interface CleanupResult {
   removedFiles: number;
   removedBytes: number;
   failed: FailedTarget[];
+  /** Set when the removal succeeded but could not be written to the operation log. */
+  logError?: string;
 }
 
 export interface OperationRecord {

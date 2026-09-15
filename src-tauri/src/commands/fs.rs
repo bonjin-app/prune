@@ -5,8 +5,13 @@ use tauri::State;
 use crate::error::{CommandError, CommandResult};
 use crate::AppState;
 
-/// Reveal a path in Finder / Explorer. Read-only; the path must be an existing target from a
-/// scan (we only check existence + that it lives under an allowed root).
+/// Reveals a path in Finder or Explorer.
+///
+/// Opening a window is harmless, but the path still has to be one Prune would work with,
+/// otherwise the command becomes a way to point the file manager anywhere on the machine.
+/// Everything is compared in canonical form: on macOS the temp directory is reached both as
+/// `/var/folders/…` and `/private/var/folders/…`, and accepting the `/private` prefix wholesale
+/// would also accept `/private/etc`.
 #[tauri::command]
 pub fn fs_reveal(state: State<'_, AppState>, path: String) -> CommandResult<()> {
     let p = Path::new(&path);
@@ -14,8 +19,7 @@ pub fn fs_reveal(state: State<'_, AppState>, path: String) -> CommandResult<()> 
         return Err(CommandError::new("invalid_path", "path does not exist"));
     }
     let engine = state.engine();
-    let known = engine.known_paths();
-    if !(p.starts_with(&known.home) || p.starts_with(&known.temp) || p.starts_with("/private")) {
+    if !engine.policy().is_inside_allowed_root(p) {
         return Err(CommandError::new(
             "invalid_path",
             "path is outside the user's directories",

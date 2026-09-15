@@ -3,6 +3,7 @@
 
 mod commands;
 mod error;
+mod recent;
 mod state;
 
 use tauri::Manager;

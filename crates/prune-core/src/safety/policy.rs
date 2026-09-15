@@ -125,6 +125,23 @@ impl SafetyPolicy {
             && std::fs::symlink_metadata(normalized).is_ok_and(|m| m.is_dir())
     }
 
+    /// `true` when the path is inside one of the directories Prune works in.
+    ///
+    /// Weaker than [`validate`](Self::validate): it says nothing about whether the path may be
+    /// removed. It answers "would Prune ever look at this?", which is what a read-only action
+    /// such as revealing a path in the file manager needs. Comparison is canonical, so on macOS
+    /// `/var/folders/…` and `/private/var/folders/…` are recognised as the same place and
+    /// `/private/etc` is not mistaken for one.
+    pub fn is_inside_allowed_root(&self, path: &Path) -> bool {
+        if !path.is_absolute() {
+            return false;
+        }
+        let canonical = canonical_or_lexical(path);
+        self.allowed_roots
+            .iter()
+            .any(|root| canonical.starts_with(root))
+    }
+
     /// `true` when the path would be refused. Convenience for risk classification.
     pub fn is_protected(&self, path: &Path) -> bool {
         self.validate(path).is_err()
@@ -263,6 +280,41 @@ mod tests {
         assert!(policy.validate(&apps.join("Foo.app/Contents")).is_err());
         assert!(policy.validate(&apps.join("Utilities")).is_err());
         assert!(policy.validate(&apps.join("Utilities/Bar.app")).is_err());
+    }
+
+    #[test]
+    fn recognises_paths_inside_the_directories_prune_works_in() {
+        let (dir, policy) = sandbox();
+        let home = dir.path().join("home");
+
+        // Inside, including the root itself and a protected subtree: this question is only
+        // about location, not about whether removal is allowed.
+        assert!(policy.is_inside_allowed_root(&home));
+        assert!(policy.is_inside_allowed_root(&home.join("Library/Caches/app")));
+        assert!(policy.is_inside_allowed_root(&home.join(".ssh")));
+
+        // Outside.
+        assert!(!policy.is_inside_allowed_root(&dir.path().join("system/bin")));
+        assert!(!policy.is_inside_allowed_root(Path::new("/usr/bin")));
+        assert!(!policy.is_inside_allowed_root(Path::new("relative/path")));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn the_two_names_macos_has_for_the_temp_directory_are_the_same_place() {
+        // The real temp directory, which is reachable as both /var/folders/… and
+        // /private/var/folders/….
+        let temp = std::env::temp_dir();
+        let policy = SafetyPolicy::from_protected(ProtectedPaths {
+            allowed_roots: vec![temp.clone()],
+            ..Default::default()
+        });
+        let canonical = std::fs::canonicalize(&temp).unwrap();
+        assert!(policy.is_inside_allowed_root(&temp));
+        assert!(policy.is_inside_allowed_root(&canonical));
+        // ...but that must not let the rest of /private in.
+        assert!(!policy.is_inside_allowed_root(Path::new("/private/etc")));
+        assert!(!policy.is_inside_allowed_root(Path::new("/etc")));
     }
 
     #[test]

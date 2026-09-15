@@ -8,6 +8,9 @@ All notable changes to Prune are documented here. The format follows
 
 ### Fixed
 
+- A cleanup that succeeded but could not be written to the operation log was reported as a failure. The files were already gone, so the user was told the opposite of what happened and might have run it again. The removal now succeeds and the result carries the logging problem, which the result dialog shows.
+- Scan sessions, cleanup plans and disk analyses were kept for the life of the process. An analysis of a home directory holds one node per directory — tens of thousands on a real machine — so a session spent scanning a few times grew steadily. Only the most recent few are kept now.
+- Revealing a path in the file manager accepted anything under `/private`, so `/etc/hosts` was refused while `/private/etc/hosts`, the same file, was allowed. The check now compares canonical paths against the directories Prune actually works in.
 - The Cleaner and Developer sections share one selection, but the Review button built its plan from everything selected anywhere. Selecting in Developer and then reviewing in Cleaner produced a plan bigger than the number on the button. Each section now plans only what it shows.
 
 ### Added

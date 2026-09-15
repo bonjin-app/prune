@@ -227,3 +227,82 @@ fn execute_refuses_paths_that_became_protected() {
     assert_eq!(plan.blocked.len(), 1);
     assert!(dir.path().join("home/.ssh/id_ed25519").exists());
 }
+
+#[test]
+fn a_cleanup_still_counts_when_the_log_cannot_be_written() {
+    let dir = build_sandbox();
+    let engine = engine_for(&dir);
+    let home = dir.path().join("home");
+    let session = engine.scan(
+        "s5",
+        &ScanRequest::default(),
+        Arc::new(AtomicBool::new(false)),
+        &|_| {},
+    );
+    let cache = session
+        .results
+        .iter()
+        .flat_map(|r| r.targets.iter())
+        .find(|t| t.path.ends_with("com.example.app"))
+        .unwrap()
+        .clone();
+    let plan = engine.plan(
+        &session,
+        std::slice::from_ref(&cache.id),
+        DeleteMode::Permanent,
+    );
+
+    // A log that cannot be opened: the path exists as a file, so creating it as a directory
+    // fails. This is the shape of a read-only or full disk.
+    let blocked = dir.path().join("blocked");
+    std::fs::write(&blocked, b"not a directory").unwrap();
+    let log = OperationLog::open(&blocked);
+
+    let result = match log {
+        // Some platforms refuse at open time, which is equally fine: the cleanup simply runs
+        // without a log.
+        Err(_) => engine.execute(&plan, None, &|_| {}).unwrap(),
+        Ok(log) => {
+            let result = engine
+                .execute(&plan, Some(&log), &|_| {})
+                .expect("a log failure must not fail the cleanup");
+            assert!(
+                result.log_error.is_some(),
+                "the user should be told the history was not recorded"
+            );
+            result
+        }
+    };
+
+    // What matters: the files really are gone and the caller was told so.
+    assert_eq!(result.removed_targets, 1);
+    assert_eq!(result.removed_bytes, 4096);
+    assert!(!home.join("Library/Caches/com.example.app").exists());
+}
+
+#[test]
+fn a_successful_cleanup_reports_no_log_problem() {
+    let dir = build_sandbox();
+    let engine = engine_for(&dir);
+    let session = engine.scan(
+        "s6",
+        &ScanRequest::default(),
+        Arc::new(AtomicBool::new(false)),
+        &|_| {},
+    );
+    let id = session
+        .results
+        .iter()
+        .flat_map(|r| r.targets.iter())
+        .find(|t| t.path.ends_with("com.example.app"))
+        .unwrap()
+        .id
+        .clone();
+    let plan = engine.plan(&session, &[id], DeleteMode::Permanent);
+    let log = OperationLog::open(&dir.path().join("goodlog")).unwrap();
+
+    let result = engine.execute(&plan, Some(&log), &|_| {}).unwrap();
+
+    assert!(result.log_error.is_none());
+    assert_eq!(log.list(10).unwrap().len(), 1);
+}

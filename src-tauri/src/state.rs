@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex, RwLock};
@@ -10,6 +9,15 @@ use prune_core::platform::{ApplicationInfo, StartupItem};
 use prune_core::settings::Settings;
 use prune_core::system::SystemMonitor;
 use prune_core::PruneEngine;
+
+use crate::recent::Recent;
+
+/// How many finished scans, plans and analyses to keep. Enough that the view the user is
+/// looking at and the one before it are always there; small enough that a long session does
+/// not hold every directory tree it ever walked.
+const RECENT_SCANS: usize = 4;
+const RECENT_DISKS: usize = 3;
+const RECENT_PLANS: usize = 16;
 
 /// Bookkeeping for a scan that is running or finished.
 pub struct ScanEntry {
@@ -39,9 +47,9 @@ pub struct AppState {
     pub data_dir: PathBuf,
     pub monitor: Arc<SystemMonitor>,
     pub ops: Arc<OperationLog>,
-    pub scans: Mutex<HashMap<String, ScanEntry>>,
-    pub plans: Mutex<HashMap<String, CleanupPlan>>,
-    pub disks: Mutex<HashMap<String, DiskEntry>>,
+    pub scans: Mutex<Recent<ScanEntry>>,
+    pub plans: Mutex<Recent<CleanupPlan>>,
+    pub disks: Mutex<Recent<DiskEntry>>,
     pub apps: Mutex<AppsState>,
     pub startup: Mutex<Vec<StartupItem>>,
 }
@@ -58,9 +66,9 @@ impl AppState {
             data_dir: data_dir.to_path_buf(),
             monitor: Arc::new(monitor),
             ops: Arc::new(ops),
-            scans: Mutex::new(HashMap::new()),
-            plans: Mutex::new(HashMap::new()),
-            disks: Mutex::new(HashMap::new()),
+            scans: Mutex::new(Recent::new(RECENT_SCANS)),
+            plans: Mutex::new(Recent::new(RECENT_PLANS)),
+            disks: Mutex::new(Recent::new(RECENT_DISKS)),
             apps: Mutex::new(AppsState::default()),
             startup: Mutex::new(Vec::new()),
         })

@@ -68,6 +68,10 @@ pub struct CleanupResult {
     pub removed_files: u64,
     pub removed_bytes: u64,
     pub failed: Vec<FailedTarget>,
+    /// Set when the removal succeeded but could not be written to the operation log. The
+    /// cleanup still happened; only the history is missing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub log_error: Option<String>,
 }
 
 /// One line in the local operation log.
