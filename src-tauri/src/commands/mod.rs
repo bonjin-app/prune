@@ -1,6 +1,6 @@
 //! IPC surface. Naming: `<domain>_<verb>_<object>` in `snake_case`.
 //!
-//! Domains: `app`, `system`, `cleaner`, `disk`, `apps`, `startup`, `ops`, `fs`.
+//! Domains: `app`, `system`, `cleaner`, `disk`, `apps`, `startup`, `settings`, `ops`, `fs`.
 
 mod app;
 mod apps;
@@ -8,6 +8,7 @@ mod cleaner;
 mod disk;
 mod fs;
 mod ops;
+mod settings;
 mod startup;
 mod system;
 
@@ -17,5 +18,6 @@ pub use cleaner::*;
 pub use disk::*;
 pub use fs::*;
 pub use ops::*;
+pub use settings::*;
 pub use startup::*;
 pub use system::*;

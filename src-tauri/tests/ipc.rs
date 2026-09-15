@@ -248,3 +248,67 @@ fn disk_scan_and_reveal_reject_bad_paths() {
     let err = invoke(&webview, "fs_reveal", json!({ "path": "/etc/hosts" })).unwrap_err();
     assert_eq!(err["code"], "invalid_path");
 }
+
+#[test]
+fn settings_report_the_folders_the_developer_scan_will_search() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_app, webview) = build_app(dir.path());
+
+    let view = ok(&webview, "settings_get", json!({}));
+    assert!(!view["homeDir"].as_str().unwrap().is_empty());
+    // A fresh profile has nothing configured, so Prune is guessing.
+    assert_eq!(view["projectRootsConfigured"], false);
+    assert!(view["settings"]["projectRoots"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+    assert!(view["effectiveProjectRoots"].is_array());
+}
+
+#[test]
+fn settings_refuse_folders_prune_could_never_clean() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_app, webview) = build_app(dir.path());
+
+    // Outside the home directory: every target found there would be blocked anyway.
+    let err = invoke(
+        &webview,
+        "settings_set_project_roots",
+        json!({ "roots": ["/usr/local"] }),
+    )
+    .unwrap_err();
+    assert_eq!(err["code"], "invalid_path");
+    assert!(err["message"].as_str().unwrap().contains("home folder"));
+
+    let err = invoke(
+        &webview,
+        "settings_set_project_roots",
+        json!({ "roots": ["relative/path"] }),
+    )
+    .unwrap_err();
+    assert_eq!(err["code"], "invalid_path");
+
+    let missing = dir.path().join("nope");
+    let err = invoke(
+        &webview,
+        "settings_set_project_roots",
+        json!({ "roots": [missing.to_string_lossy()] }),
+    )
+    .unwrap_err();
+    assert_eq!(err["code"], "invalid_path");
+
+    // A rejected list changes nothing.
+    let view = ok(&webview, "settings_get", json!({}));
+    assert!(view["settings"]["projectRoots"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+
+    // An empty list is accepted and means "go back to guessing".
+    let view = ok(
+        &webview,
+        "settings_set_project_roots",
+        json!({ "roots": [] }),
+    );
+    assert_eq!(view["projectRootsConfigured"], false);
+}

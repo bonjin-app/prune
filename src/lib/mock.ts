@@ -290,6 +290,18 @@ function fakeResults(providerIds?: string[]): ScanResult[] {
 const sessions = new Map<string, ScanSession>();
 const diskScans = new Map<string, { root: string; cancelled: boolean }>();
 
+let mockProjectRoots: string[] = [];
+function mockSettings() {
+  return {
+    settings: { projectRoots: mockProjectRoots },
+    effectiveProjectRoots: mockProjectRoots.length
+      ? mockProjectRoots
+      : [`${HOME}/Projects`, `${HOME}/Desktop`],
+    projectRootsConfigured: mockProjectRoots.length > 0,
+    homeDir: HOME,
+  };
+}
+
 const MOCK_STARTUP: StartupItem[] = [
   {
     id: "su-docker",
@@ -1042,6 +1054,15 @@ export const mockBackend: Backend = {
   },
   async appsRunUninstaller() {
     throw { code: "not_implemented", message: "vendor uninstallers exist only on Windows" };
+  },
+  async settingsGet() {
+    return mockSettings();
+  },
+  async settingsSetProjectRoots(roots) {
+    const bad = roots.find((r) => !r.startsWith(HOME));
+    if (bad) throw { code: "invalid_path", message: `${bad}: must be inside your home folder` };
+    mockProjectRoots = roots.filter((r) => r.trim().length > 0);
+    return mockSettings();
   },
   async startupList() {
     await new Promise((r) => setTimeout(r, 200));

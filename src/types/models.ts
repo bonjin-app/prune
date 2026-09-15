@@ -401,3 +401,18 @@ export interface Permissions {
   blocked: string[];
   howToGrant?: string;
 }
+
+// ---- Settings (crates/prune-core/src/settings) ----
+
+export interface Settings {
+  projectRoots: string[];
+}
+
+export interface SettingsView {
+  settings: Settings;
+  /** Folders that will actually be searched for project artifacts. */
+  effectiveProjectRoots: string[];
+  /** False when Prune is guessing because nothing has been configured. */
+  projectRootsConfigured: boolean;
+  homeDir: string;
+}

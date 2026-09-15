@@ -21,7 +21,7 @@ pub fn disk_start_scan<R: Runtime>(
 ) -> CommandResult<String> {
     let root: PathBuf = match root {
         Some(r) if !r.trim().is_empty() => PathBuf::from(r.trim()),
-        _ => state.engine.known_paths().home.clone(),
+        _ => state.engine().known_paths().home.clone(),
     };
     if !root.is_absolute() {
         return Err(CommandError::new("invalid_path", "path must be absolute"));
@@ -42,7 +42,7 @@ pub fn disk_start_scan<R: Runtime>(
         },
     );
 
-    let engine = state.engine.clone();
+    let engine = state.engine();
     let id = scan_id.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let progress_app = app.clone();

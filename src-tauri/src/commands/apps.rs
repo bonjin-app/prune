@@ -18,7 +18,7 @@ pub fn apps_start_scan<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, AppState>,
 ) -> CommandResult<Vec<ApplicationInfo>> {
-    let list = state.engine.applications()?;
+    let list = state.engine().applications()?;
     let scan_id = uuid::Uuid::new_v4().to_string();
     {
         let mut apps_state = state.apps.lock().unwrap();
@@ -78,7 +78,7 @@ pub async fn apps_get_detail(
         .find(|a| a.id == app_id)
         .cloned()
         .ok_or_else(|| CommandError::new("unknown_app", app_id.clone()))?;
-    let engine = state.engine.clone();
+    let engine = state.engine();
     let detail = tauri::async_runtime::spawn_blocking(move || {
         engine.app_detail(&info, &AtomicBool::new(false))
     })

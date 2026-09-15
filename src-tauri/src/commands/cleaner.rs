@@ -14,7 +14,7 @@ use crate::AppState;
 
 #[tauri::command]
 pub fn cleaner_list_providers(state: State<'_, AppState>) -> CommandResult<Vec<ProviderInfo>> {
-    Ok(state.engine.providers())
+    Ok(state.engine().providers())
 }
 
 /// Starts a scan on a worker thread and returns its id immediately.
@@ -35,7 +35,7 @@ pub fn cleaner_start_scan<R: Runtime>(
         },
     );
 
-    let engine = state.engine.clone();
+    let engine = state.engine();
     let request = ScanRequest { provider_ids };
     let id = scan_id.clone();
     tauri::async_runtime::spawn_blocking(move || {
@@ -102,7 +102,7 @@ pub fn cleaner_preview(
         ));
     }
     let plan = state
-        .engine
+        .engine()
         .plan(&session, &target_ids, mode.unwrap_or_default());
     state
         .plans
@@ -128,7 +128,7 @@ pub async fn cleaner_execute<R: Runtime>(
         .ok_or_else(|| CommandError::new("unknown_plan", plan_id.clone()))?;
     let scan_id = plan.scan_id.clone();
     let plan_target_ids: Vec<String> = plan.targets.iter().map(|t| t.id.clone()).collect();
-    let engine = state.engine.clone();
+    let engine = state.engine();
     let ops = state.ops.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
         let on_progress = |p: prune_core::models::CleanupProgress| {

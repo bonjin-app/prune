@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 
 use prune_core::analyzer::DiskAnalysis;
 use prune_core::models::{CleanupPlan, ScanSession};
 use prune_core::ops::OperationLog;
 use prune_core::platform::{ApplicationInfo, StartupItem};
+use prune_core::settings::Settings;
 use prune_core::system::SystemMonitor;
 use prune_core::PruneEngine;
 
@@ -32,7 +33,10 @@ pub struct AppsState {
 
 /// Process-wide state managed by Tauri.
 pub struct AppState {
-    pub engine: Arc<PruneEngine>,
+    /// Rebuilt when settings change, so every later command sees the new project roots.
+    engine: RwLock<Arc<PruneEngine>>,
+    pub settings: Mutex<Settings>,
+    pub data_dir: PathBuf,
     pub monitor: Arc<SystemMonitor>,
     pub ops: Arc<OperationLog>,
     pub scans: Mutex<HashMap<String, ScanEntry>>,
@@ -44,11 +48,14 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(data_dir: &Path) -> Result<Self, Box<dyn std::error::Error>> {
-        let engine = PruneEngine::new();
+        let settings = Settings::load(data_dir);
+        let engine = PruneEngine::with_settings(&settings);
         let monitor = SystemMonitor::new(&engine.known_paths().home);
         let ops = OperationLog::open(data_dir)?;
         Ok(Self {
-            engine: Arc::new(engine),
+            engine: RwLock::new(Arc::new(engine)),
+            settings: Mutex::new(settings),
+            data_dir: data_dir.to_path_buf(),
             monitor: Arc::new(monitor),
             ops: Arc::new(ops),
             scans: Mutex::new(HashMap::new()),
@@ -57,5 +64,20 @@ impl AppState {
             apps: Mutex::new(AppsState::default()),
             startup: Mutex::new(Vec::new()),
         })
+    }
+
+    /// The current engine. Held by `Arc` so a long scan keeps working on the engine it started
+    /// with even if settings change underneath it.
+    pub fn engine(&self) -> Arc<PruneEngine> {
+        self.engine.read().unwrap().clone()
+    }
+
+    /// Persists new settings and rebuilds the engine around them.
+    pub fn apply_settings(&self, settings: Settings) -> prune_core::Result<()> {
+        settings.save(&self.data_dir)?;
+        let engine = Arc::new(PruneEngine::with_settings(&settings));
+        *self.engine.write().unwrap() = engine;
+        *self.settings.lock().unwrap() = settings;
+        Ok(())
     }
 }

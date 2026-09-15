@@ -36,6 +36,7 @@ pub mod platform;
 pub mod providers;
 pub mod safety;
 pub mod scan;
+pub mod settings;
 pub mod system;
 
 pub use engine::PruneEngine;

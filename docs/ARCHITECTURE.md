@@ -30,6 +30,7 @@ prune/
 │   │   │   ├── browser/       Chromium family, Firefox
 │   │   │   └── developer/     tool caches (declarative) + project artifact walker
 │   │   ├── scan/              parallel runner, progress, cancel, overlap de-dup
+│   │   ├── settings/          user settings the engine needs (project roots)
 │   │   ├── analyzer/          disk analyzer: directory tree, large files, extensions
 │   │   ├── apps/              uninstaller: app detail + leftovers as cleanup targets
 │   │   ├── ops/               OperationLog (JSONL)
@@ -38,7 +39,7 @@ prune/
 │   ├── examples/{scan,disk,apps,startup}.rs  read-only CLI prototypes
 │   └── tests/pipeline.rs      end-to-end against a sandboxed fake home
 ├── src-tauri/                 Tauri shell
-│   ├── src/commands/          app, system, cleaner, disk, apps, startup, ops, fs
+│   ├── src/commands/          app, system, cleaner, disk, apps, startup, settings, ops, fs
 │   ├── src/state.rs           AppState: engine, monitor, ops, scans, plans, disks, apps, startup
 │   ├── tauri.conf.json        window, CSP, bundle
 │   └── capabilities/          core permissions only (no shell / fs / http plugins)
@@ -224,6 +225,26 @@ no content read) and reports which are blocked plus how to grant access.
 `open_privacy_settings` opens the relevant pane. The UI shows a dismissible banner on the
 dashboard and above every scan, and Settings lists the state. Windows has no equivalent gate, so
 it reports `NotApplicable`.
+
+## 5f. Settings
+
+`settings.json` in the application data directory holds only what the engine needs; theme and
+delete mode stay in the frontend because the engine has no use for them. Today that is the list
+of folders searched for project artifacts.
+
+Three rules make this safe to get wrong:
+
+- A candidate folder must be absolute, exist, be a directory, and sit **inside the home
+  directory** — outside it, every target found would be refused by the safety layer anyway, so
+  accepting such a folder would only produce a list of things that cannot be cleaned.
+- Nested folders collapse into their parent, so no tree is walked twice.
+- Roots that no longer validate are dropped at load time, and if nothing is left the engine
+  keeps the guessed folders. A stale or mistyped setting therefore degrades to the previous
+  behaviour instead of silently finding nothing.
+
+`AppState` keeps the engine behind an `RwLock<Arc<PruneEngine>>`: changing settings rebuilds it,
+while a scan already in flight keeps the `Arc` it started with and finishes against consistent
+paths.
 
 ## 6. Tauri layer
 

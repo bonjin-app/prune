@@ -7,7 +7,7 @@ use crate::AppState;
 /// Programs that start by themselves. Read-only.
 #[tauri::command]
 pub async fn startup_list(state: State<'_, AppState>) -> CommandResult<Vec<StartupItem>> {
-    let engine = state.engine.clone();
+    let engine = state.engine();
     let items = tauri::async_runtime::spawn_blocking(move || engine.startup_items())
         .await
         .map_err(|e| CommandError::new("join", e.to_string()))??;
@@ -30,7 +30,7 @@ pub async fn startup_set_enabled(
         .find(|i| i.id == item_id)
         .cloned()
         .ok_or_else(|| CommandError::new("unknown_startup_item", item_id.clone()))?;
-    let engine = state.engine.clone();
+    let engine = state.engine();
     let target = item.clone();
     tauri::async_runtime::spawn_blocking(move || engine.set_startup_enabled(&target, enabled))
         .await

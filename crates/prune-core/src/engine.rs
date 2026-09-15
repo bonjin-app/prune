@@ -28,9 +28,27 @@ pub struct PruneEngine {
 }
 
 impl PruneEngine {
-    /// Engine for the running OS with the built-in providers.
+    /// Engine for the running OS with the built-in providers and default settings.
     pub fn new() -> Self {
         Self::with_parts(platform::current(), ProviderRegistry::with_defaults())
+    }
+
+    /// Engine for the running OS, honouring the user's settings.
+    ///
+    /// Configured project roots replace the guessed ones entirely, so a user who names their
+    /// code directories never has an unrelated tree walked.
+    pub fn with_settings(settings: &crate::settings::Settings) -> Self {
+        let mut engine = Self::new();
+        let configured = settings.sanitized_roots(&engine.known.home);
+        if !configured.is_empty() {
+            engine.known.project_roots = configured;
+        }
+        engine
+    }
+
+    /// Whether the project roots came from settings rather than from guessing.
+    pub fn project_roots_are_configured(&self, settings: &crate::settings::Settings) -> bool {
+        !settings.sanitized_roots(&self.known.home).is_empty()
     }
 
     /// Engine with a custom platform (tests, sandboxes) and provider set.
@@ -310,5 +328,42 @@ fn humanize(id: &str) -> String {
 impl Default for PruneEngine {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::settings::Settings;
+    use std::path::PathBuf;
+
+    #[test]
+    fn unusable_configured_roots_fall_back_to_the_guessed_ones() {
+        let guessed = PruneEngine::new();
+        let engine = PruneEngine::with_settings(&Settings {
+            // Neither exists, and one is outside the home directory.
+            project_roots: vec![
+                PathBuf::from("/definitely/not/here"),
+                PathBuf::from("relative"),
+            ],
+        });
+        assert_eq!(
+            engine.known_paths().project_roots,
+            guessed.known_paths().project_roots,
+            "a bad setting must not silently disable the developer scan"
+        );
+        assert!(!engine.project_roots_are_configured(&Settings {
+            project_roots: vec![PathBuf::from("/definitely/not/here")],
+        }));
+    }
+
+    #[test]
+    fn default_settings_keep_the_guessed_roots() {
+        let guessed = PruneEngine::new();
+        let engine = PruneEngine::with_settings(&Settings::default());
+        assert_eq!(
+            engine.known_paths().project_roots,
+            guessed.known_paths().project_roots
+        );
     }
 }

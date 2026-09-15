@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Card, CardHeader } from "@/components/ui/Card";
+import { ProjectRoots } from "./ProjectRoots";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { cn } from "@/lib/cn";
 import { formatBytes, formatCount, formatDateTime } from "@/lib/format";
@@ -44,6 +45,8 @@ export function SettingsView() {
             />
           </div>
         </Card>
+
+        <ProjectRoots />
 
         <Card>
           <CardHeader

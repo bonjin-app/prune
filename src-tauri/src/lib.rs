@@ -47,6 +47,8 @@ pub fn register_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri
         commands::apps_start_scan,
         commands::apps_get_detail,
         commands::apps_run_uninstaller,
+        commands::settings_get,
+        commands::settings_set_project_roots,
         commands::startup_list,
         commands::startup_set_enabled,
         commands::ops_list,

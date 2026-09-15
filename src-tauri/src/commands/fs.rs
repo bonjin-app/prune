@@ -13,9 +13,9 @@ pub fn fs_reveal(state: State<'_, AppState>, path: String) -> CommandResult<()> 
     if !p.is_absolute() || !p.exists() {
         return Err(CommandError::new("invalid_path", "path does not exist"));
     }
-    let home = &state.engine.known_paths().home;
-    let temp = &state.engine.known_paths().temp;
-    if !(p.starts_with(home) || p.starts_with(temp) || p.starts_with("/private")) {
+    let engine = state.engine();
+    let known = engine.known_paths();
+    if !(p.starts_with(&known.home) || p.starts_with(&known.temp) || p.starts_with("/private")) {
         return Err(CommandError::new(
             "invalid_path",
             "path is outside the user's directories",
