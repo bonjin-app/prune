@@ -71,13 +71,25 @@ pub struct DiskStatus {
     pub is_primary: bool,
 }
 
-/// Live snapshot. Call repeatedly; CPU usage is measured between calls.
+/// Network throughput, measured between snapshots.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NetworkStatus {
+    pub down_bytes_per_sec: u64,
+    pub up_bytes_per_sec: u64,
+    /// Totals since the machine booted, across all interfaces.
+    pub total_received_bytes: u64,
+    pub total_transmitted_bytes: u64,
+}
+
+/// Live snapshot. Call repeatedly; CPU usage and network rates are measured between calls.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SystemSnapshot {
     pub cpu: CpuStatus,
     pub memory: MemoryStatus,
     pub disks: Vec<DiskStatus>,
+    pub network: NetworkStatus,
     pub uptime_seconds: u64,
     pub process_count: usize,
 }
@@ -93,4 +105,19 @@ pub struct ProcessInfo {
     pub user: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_pid: Option<u32>,
+    /// Whether Prune will let this process be stopped.
+    pub can_terminate: bool,
+    /// Why not, when it will not.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub protected_reason: Option<String>,
+}
+
+/// How to stop a process.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StopMode {
+    /// Ask it to exit and let it save its work. What "Quit" means everywhere else.
+    Ask,
+    /// Stop it immediately. Unsaved work is lost.
+    Force,
 }

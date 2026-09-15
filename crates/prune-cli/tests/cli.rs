@@ -215,3 +215,27 @@ fn log_shows_what_was_removed() {
     let records: serde_json::Value = serde_json::from_str(&out).unwrap();
     assert_eq!(records.as_array().unwrap().len(), 1);
 }
+
+#[test]
+fn processes_lists_and_marks_what_it_will_not_stop() {
+    let h = harness();
+    let (code, out) = run(&h, &["processes", "--limit", "50"]);
+
+    assert_eq!(code, EXIT_OK);
+    assert!(!out.trim().is_empty(), "the machine always has processes");
+    // Whatever is running, this test's own process must be listed as protected.
+    let self_pid = std::process::id().to_string();
+    let own_line = out.lines().find(|l| l.trim_start().starts_with(&self_pid));
+    if let Some(line) = own_line {
+        assert!(line.contains("protected"), "{line}");
+    }
+}
+
+#[test]
+fn processes_refuses_to_stop_the_init_process() {
+    let h = harness();
+    let (code, out) = run(&h, &["processes", "--stop", "1"]);
+
+    assert_eq!(code, prune_cli::EXIT_ERROR);
+    assert!(out.contains("cannot be stopped"), "{out}");
+}

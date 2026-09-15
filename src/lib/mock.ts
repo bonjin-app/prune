@@ -290,6 +290,11 @@ function fakeResults(providerIds?: string[]): ScanResult[] {
 const sessions = new Map<string, ScanSession>();
 const diskScans = new Map<string, { root: string; cancelled: boolean }>();
 
+/** Processes the mock refuses to stop, mirroring the engine's protection rules. */
+const MOCK_REASON = "part of the operating system; stopping it would take the machine down";
+const MOCK_PROTECTED = new Map<number, string>();
+const mockStopped = new Set<number>();
+
 let mockProjectRoots: string[] = [];
 function mockSettings() {
   return {
@@ -687,9 +692,21 @@ export const mockBackend: Backend = {
           isPrimary: false,
         },
       ],
+      network: {
+        downBytesPerSec: Math.round(400_000 + Math.random() * 3_000_000),
+        upBytesPerSec: Math.round(50_000 + Math.random() * 400_000),
+        totalReceivedBytes: 184_000_000_000,
+        totalTransmittedBytes: 22_000_000_000,
+      },
       uptimeSeconds: 3 * 86400 + 4 * 3600,
       processCount: 612,
     };
+  },
+  async systemStopProcess(pid, mode) {
+    const target = MOCK_PROTECTED.get(pid);
+    if (target) throw { code: "other", message: `${target} cannot be stopped: ${MOCK_REASON}` };
+    mockStopped.add(pid);
+    console.info("[mock] stop", pid, mode);
   },
   async systemListProcesses(limit = 50) {
     const names = [
@@ -704,14 +721,23 @@ export const mockBackend: Backend = {
       "kernel_task",
       "Code Helper (Plugin)",
     ];
-    return Array.from({ length: limit }, (_, i) => ({
-      pid: 100 + i * 7,
-      name: names[i % names.length] ?? "proc",
-      cpuPercent: Math.max(0, 40 - i * 3 + Math.random() * 3),
-      memoryBytes: (900 - i * 40) * 1e6,
-      user: "developer",
-      parentPid: 1,
-    }));
+    const critical = new Set(["WindowServer", "Finder", "kernel_task"]);
+    return Array.from({ length: limit }, (_, i) => {
+      const pid = 100 + i * 7;
+      const name = names[i % names.length] ?? "proc";
+      const isProtected = critical.has(name);
+      if (isProtected) MOCK_PROTECTED.set(pid, name);
+      return {
+        pid,
+        name,
+        cpuPercent: Math.max(0, 40 - i * 3 + Math.random() * 3),
+        memoryBytes: (900 - i * 40) * 1e6,
+        user: "developer",
+        parentPid: 1,
+        canTerminate: !isProtected,
+        protectedReason: isProtected ? MOCK_REASON : undefined,
+      };
+    }).filter((p) => !mockStopped.has(p.pid));
   },
   async cleanerListProviders() {
     return PROVIDERS;

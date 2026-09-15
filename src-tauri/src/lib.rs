@@ -33,6 +33,7 @@ pub fn register_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri
         commands::system_get_info,
         commands::system_get_snapshot,
         commands::system_list_processes,
+        commands::system_stop_process,
         commands::cleaner_list_providers,
         commands::cleaner_start_scan,
         commands::cleaner_cancel_scan,

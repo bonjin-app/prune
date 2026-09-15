@@ -18,9 +18,10 @@ use std::sync::Arc;
 
 use clap::{Parser, Subcommand};
 use prune_core::analyzer;
-use prune_core::models::{DeleteMode, RiskLevel, ScanSession};
+use prune_core::models::{DeleteMode, RiskLevel, ScanSession, StopMode};
 use prune_core::ops::OperationLog;
 use prune_core::scan::ScanRequest;
+use prune_core::system::SystemMonitor;
 use prune_core::PruneEngine;
 
 mod render;
@@ -85,6 +86,18 @@ pub enum Command {
         #[arg(long, value_name = "NAME")]
         detail: Option<String>,
     },
+    /// List running processes, or stop one.
+    Processes {
+        /// How many to show, busiest first.
+        #[arg(long, default_value_t = 20)]
+        limit: usize,
+        /// Stop this process id. Prune refuses system processes and other users'.
+        #[arg(long, value_name = "PID")]
+        stop: Option<u32>,
+        /// Stop it immediately instead of asking it to exit. Unsaved work is lost.
+        #[arg(long)]
+        force: bool,
+    },
     /// List programs that start by themselves. Read-only.
     Startup,
     /// Show the local operation log.
@@ -140,6 +153,9 @@ pub fn run(
         ),
         Command::Disk { path, large } => disk(engine, path.as_deref(), *large, cli.json, out),
         Command::Apps { detail } => apps(engine, detail.as_deref(), cli.json, out),
+        Command::Processes { limit, stop, force } => {
+            processes(*limit, *stop, *force, cli.json, out)
+        }
         Command::Startup => startup(engine, cli.json, out),
         Command::Log { limit } => operation_log(log, *limit, cli.json, out),
     }
@@ -398,6 +414,63 @@ fn apps(
         write_json(out, &detail)?;
     } else {
         render::app_detail(out, &detail)?;
+    }
+    Ok(EXIT_OK)
+}
+
+fn processes(
+    limit: usize,
+    stop: Option<u32>,
+    force: bool,
+    json: bool,
+    out: &mut impl Write,
+) -> std::io::Result<i32> {
+    let monitor = SystemMonitor::new(&std::env::temp_dir());
+
+    if let Some(pid) = stop {
+        let mode = if force {
+            StopMode::Force
+        } else {
+            StopMode::Ask
+        };
+        return match monitor.stop_process(pid, mode) {
+            Ok(()) => {
+                writeln!(
+                    out,
+                    "{} process {pid}.",
+                    if force { "Stopped" } else { "Asked to quit" }
+                )?;
+                Ok(EXIT_OK)
+            }
+            Err(e) => {
+                writeln!(out, "error: {e}")?;
+                Ok(EXIT_ERROR)
+            }
+        };
+    }
+
+    let list = monitor.processes(limit.min(2000));
+    if json {
+        write_json(out, &list)?;
+        return Ok(EXIT_OK);
+    }
+    for p in &list {
+        writeln!(
+            out,
+            "{:>8}  {:>6}  {:>10}  {:<30} {}",
+            p.pid,
+            format!("{:.1}%", p.cpu_percent),
+            human_bytes(p.memory_bytes),
+            render::truncate(&p.name, 30),
+            if p.can_terminate {
+                String::new()
+            } else {
+                format!(
+                    "protected: {}",
+                    p.protected_reason.clone().unwrap_or_default()
+                )
+            }
+        )?;
     }
     Ok(EXIT_OK)
 }

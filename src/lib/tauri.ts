@@ -27,6 +27,7 @@ import type {
   ScanProgress,
   ScanSession,
   SettingsView,
+  StopMode,
   StartupItem,
   SystemInfo,
   SystemSnapshot,
@@ -62,6 +63,7 @@ export interface Backend {
   systemGetInfo(): Promise<SystemInfo>;
   systemGetSnapshot(): Promise<SystemSnapshot>;
   systemListProcesses(limit?: number): Promise<ProcessInfo[]>;
+  systemStopProcess(pid: number, mode: StopMode): Promise<void>;
   cleanerListProviders(): Promise<ProviderInfo[]>;
   cleanerStartScan(providerIds?: string[]): Promise<string>;
   cleanerCancelScan(scanId: string): Promise<void>;
@@ -92,6 +94,7 @@ const tauriBackend: Backend = {
   systemGetInfo: () => invoke<SystemInfo>("system_get_info"),
   systemGetSnapshot: () => invoke<SystemSnapshot>("system_get_snapshot"),
   systemListProcesses: (limit) => invoke<ProcessInfo[]>("system_list_processes", { limit }),
+  systemStopProcess: (pid, mode) => invoke<void>("system_stop_process", { pid, mode }),
   cleanerListProviders: () => invoke<ProviderInfo[]>("cleaner_list_providers"),
   cleanerStartScan: (providerIds) => invoke<string>("cleaner_start_scan", { providerIds }),
   cleanerCancelScan: (scanId) => invoke<void>("cleaner_cancel_scan", { scanId }),

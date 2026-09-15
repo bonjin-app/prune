@@ -1,6 +1,13 @@
 import { create } from "zustand";
 import { backend, errorMessage } from "@/lib/tauri";
-import type { AppMeta, Permissions, ProcessInfo, SystemInfo, SystemSnapshot } from "@/types/models";
+import type {
+  AppMeta,
+  Permissions,
+  ProcessInfo,
+  StopMode,
+  SystemInfo,
+  SystemSnapshot,
+} from "@/types/models";
 
 interface SystemState {
   meta: AppMeta | null;
@@ -12,6 +19,8 @@ interface SystemState {
   loadStatic: () => Promise<void>;
   refreshSnapshot: () => Promise<void>;
   refreshProcesses: (limit?: number) => Promise<void>;
+  /** Asks a process to stop, or forces it. Returns true when the system accepted. */
+  stopProcess: (pid: number, mode: StopMode) => Promise<boolean>;
 }
 
 export const useSystem = create<SystemState>((set) => ({
@@ -41,6 +50,18 @@ export const useSystem = create<SystemState>((set) => ({
       set({ error: errorMessage(e) });
     }
   },
+  stopProcess: async (pid, mode) => {
+    try {
+      await backend.systemStopProcess(pid, mode);
+      // A process asked to quit takes a moment to go; the next poll picks that up.
+      set((s) => ({ processes: s.processes.filter((p) => p.pid !== pid) }));
+      return true;
+    } catch (e) {
+      set({ error: errorMessage(e) });
+      return false;
+    }
+  },
+
   refreshProcesses: async (limit = 40) => {
     try {
       const processes = await backend.systemListProcesses(limit);

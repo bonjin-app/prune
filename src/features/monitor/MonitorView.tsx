@@ -1,14 +1,18 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Meter } from "@/components/ui/Meter";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { Ban, Lock } from "lucide-react";
 import { formatBytes, formatPercent } from "@/lib/format";
 import { startSnapshotPolling, useSystem } from "@/stores/system";
+import type { ProcessInfo } from "@/types/models";
+import { StopProcessDialog } from "./StopProcessDialog";
 
 export function MonitorView() {
   const snapshot = useSystem((s) => s.snapshot);
   const processes = useSystem((s) => s.processes);
   const refreshProcesses = useSystem((s) => s.refreshProcesses);
+  const [stopping, setStopping] = useState<ProcessInfo | null>(null);
 
   useEffect(() => {
     const stop = startSnapshotPolling(2000);
@@ -105,6 +109,21 @@ export function MonitorView() {
                 />
               );
             })}
+            {snapshot?.network && (
+              <div className="border-t border-line pt-3">
+                <div className="flex justify-between text-[12px]">
+                  <span className="text-fg-muted">Network</span>
+                  <span className="tnum">
+                    ↓ {formatBytes(snapshot.network.downBytesPerSec)}/s · ↑{" "}
+                    {formatBytes(snapshot.network.upBytesPerSec)}/s
+                  </span>
+                </div>
+                <div className="mt-0.5 text-right text-[11px] text-fg-faint tnum">
+                  {formatBytes(snapshot.network.totalReceivedBytes)} in,{" "}
+                  {formatBytes(snapshot.network.totalTransmittedBytes)} out since boot
+                </div>
+              </div>
+            )}
           </div>
         </Card>
 
@@ -119,6 +138,7 @@ export function MonitorView() {
                   <th className="px-2 py-1 text-right font-medium">Memory</th>
                   <th className="px-2 py-1 text-right font-medium">PID</th>
                   <th className="px-2 py-1 text-left font-medium">User</th>
+                  <th className="px-2 py-1 text-right font-medium" />
                 </tr>
               </thead>
               <tbody>
@@ -129,6 +149,27 @@ export function MonitorView() {
                     <td className="px-2 py-1 text-right tnum">{formatBytes(p.memoryBytes)}</td>
                     <td className="px-2 py-1 text-right text-fg-faint tnum">{p.pid}</td>
                     <td className="px-2 py-1 text-fg-faint">{p.user ?? ""}</td>
+                    <td className="px-2 py-1 text-right">
+                      {p.canTerminate ? (
+                        <button
+                          type="button"
+                          onClick={() => setStopping(p)}
+                          title={`Stop ${p.name}`}
+                          aria-label={`Stop ${p.name}`}
+                          className="rounded p-1 text-fg-faint hover:bg-danger-soft hover:text-danger"
+                        >
+                          <Ban size={12} />
+                        </button>
+                      ) : (
+                        <span
+                          title={p.protectedReason}
+                          aria-label={p.protectedReason}
+                          className="inline-flex p-1 text-fg-faint/60"
+                        >
+                          <Lock size={11} />
+                        </span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -136,6 +177,7 @@ export function MonitorView() {
           </div>
         </Card>
       </div>
+      <StopProcessDialog process={stopping} onClose={() => setStopping(null)} />
     </div>
   );
 }

@@ -185,6 +185,7 @@ export interface SystemSnapshot {
   cpu: CpuStatus;
   memory: MemoryStatus;
   disks: DiskStatus[];
+  network: NetworkStatus;
   uptimeSeconds: number;
   processCount: number;
 }
@@ -196,6 +197,19 @@ export interface ProcessInfo {
   memoryBytes: number;
   user?: string;
   parentPid?: number;
+  /** Whether Prune will let this process be stopped. */
+  canTerminate: boolean;
+  /** Why not, when it will not. */
+  protectedReason?: string;
+}
+
+export type StopMode = "ask" | "force";
+
+export interface NetworkStatus {
+  downBytesPerSec: number;
+  upBytesPerSec: number;
+  totalReceivedBytes: number;
+  totalTransmittedBytes: number;
 }
 
 export interface AppMeta {

@@ -270,6 +270,28 @@ Two choices belong to the CLI itself, because a terminal has no confirmation dia
 against a [`SandboxPlatform`](#) and assert on both the output and the filesystem — including
 that a dry run changes nothing and that `node_modules` survives a plain `clean`.
 
+## 5h. Stopping a process
+
+Stopping the wrong process logs the user out or takes the machine down, and unlike a deleted
+cache there is no trash to recover from. `system::protection::classify` is therefore a single
+pure function, exhaustively tested, that refuses:
+
+- pid 0 and 1 — the kernel and init on every supported platform;
+- a list of names that hold the session together (`WindowServer`, `loginwindow`, `launchd`,
+  `Finder`, `lsass.exe`, `csrss.exe`, `explorer.exe`, `systemd`, …), matched case-insensitively;
+- anything owned by another user, or whose owner cannot be read, because stopping it would need
+  rights Prune never asks for;
+- Prune itself.
+
+`SystemMonitor::stop_process` applies those rules again at the moment of stopping rather than
+trusting the caller: the UI sends a process id, and by the time it arrives that id may belong to
+something else. Quitting sends `SIGTERM` so the program can save; forcing sends `SIGKILL`, and
+the dialog says which is which.
+
+`crates/prune-core/tests/processes.rs` verifies the whole path for real — it starts a process,
+stops it both ways, and checks that pid 1, Prune itself and an unknown id are refused. The only
+process those tests stop is the one they started.
+
 ## 6. Tauri layer
 
 Command naming: `<domain>_<verb>_<object>` in `snake_case`.

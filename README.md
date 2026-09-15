@@ -158,6 +158,8 @@ prune clean                      # show what would go — a dry run
 prune clean --yes                # move safe items to the trash
 prune clean --include-low --yes  # also node_modules, build directories, …
 prune disk ~/Projects --large 500
+prune processes --limit 20
+prune processes --stop 1234
 prune apps --detail "Visual Studio Code"
 prune startup
 prune log
