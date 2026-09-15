@@ -6,6 +6,7 @@ import { useSystem } from "@/stores/system";
 import { useUi } from "@/stores/ui";
 import { DEVELOPER_CATEGORIES } from "@/types/models";
 import { CleanerWorkspace } from "../cleaner/CleanerWorkspace";
+import { DockerCard } from "./DockerCard";
 import { DeleteModeToggle } from "../cleaner/DeleteModeToggle";
 
 export function DeveloperView() {
@@ -47,6 +48,9 @@ export function DeveloperView() {
         }
         actions={<DeleteModeToggle />}
       />
+      <div className="px-7 pb-3">
+        <DockerCard />
+      </div>
       <CleanerWorkspace
         categories={DEVELOPER_CATEGORIES}
         emptyTitle="Prune your toolchain"

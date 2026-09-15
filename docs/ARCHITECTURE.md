@@ -34,6 +34,7 @@ prune/
 │   │   ├── settings/          user settings the engine needs (project roots)
 │   │   ├── analyzer/          disk analyzer: directory tree, large files, extensions
 │   │   ├── apps/              uninstaller: app detail + leftovers as cleanup targets
+│   │   ├── docker/            Docker usage and the two prune commands
 │   │   ├── ops/               OperationLog (JSONL)
 │   │   ├── platform/          PlatformService trait; macos/, windows/, generic/, sandbox
 │   │   └── system/            SystemMonitor (sysinfo)
@@ -358,17 +359,33 @@ Never use real system paths in tests.
 | 6 Uninstaller       | apps + related data                                                     | planned                                                    |
 | 7 Monitor / Startup | monitor done; startup items planned                                     | partial                                                    |
 
-## 10. Deferred: Docker
+## 10. Docker, the one cleanup outside the pipeline
 
-Spec §27 asks for Docker cleanup. Meaningful Docker reclamation (images, containers, volumes,
-build cache) lives inside Docker's own VM disk image, so it cannot go through the file-deletion
-pipeline: it needs `docker system df` / `docker system prune`, which is a different kind of
-operation with different failure modes. Deleting `Docker.raw` directly would be a factory reset,
-not a cleanup, so it is deliberately not offered as a checkbox next to caches. The feature is
-deferred until it can be designed and verified as a command-based provider with its own
-confirmation step.
+Docker is often the largest single thing on a developer's disk, and the only target Prune
+cannot treat as files: images, containers and build cache live inside a disk image the daemon
+owns, and deleting that file is a factory reset rather than a cleanup. So `docker/` does not use
+`SafetyPolicy`, `CleanupPlan` or the trash at all. It asks the Docker CLI what is reclaimable
+and, on confirmation, asks Docker to reclaim it.
 
-## 10b. Known limitations
+Because the usual protections do not apply, three others take their place:
+
+- **Only two commands are reachable**, `docker system prune --force` and
+  `docker builder prune --force`. No `-a`, so images in use stay; never `--volumes`, because
+  volumes hold databases and other state a developer expects to survive a cleanup. A test
+  asserts those flags never appear.
+- **The exact command is shown before it runs**, and Docker's own output afterwards, because
+  Prune cannot verify or undo what Docker did.
+- Volumes appear in the table with their size, marked as kept, and are excluded from the
+  headline "reclaimable" figure so that number never promises something Prune will not do.
+
+Command execution goes through a `CommandRunner` trait. The tests inject a fake that records
+the argv and replies with real `docker system df` output, so parsing, argument construction,
+the missing-Docker case and the stopped-daemon case are all covered without Docker installed.
+The same path was exercised against a stub `docker` on `PATH` to confirm the real runner sends
+exactly those arguments. **It has not been run against a real Docker daemon**, which is the one
+gap left in this feature.
+
+## 11. Known limitations
 
 - macOS: `~/.Trash`, Safari, Mail and Messages are TCC-protected. Prune detects this and says so
   (see §5e), but cannot read them until the user grants Full Disk Access and restarts the app.

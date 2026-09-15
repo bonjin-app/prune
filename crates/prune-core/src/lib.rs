@@ -27,6 +27,7 @@
 
 pub mod analyzer;
 pub mod apps;
+pub mod docker;
 pub mod engine;
 pub mod error;
 pub mod fs;

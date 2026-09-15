@@ -54,18 +54,18 @@ safety as the primary feature.
 
 ## Features
 
-| Area            | Status     | What it does                                                                     |
-| --------------- | ---------- | -------------------------------------------------------------------------------- |
-| Dashboard       | ✅         | Storage, memory, CPU at a glance; reclaimable space by category; recent activity |
-| Cleaner         | ✅         | Application caches, logs, temporary files, Trash, old installers, browser caches |
-| Developer       | ✅         | Global tool caches + project artifact finder with per-item risk levels           |
-| Monitor         | ✅         | Live CPU per core, memory, swap, disks, top processes                            |
-| Command palette | ✅         | `⌘K` / `Ctrl+K` to jump anywhere or start a scan                                 |
-| Disk analyzer   | 🔜 Phase 5 | Directory tree, large file finder, visual usage                                  |
-| Uninstaller     | 🔜 Phase 6 | Apps with their caches, preferences, containers                                  |
-| Startup manager | 🔜 Phase 7 | Login items and launch agents, enable / disable                                  |
-| Docker cleanup  | 🔜         | Images, containers, volumes, build cache                                         |
-| CLI             | 🔜         | `prune scan`, `prune clean --developer`, … (read-only prototype available)       |
+| Area            | Status     | What it does                                                                           |
+| --------------- | ---------- | -------------------------------------------------------------------------------------- |
+| Dashboard       | ✅         | Storage, memory, CPU at a glance; reclaimable space by category; recent activity       |
+| Cleaner         | ✅         | Application caches, logs, temporary files, Trash, old installers, browser caches       |
+| Developer       | ✅         | Global tool caches + project artifact finder with per-item risk levels                 |
+| Monitor         | ✅         | Live CPU per core, memory, swap, disks, top processes                                  |
+| Command palette | ✅         | `⌘K` / `Ctrl+K` to jump anywhere or start a scan                                       |
+| Disk analyzer   | 🔜 Phase 5 | Directory tree, large file finder, visual usage                                        |
+| Uninstaller     | 🔜 Phase 6 | Apps with their caches, preferences, containers                                        |
+| Startup manager | 🔜 Phase 7 | Login items and launch agents, enable / disable                                        |
+| Docker          | ✅         | What Docker is holding, and two conservative prune commands. Volumes are never touched |
+| CLI             | 🔜         | `prune scan`, `prune clean --developer`, … (read-only prototype available)             |
 
 Every removable item carries a risk level:
 
@@ -158,6 +158,8 @@ prune clean                      # show what would go — a dry run
 prune clean --yes                # move safe items to the trash
 prune clean --include-low --yes  # also node_modules, build directories, …
 prune disk ~/Projects --large 500
+prune docker
+prune docker --prune-cache --yes
 prune processes --limit 20
 prune processes --stop 1234
 prune apps --detail "Visual Studio Code"

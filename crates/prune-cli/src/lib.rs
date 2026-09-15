@@ -18,6 +18,7 @@ use std::sync::Arc;
 
 use clap::{Parser, Subcommand};
 use prune_core::analyzer;
+use prune_core::docker as docker_api;
 use prune_core::models::{DeleteMode, RiskLevel, ScanSession, StopMode};
 use prune_core::ops::OperationLog;
 use prune_core::scan::ScanRequest;
@@ -86,6 +87,19 @@ pub enum Command {
         #[arg(long, value_name = "NAME")]
         detail: Option<String>,
     },
+    /// Show what Docker is holding, or ask it to reclaim space.
+    Docker {
+        /// Remove build cache: `docker builder prune --force`.
+        #[arg(long)]
+        prune_cache: bool,
+        /// Remove stopped containers, unused networks, dangling images and build cache:
+        /// `docker system prune --force`. Volumes are never touched.
+        #[arg(long)]
+        prune_unused: bool,
+        /// Actually run it. Without this the command is only printed.
+        #[arg(long, short = 'y')]
+        yes: bool,
+    },
     /// List running processes, or stop one.
     Processes {
         /// How many to show, busiest first.
@@ -153,6 +167,11 @@ pub fn run(
         ),
         Command::Disk { path, large } => disk(engine, path.as_deref(), *large, cli.json, out),
         Command::Apps { detail } => apps(engine, detail.as_deref(), cli.json, out),
+        Command::Docker {
+            prune_cache,
+            prune_unused,
+            yes,
+        } => docker(*prune_cache, *prune_unused, *yes, cli.json, out),
         Command::Processes { limit, stop, force } => {
             processes(*limit, *stop, *force, cli.json, out)
         }
@@ -416,6 +435,94 @@ fn apps(
         render::app_detail(out, &detail)?;
     }
     Ok(EXIT_OK)
+}
+
+fn docker(
+    prune_cache: bool,
+    prune_unused: bool,
+    yes: bool,
+    json: bool,
+    out: &mut impl Write,
+) -> std::io::Result<i32> {
+    let runner = docker_api::SystemRunner;
+
+    let action = match (prune_unused, prune_cache) {
+        (true, _) => Some(docker_api::DockerAction::SystemPrune),
+        (_, true) => Some(docker_api::DockerAction::BuilderPrune),
+        _ => None,
+    };
+
+    if let Some(action) = action {
+        if !yes {
+            writeln!(out, "{}", action.description())?;
+            writeln!(out, "\nWould run: {}", action.display())?;
+            writeln!(out, "Nothing was removed. Add --yes to run it.")?;
+            return Ok(EXIT_OK);
+        }
+        return match docker_api::prune(&runner, action) {
+            Ok(result) => {
+                if json {
+                    write_json(out, &result)?;
+                } else {
+                    writeln!(
+                        out,
+                        "{} reclaimed {}.",
+                        result.command,
+                        human_bytes(result.reclaimed_bytes)
+                    )?;
+                }
+                Ok(EXIT_OK)
+            }
+            Err(e) => {
+                writeln!(out, "error: {e}")?;
+                Ok(EXIT_ERROR)
+            }
+        };
+    }
+
+    let state = docker_api::status(&runner);
+    if json {
+        write_json(out, &state)?;
+        return Ok(match state {
+            docker_api::DockerState::Ready { .. } => EXIT_OK,
+            _ => EXIT_NOTHING,
+        });
+    }
+    match state {
+        docker_api::DockerState::NotInstalled => {
+            writeln!(out, "Docker is not installed.")?;
+            Ok(EXIT_NOTHING)
+        }
+        docker_api::DockerState::NotRunning { message } => {
+            writeln!(out, "Docker is not answering: {message}")?;
+            Ok(EXIT_NOTHING)
+        }
+        docker_api::DockerState::Ready { usage } => {
+            for entry in &usage.entries {
+                writeln!(
+                    out,
+                    "{:<14} {:>10}  {:>10} reclaimable  {:>3} of {:>3} in use{}",
+                    entry.label,
+                    human_bytes(entry.size_bytes),
+                    human_bytes(entry.reclaimable_bytes),
+                    entry.active_count,
+                    entry.total_count,
+                    if entry.reclaimable_by_prune {
+                        ""
+                    } else {
+                        "  (kept: Prune never removes volumes)"
+                    }
+                )?;
+            }
+            writeln!(
+                out,
+                "\n{} in use, {} reclaimable with `prune docker --prune-unused`.",
+                human_bytes(usage.total_bytes),
+                human_bytes(usage.reclaimable_bytes)
+            )?;
+            Ok(EXIT_OK)
+        }
+    }
 }
 
 fn processes(

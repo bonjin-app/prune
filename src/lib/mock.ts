@@ -295,6 +295,60 @@ const MOCK_REASON = "part of the operating system; stopping it would take the ma
 const MOCK_PROTECTED = new Map<number, string>();
 const mockStopped = new Set<number>();
 
+const mockDockerPruned = new Set<string>();
+function mockDockerUsage(scale: number) {
+  const gb = 1e9;
+  const entries = [
+    {
+      kind: "images" as const,
+      label: "Images",
+      note: "Unused images are re-pulled or rebuilt when needed.",
+      totalCount: 24,
+      activeCount: 3,
+      sizeBytes: 12.4 * gb,
+      reclaimableBytes: 9.1 * gb * scale,
+      reclaimableByPrune: true,
+    },
+    {
+      kind: "containers" as const,
+      label: "Containers",
+      note: "Stopped containers. Running ones are never touched.",
+      totalCount: 7,
+      activeCount: 2,
+      sizeBytes: 4.2 * gb,
+      reclaimableBytes: 3.8 * gb * scale,
+      reclaimableByPrune: true,
+    },
+    {
+      kind: "volumes" as const,
+      label: "Volumes",
+      note: "Volumes hold data such as databases. Prune never removes these.",
+      totalCount: 11,
+      activeCount: 4,
+      sizeBytes: 8.4 * gb,
+      reclaimableBytes: 2.1 * gb,
+      reclaimableByPrune: false,
+    },
+    {
+      kind: "build_cache" as const,
+      label: "Build cache",
+      note: "Layers from past builds. The next build is slower.",
+      totalCount: 132,
+      activeCount: 0,
+      sizeBytes: 6.8 * gb,
+      reclaimableBytes: 6.8 * gb * scale,
+      reclaimableByPrune: true,
+    },
+  ];
+  return {
+    entries,
+    totalBytes: entries.reduce((a, e) => a + e.sizeBytes, 0),
+    reclaimableBytes: entries
+      .filter((e) => e.reclaimableByPrune)
+      .reduce((a, e) => a + e.reclaimableBytes, 0),
+  };
+}
+
 let mockProjectRoots: string[] = [];
 function mockSettings() {
   return {
@@ -1026,6 +1080,25 @@ export const mockBackend: Backend = {
     return mockLargeFiles(d.root)
       .filter((f) => f.sizeBytes >= minBytes && removed.has(f.targetId))
       .slice(0, limit);
+  },
+  async dockerStatus() {
+    await new Promise((r) => setTimeout(r, 250));
+    if (mockDockerPruned.has("system_prune")) {
+      return { state: "ready" as const, usage: mockDockerUsage(0.15) };
+    }
+    return { state: "ready" as const, usage: mockDockerUsage(1) };
+  },
+  async dockerPrune(action) {
+    await new Promise((r) => setTimeout(r, 600));
+    mockDockerPruned.add(action);
+    const reclaimed = action === "system_prune" ? 19.7e9 : 6.8e9;
+    return {
+      action,
+      command:
+        action === "system_prune" ? "docker system prune --force" : "docker builder prune --force",
+      reclaimedBytes: reclaimed,
+      output: `deleted: sha256:8f2b…\n\nTotal reclaimed space: ${(reclaimed / 1e9).toFixed(1)}GB`,
+    };
   },
   async appsStartScan() {
     const id = `apps-${Date.now()}`;

@@ -430,3 +430,56 @@ export interface SettingsView {
   projectRootsConfigured: boolean;
   homeDir: string;
 }
+
+// ---- Docker (crates/prune-core/src/docker) ----
+
+export type DockerKind = "images" | "containers" | "volumes" | "build_cache";
+
+export interface DockerEntry {
+  kind: DockerKind;
+  label: string;
+  note: string;
+  totalCount: number;
+  activeCount: number;
+  sizeBytes: number;
+  reclaimableBytes: number;
+  /** False for volumes, which Prune never removes. */
+  reclaimableByPrune: boolean;
+}
+
+export interface DockerUsage {
+  entries: DockerEntry[];
+  totalBytes: number;
+  /** Excludes volumes, since Prune will not remove them. */
+  reclaimableBytes: number;
+}
+
+export type DockerState =
+  | { state: "not_installed" }
+  | { state: "not_running"; message: string }
+  | { state: "ready"; usage: DockerUsage };
+
+export type DockerAction = "system_prune" | "builder_prune";
+
+export interface DockerPruneResult {
+  action: DockerAction;
+  command: string;
+  reclaimedBytes: number;
+  output: string;
+}
+
+export const DOCKER_ACTION_LABEL: Record<DockerAction, string> = {
+  system_prune: "Remove unused data",
+  builder_prune: "Remove build cache",
+};
+
+export const DOCKER_ACTION_COMMAND: Record<DockerAction, string> = {
+  system_prune: "docker system prune --force",
+  builder_prune: "docker builder prune --force",
+};
+
+export const DOCKER_ACTION_DESCRIPTION: Record<DockerAction, string> = {
+  system_prune:
+    "Stopped containers, unused networks, dangling images and build cache. Images still in use and all volumes are kept.",
+  builder_prune: "Layers cached from past builds. Images and containers are untouched.",
+};

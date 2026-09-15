@@ -17,6 +17,9 @@ import type {
   CleanupResult,
   DeleteMode,
   DiskNodeView,
+  DockerAction,
+  DockerPruneResult,
+  DockerState,
   DiskProgress,
   DiskSummary,
   LargeFile,
@@ -75,6 +78,8 @@ export interface Backend {
   diskGetSummary(scanId: string): Promise<DiskSummary>;
   diskGetNode(scanId: string, path?: string): Promise<DiskNodeView>;
   diskLargeFiles(scanId: string, minBytes: number, limit?: number): Promise<LargeFile[]>;
+  dockerStatus(): Promise<DockerState>;
+  dockerPrune(action: DockerAction): Promise<DockerPruneResult>;
   appsStartScan(): Promise<ApplicationInfo[]>;
   appsGetDetail(appId: string): Promise<AppDetail>;
   appsRunUninstaller(appId: string): Promise<void>;
@@ -108,6 +113,8 @@ const tauriBackend: Backend = {
   diskGetNode: (scanId, path) => invoke<DiskNodeView>("disk_get_node", { scanId, path }),
   diskLargeFiles: (scanId, minBytes, limit) =>
     invoke<LargeFile[]>("disk_large_files", { scanId, minBytes, limit }),
+  dockerStatus: () => invoke<DockerState>("docker_status"),
+  dockerPrune: (action) => invoke<DockerPruneResult>("docker_prune", { action }),
   appsStartScan: () => invoke<ApplicationInfo[]>("apps_start_scan"),
   appsGetDetail: (appId) => invoke<AppDetail>("apps_get_detail", { appId }),
   appsRunUninstaller: (appId) => invoke<void>("apps_run_uninstaller", { appId }),

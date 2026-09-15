@@ -239,3 +239,24 @@ fn processes_refuses_to_stop_the_init_process() {
     assert_eq!(code, prune_cli::EXIT_ERROR);
     assert!(out.contains("cannot be stopped"), "{out}");
 }
+
+#[test]
+fn docker_names_the_command_and_runs_nothing_without_yes() {
+    let h = harness();
+
+    // This path returns before Docker is contacted, so it behaves the same on a machine with
+    // Docker and one without.
+    let (code, out) = run(&h, &["docker", "--prune-unused"]);
+    assert_eq!(code, EXIT_OK);
+    assert!(out.contains("docker system prune --force"), "{out}");
+    assert!(out.contains("Add --yes"), "{out}");
+    assert!(out.contains("volumes are kept"), "{out}");
+
+    let (code, out) = run(&h, &["docker", "--prune-cache"]);
+    assert_eq!(code, EXIT_OK);
+    assert!(out.contains("docker builder prune --force"), "{out}");
+
+    // The commands Prune is willing to run must never widen to these.
+    assert!(!out.contains("--volumes"), "{out}");
+    assert!(!out.contains("prune -a"), "{out}");
+}
