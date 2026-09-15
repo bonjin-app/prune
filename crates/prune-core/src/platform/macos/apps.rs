@@ -167,7 +167,7 @@ pub fn related_paths(app: &ApplicationInfo, known: &KnownPaths) -> Vec<RelatedPa
     // Name-based locations. Electron apps in particular store data under their
     // `CFBundleName` ("Code" for Visual Studio Code) rather than the bundle identifier,
     // so every known name is tried. Only exact matches, never prefixes.
-    for name in data_names(app) {
+    for name in data_names(app).into_iter().chain(vendor_subfolders(app)) {
         push(
             AppDataKind::ApplicationSupport,
             lib.join("Application Support").join(&name),
@@ -178,13 +178,77 @@ pub fn related_paths(app: &ApplicationInfo, known: &KnownPaths) -> Vec<RelatedPa
     out
 }
 
+/// Folders shared by several products, or by the system.
+///
+/// Matching by folder name is what finds `~/Library/Application Support/Code` for Visual
+/// Studio Code, but it would also hand one application everything under a vendor's umbrella
+/// folder. Uninstalling a single Google application must not offer to delete Chrome's
+/// profiles, Drive's database and the updater along with it.
+const SHARED_FOLDERS: &[&str] = &[
+    "google",
+    "microsoft",
+    "apple",
+    "adobe",
+    "mozilla",
+    "jetbrains",
+    "bravesoftware",
+    "chromium",
+    "electron",
+    "com.apple.tcc",
+    "caches",
+    "logs",
+    "preferences",
+    "containers",
+    "crashreporter",
+    "crashpad",
+    "diagnosticreports",
+    "developer",
+    "cloudkit",
+    "mobilesync",
+    "addressbook",
+    "keychains",
+    "safari",
+    "firefox",
+];
+
+/// Relative paths of the form `Vendor/Product`.
+///
+/// `Google Chrome` keeps its profiles in `Application Support/Google/Chrome`. The vendor
+/// folder itself is shared and must never be claimed, but the product folder inside it belongs
+/// to this application alone, so it is looked for explicitly.
+fn vendor_subfolders(app: &ApplicationInfo) -> Vec<String> {
+    let mut names = vec![app.name.trim().to_string()];
+    names.extend(read_info_plist(Path::new(&app.path)).name);
+    let mut out: Vec<String> = names
+        .iter()
+        .filter_map(|name| {
+            let (vendor, rest) = name.split_once(' ')?;
+            if !SHARED_FOLDERS.contains(&vendor.to_ascii_lowercase().as_str()) {
+                return None;
+            }
+            let rest = rest.trim();
+            (rest.len() >= 3).then(|| format!("{vendor}/{rest}"))
+        })
+        .collect();
+    out.sort();
+    out.dedup();
+    out
+}
+
 /// Folder names an application may use for its data: the bundle file name plus the names
-/// declared in `Info.plist`. Short names are dropped to avoid matching unrelated folders.
+/// declared in `Info.plist`.
+///
+/// Short names are dropped because they match too much, and so are folders several products
+/// share, because a name is not proof of ownership.
 fn data_names(app: &ApplicationInfo) -> Vec<String> {
     let bm = read_info_plist(Path::new(&app.path));
     let mut names = vec![app.name.trim().to_string()];
     names.extend(bm.name);
-    names.retain(|n| n.len() >= 3 && !n.contains('/'));
+    names.retain(|n| {
+        n.len() >= 3
+            && !n.contains('/')
+            && !SHARED_FOLDERS.contains(&n.to_ascii_lowercase().as_str())
+    });
     names.sort();
     names.dedup();
     names
@@ -262,6 +326,64 @@ mod tests {
                 .as_path()
         ));
         assert!(!paths.contains(&lib.join("Application Support/CodeOther").as_path()));
+    }
+
+    #[test]
+    fn a_vendor_folder_is_never_attributed_to_one_application() {
+        let dir = tempfile::tempdir().unwrap();
+        let home = dir.path().to_path_buf();
+        let lib = home.join("Library");
+        // An umbrella folder several products write into.
+        std::fs::create_dir_all(lib.join("Application Support/Google/Chrome")).unwrap();
+        std::fs::create_dir_all(lib.join("Caches/Google")).unwrap();
+        // And the application's own folder, which should still be found.
+        std::fs::create_dir_all(lib.join("Application Support/GoogleUpdater")).unwrap();
+
+        let known = KnownPaths {
+            home: home.clone(),
+            ..Default::default()
+        };
+        let app = fake_app(&home, "Google", "com.google.updater");
+        let paths: Vec<_> = related_paths(&app, &known)
+            .iter()
+            .map(|r| r.path.clone())
+            .collect();
+
+        assert!(!paths.contains(&lib.join("Application Support/Google")));
+        assert!(!paths.contains(&lib.join("Caches/Google")));
+
+        // A name of its own still matches.
+        let app = fake_app(&home, "GoogleUpdater", "com.google.updater");
+        let paths: Vec<_> = related_paths(&app, &known)
+            .iter()
+            .map(|r| r.path.clone())
+            .collect();
+        assert!(paths.contains(&lib.join("Application Support/GoogleUpdater")));
+    }
+
+    #[test]
+    fn a_product_folder_inside_a_vendor_folder_is_still_found() {
+        let dir = tempfile::tempdir().unwrap();
+        let home = dir.path().to_path_buf();
+        let lib = home.join("Library");
+        // How Chrome actually lays out its data.
+        std::fs::create_dir_all(lib.join("Application Support/Google/Chrome/Default")).unwrap();
+        // A sibling product under the same vendor, which belongs to something else.
+        std::fs::create_dir_all(lib.join("Application Support/Google/DriveFS")).unwrap();
+
+        let known = KnownPaths {
+            home: home.clone(),
+            ..Default::default()
+        };
+        let app = fake_app(&home, "Google Chrome", "com.google.Chrome");
+        let paths: Vec<_> = related_paths(&app, &known)
+            .iter()
+            .map(|r| r.path.clone())
+            .collect();
+
+        assert!(paths.contains(&lib.join("Application Support/Google/Chrome")));
+        assert!(!paths.contains(&lib.join("Application Support/Google")));
+        assert!(!paths.contains(&lib.join("Application Support/Google/DriveFS")));
     }
 
     #[test]

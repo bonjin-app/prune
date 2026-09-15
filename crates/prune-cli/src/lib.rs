@@ -258,12 +258,18 @@ fn scan(
 }
 
 /// Ids of the targets `clean` is willing to select without the user naming each one.
-pub fn auto_selected(session: &ScanSession, include_low: bool) -> Vec<String> {
+///
+/// Risk decides most of it, but there is a second rule: some targets cannot be moved to the
+/// trash — items already in it, for instance — and are always deleted outright. Selecting those
+/// while promising "move to the trash" would delete a user's Trash on a command that reads as
+/// reversible, so they are only taken when `--permanent` was asked for.
+pub fn auto_selected(session: &ScanSession, include_low: bool, permanent: bool) -> Vec<String> {
     session
         .results
         .iter()
         .flat_map(|r| r.targets.iter())
         .filter(|t| t.risk == RiskLevel::Safe || (include_low && t.risk == RiskLevel::Low))
+        .filter(|t| permanent || !t.permanent_only)
         .map(|t| t.id.clone())
         .collect()
 }
@@ -280,7 +286,7 @@ fn clean(
     out: &mut impl Write,
 ) -> std::io::Result<i32> {
     let session = scan(engine, only, out, !json)?;
-    let ids = auto_selected(&session, include_low);
+    let ids = auto_selected(&session, include_low, permanent);
     let mode = if permanent {
         DeleteMode::Permanent
     } else {
@@ -288,11 +294,36 @@ fn clean(
     };
     let plan = engine.plan(&session, &ids, mode);
 
+    // Targets that can only be deleted outright are left out of a trash-mode run. Saying so
+    // matters most when they were the only thing found, or the answer looks like "nothing is
+    // there" when something is.
+    let held_back = if permanent {
+        0
+    } else {
+        session
+            .results
+            .iter()
+            .flat_map(|r| r.targets.iter())
+            .filter(|t| t.permanent_only && (t.risk == RiskLevel::Safe || include_low))
+            .count()
+    };
+    let held_back_note = |out: &mut dyn Write| -> std::io::Result<()> {
+        if held_back == 0 {
+            return Ok(());
+        }
+        writeln!(
+            out,
+            "\n{held_back} item(s) can only be deleted outright, such as anything already in \
+             the trash. Add --permanent to include them."
+        )
+    };
+
     if plan.targets.is_empty() {
         if json {
             write_json(out, &plan)?;
         } else {
             writeln!(out, "Nothing to remove.")?;
+            held_back_note(out)?;
         }
         return Ok(EXIT_NOTHING);
     }
@@ -302,6 +333,7 @@ fn clean(
             write_json(out, &plan)?;
         } else {
             render::plan_table(out, &plan)?;
+            held_back_note(out)?;
             writeln!(
                 out,
                 "\nDry run. Nothing was removed. Add --yes to {}.",

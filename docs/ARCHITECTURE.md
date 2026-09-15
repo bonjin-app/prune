@@ -182,7 +182,15 @@ Windows. Sizes are measured in parallel afterwards and streamed to the UI, so th
 instantly.
 
 `platform::app_related_paths` returns the existing locations an application writes outside its
-bundle. macOS matches on the bundle identifier (`~/Library/Caches/<id>`, `Containers`, `WebKit`,
+bundle. Matching by folder name is what makes this work for Electron apps, and also what makes
+it dangerous: a vendor folder such as `~/Library/Application Support/Google` is shared by
+Chrome, Drive and the updater, so no single application may claim it. Those names are on a
+denylist. The product folder _inside_ one is a different matter — `Google Chrome` does own
+`Google/Chrome` — so a name of the form `Vendor Product` is also looked up as `Vendor/Product`.
+Without both halves of that rule the uninstaller either offers a sibling's data or misses the
+application's own.
+
+macOS matches on the bundle identifier (`~/Library/Caches/<id>`, `Containers`, `WebKit`,
 `HTTPStorages`, `Application Scripts`, and `Preferences` / `Saved Application State` entries
 prefixed with the id) **and** on folder names, using both the bundle file name and
 `CFBundleName` — Electron apps store data under the latter (`~/Library/Application Support/Code`

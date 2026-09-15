@@ -8,6 +8,9 @@ All notable changes to Prune are documented here. The format follows
 
 ### Fixed
 
+- `prune clean` emptied the Trash while promising to move things there. Items already in the trash can only be deleted outright, so a run that reads as reversible must leave them alone; it now does, and says why instead of reporting "nothing to remove".
+- Uninstalling an application could offer to delete a vendor folder several products share. Removing one Google application would have taken Chrome's profiles and Drive's data with it. Vendor folders are never claimed now, but the product folder inside one still is, so Google Chrome correctly reports `Application Support/Google/Chrome` and leaves `Application Support/Google` alone.
+- Old installers no longer match `.zip` on Windows. A zip is as likely to be a download worth keeping as an installer.
 - A cleanup that succeeded but could not be written to the operation log was reported as a failure. The files were already gone, so the user was told the opposite of what happened and might have run it again. The removal now succeeds and the result carries the logging problem, which the result dialog shows.
 - Scan sessions, cleanup plans and disk analyses were kept for the life of the process. An analysis of a home directory holds one node per directory — tens of thousands on a real machine — so a session spent scanning a few times grew steadily. Only the most recent few are kept now.
 - Revealing a path in the file manager accepted anything under `/private`, so `/etc/hosts` was refused while `/private/etc/hosts`, the same file, was allowed. The check now compares canonical paths against the directories Prune actually works in.

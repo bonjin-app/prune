@@ -95,10 +95,13 @@ pub const TEMP_FILES: SimpleProvider = SimpleProvider::new(
 pub struct OldInstallers;
 
 impl OldInstallers {
+    /// Only formats that exist to install something. A `.zip` was deliberately dropped: it is
+    /// as likely to be a download the user meant to keep as an installer, and Prune should not
+    /// be the reason someone loses one.
     const EXTENSIONS: &'static [&'static str] = if cfg!(target_os = "windows") {
-        &["msi", "exe", "iso", "zip", "appx", "msix"]
+        &["msi", "msix", "appx", "appxbundle", "iso"]
     } else {
-        &["dmg", "pkg", "iso", "xip"]
+        &["dmg", "pkg", "xip", "iso"]
     };
 }
 

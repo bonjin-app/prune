@@ -32,6 +32,7 @@ fn harness() -> Harness {
     sandbox
         .write("Projects/web/node_modules/left-pad/index.js", 3_000)
         .unwrap();
+    sandbox.write(".Trash/discarded.txt", 900).unwrap();
     sandbox.write("Documents/thesis.txt", 100).unwrap();
     sandbox.write(".ssh/id_ed25519", 64).unwrap();
 
@@ -259,4 +260,30 @@ fn docker_names_the_command_and_runs_nothing_without_yes() {
     // The commands Prune is willing to run must never widen to these.
     assert!(!out.contains("--volumes"), "{out}");
     assert!(!out.contains("prune -a"), "{out}");
+}
+
+#[test]
+fn clean_does_not_empty_the_trash_while_promising_to_move_things_there() {
+    let h = harness();
+    let discarded = h.sandbox.home().join(".Trash/discarded.txt");
+    assert!(discarded.exists());
+
+    // The default reads as reversible, so it must leave alone anything that can only be
+    // deleted outright.
+    let (code, out) = run(&h, &["clean", "--yes", "--only", "trash"]);
+    assert_eq!(code, EXIT_NOTHING, "{out}");
+    assert!(
+        discarded.exists(),
+        "the trash was emptied by a `move to trash` run"
+    );
+
+    // The dry run says why, rather than silently leaving it out.
+    let (_, out) = run(&h, &["clean", "--only", "trash"]);
+    assert!(out.contains("deleted outright"), "{out}");
+    assert!(out.contains("--permanent"), "{out}");
+
+    // Asking for permanent removal does take it.
+    let (code, out) = run(&h, &["clean", "--permanent", "--yes", "--only", "trash"]);
+    assert_eq!(code, EXIT_OK, "{out}");
+    assert!(!discarded.exists(), "{out}");
 }
