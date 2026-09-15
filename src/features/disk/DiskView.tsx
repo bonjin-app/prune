@@ -112,7 +112,9 @@ export function DiskView() {
             <div className="ml-auto text-[12px] text-fg-muted tnum">
               {formatBytes(summary.totalBytes)} · {formatCount(summary.fileCount)} files ·{" "}
               {formatCount(summary.dirCount)} folders · {(summary.durationMs / 1000).toFixed(1)}s
-              {summary.status === "cancelled" && <span className="ml-2 text-warn">cancelled</span>}
+              {summary.status === "cancelled" && (
+                <span className="ml-2 text-warn">stopped early, partial</span>
+              )}
               {summary.issueCount > 0 && (
                 <span className="ml-2 text-warn">{summary.issueCount} skipped</span>
               )}

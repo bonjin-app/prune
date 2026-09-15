@@ -197,6 +197,11 @@ Discovery → Path Validation → Risk Classification → User Confirmation → 
 
 Details, module map, IPC naming and the provider interface: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
+## Releasing
+
+Tagging `v*` builds the desktop bundles and the CLI for macOS and Windows and opens a draft
+release. The steps are in [RELEASING.md](RELEASING.md).
+
 ## Security
 
 Prune deletes files, so every bug that could remove the wrong thing is treated as a security

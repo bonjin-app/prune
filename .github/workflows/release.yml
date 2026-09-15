@@ -9,6 +9,7 @@ permissions:
   contents: write
 
 jobs:
+  # The desktop bundles. Creates (or reuses) the draft release for the tag.
   release:
     name: ${{ matrix.name }}
     strategy:
@@ -60,3 +61,53 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+  # The `prune` command line, attached to the same release. Built after the bundles so the
+  # draft release already exists.
+  cli:
+    name: CLI (${{ matrix.name }})
+    needs: release
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS (Apple Silicon)
+            os: macos-latest
+            target: aarch64-apple-darwin
+          - name: macOS (Intel)
+            os: macos-latest
+            target: x86_64-apple-darwin
+          - name: Windows (x64)
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
+          key: cli-${{ matrix.target }}
+      - run: cargo build -p prune-cli --release --target ${{ matrix.target }}
+      - name: Package
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          dir="target/${{ matrix.target }}/release"
+          name="prune-${tag}-${{ matrix.target }}"
+          if [ -f "$dir/prune.exe" ]; then
+            7z a "$name.zip" "./$dir/prune.exe" ./LICENSE ./README.md
+          else
+            tar -czf "$name.tar.gz" -C "$dir" prune -C "$GITHUB_WORKSPACE" LICENSE README.md
+          fi
+      - name: Attach to the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${GITHUB_REF_NAME}" prune-*.tar.gz prune-*.zip --clobber

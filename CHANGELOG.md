@@ -22,6 +22,8 @@ All notable changes to Prune are documented here. The format follows
 - Startup manager: launch agents and daemons on macOS (with launchd's override database deciding the real state), `Run` registry keys and Start Menu Startup folders on Windows. Toggling is reversible and writes only to the override database / `StartupApproved`; nothing is deleted and items shared by all users stay read-only (Phase 7).
 - Monitor: CPU per core, memory, swap, disks, top processes (read-only).
 - Preview (dry run) → confirm → remove → operation log pipeline with `Move to Trash` / `Delete permanently` modes.
+- A stopped scan now says its results are partial instead of presenting a smaller total as the whole picture.
+- Releasing is documented and scripted: `scripts/set-version.sh` writes the version everywhere, and tagging builds the desktop bundles and the CLI for macOS and Windows into a draft release.
 - Scan results can be filtered by name, path or kind and narrowed to safe items only, and are listed biggest first. With thirty providers and hundreds of project artifacts, the list needed a way in.
 - Dashboard's Review & Clean arrives with the safe items already ticked.
 - Command palette (⌘K / Ctrl+K) and ⌘/Ctrl + digit shortcuts for every view.

@@ -81,6 +81,10 @@ A pull request is rejected if it:
 Conventional Commits (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`). Keep the
 subject under 72 characters.
 
+## Releasing
+
+See [RELEASING.md](RELEASING.md).
+
 ## License
 
 By contributing you agree that your contributions are licensed under the MIT License.

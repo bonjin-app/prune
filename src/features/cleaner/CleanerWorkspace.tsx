@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from "react";
-import { Ban, RefreshCw, Search, Sparkles, X } from "lucide-react";
+import { AlertTriangle, Ban, RefreshCw, Search, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { cn } from "@/lib/cn";
@@ -25,6 +25,7 @@ export function CleanerWorkspace({
 }) {
   const providers = useScan((s) => s.providers);
   const session = useScan((s) => s.session);
+  const cancelled = session?.status === "cancelled";
   const scanning = useScan((s) => s.scanning);
   const selected = useScan((s) => s.selected);
   const startScan = useScan((s) => s.startScan);
@@ -91,6 +92,24 @@ export function CleanerWorkspace({
             <RefreshCw size={14} /> {hasResults ? "Rescan" : "Scan"}
           </Button>
         )}
+        {cancelled && !scanning && (
+          <div className="mx-7 mb-3 flex items-center gap-2.5 rounded-lg border border-warn/30 bg-warn-soft/40 px-4 py-2.5 text-[12.5px]">
+            <AlertTriangle size={14} className="shrink-0 text-warn" />
+            <span>
+              You stopped this scan, so these results are partial. The totals below are lower than
+              what is really there.
+            </span>
+            <Button
+              size="sm"
+              variant="secondary"
+              className="ml-auto"
+              onClick={() => void startScan(scopedIds)}
+            >
+              Scan again
+            </Button>
+          </div>
+        )}
+
         {hasResults && !scanning && (
           <>
             <Button
