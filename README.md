@@ -38,10 +38,11 @@ safety as the primary feature.
 
 ## Why Prune?
 
-- **Developer cleanup as a first-class feature.** `node_modules`, Rust `target/`, Gradle and
-  Maven caches, Xcode DerivedData and Archives, pnpm / npm / Yarn / Bun stores, Cargo, pip, uv,
-  Go, NuGet, CocoaPods, Homebrew, Simulator caches, `build/`, `dist/`, Python caches and
-  virtualenvs — found and sized, per project.
+- **Developer cleanup as a first-class feature.** Thirty-odd tool caches — npm, pnpm, Yarn, Bun,
+  node-gyp, Deno, Playwright, Puppeteer, Cypress, Electron, Gradle, Maven, Cargo, Go, NuGet,
+  CocoaPods, Swift Package Manager, pub, RubyGems, Composer, JetBrains, Homebrew, Xcode
+  DerivedData and Archives, Simulator caches — plus project artifacts found per project:
+  `node_modules`, Rust `target/`, `build/`, `dist/`, Python caches and virtualenvs.
 - **Safe by default.** A whitelist of removable roots, a list of protected paths, a mandatory
   dry run, Trash before permanent deletion, and a local operation log. See
   [SECURITY.md](SECURITY.md) for the guarantees.

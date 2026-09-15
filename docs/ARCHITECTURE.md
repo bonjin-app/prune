@@ -115,7 +115,10 @@ project artifact walker.
 **Overlap de-duplication.** A generic provider (`user_cache`, priority 10) may report
 `~/Library/Caches/Homebrew` while `homebrew_cache` (priority 60) reports the same directory.
 After all providers finish, `scan::dedupe_overlaps` keeps the higher-priority target for any
-equal / ancestor / descendant pair, so no byte is offered twice.
+equal / ancestor / descendant pair, so no byte is offered twice. This is what lets a recognised
+tool cache move out of the anonymous "Application Caches" pile and into the Developer view with
+its own name, description and risk, without being counted twice — verified against a real
+machine as well as in tests.
 
 **Project artifacts.** The walker only reports a directory when a marker proves it is a build
 artifact (`node_modules` next to `package.json`, `target` next to `Cargo.toml`, `.venv`
