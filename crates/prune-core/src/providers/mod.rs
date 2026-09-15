@@ -10,7 +10,7 @@ pub mod browser;
 pub mod developer;
 pub mod system;
 
-pub use context::{ScanContext, ScanOutput};
+pub use context::{measure, Measured, ScanContext, ScanOutput};
 pub use registry::{default_providers, ProviderRegistry};
 pub use simple::{Root, RootMode, SimpleProvider};
 

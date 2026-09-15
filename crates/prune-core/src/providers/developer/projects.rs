@@ -7,6 +7,7 @@
 
 use std::path::{Path, PathBuf};
 
+use rayon::prelude::*;
 use walkdir::WalkDir;
 
 use crate::models::{Category, RiskLevel};
@@ -263,7 +264,52 @@ impl CleanupProvider for ProjectArtifacts {
     }
 
     fn scan(&self, ctx: &ScanContext<'_>) -> ScanOutput {
+        let (candidates, mut out) = self.discover(ctx);
+
+        // Hundreds of artifacts, most of them small: measuring them one after another leaves
+        // most cores idle even though each measurement is itself parallel. Measuring across
+        // artifacts as well keeps the machine busy for the whole scan.
+        let measured: Vec<crate::providers::Measured> = candidates
+            .par_iter()
+            .map(|c| {
+                crate::providers::measure(
+                    ctx,
+                    self.id(),
+                    &c.path,
+                    c.label.clone(),
+                    c.risk,
+                    Some(c.kind.to_string()),
+                    false,
+                )
+            })
+            .collect();
+        for m in measured {
+            out.issues.extend(m.issues);
+            if let Some(target) = m.target {
+                out.targets.push(target);
+            }
+        }
+        // Parallel measurement finishes in arbitrary order; sort so the same machine always
+        // produces the same list.
+        out.targets.sort_by(|a, b| a.path.cmp(&b.path));
+        out
+    }
+}
+
+/// One artifact directory found by the walk, before it has been measured.
+struct Candidate {
+    path: PathBuf,
+    label: String,
+    kind: &'static str,
+    risk: RiskLevel,
+}
+
+impl ProjectArtifacts {
+    /// Walks the project roots looking for artifact directories. Cheap compared with measuring
+    /// them, and never descends into one it has already reported.
+    fn discover(&self, ctx: &ScanContext<'_>) -> (Vec<Candidate>, ScanOutput) {
         let mut out = ScanOutput::default();
+        let mut candidates = Vec::new();
         let mut visited: u64 = 0;
         for root in Self::roots(ctx.known) {
             let mut walker = WalkDir::new(&root)
@@ -273,7 +319,7 @@ impl CleanupProvider for ProjectArtifacts {
                 .into_iter();
             while let Some(entry) = walker.next() {
                 if ctx.is_cancelled() {
-                    return out;
+                    return (candidates, out);
                 }
                 let entry = match entry {
                     Ok(e) => e,
@@ -293,16 +339,12 @@ impl CleanupProvider for ProjectArtifacts {
                 }
                 let path = entry.path();
                 if let Some(rule) = matching_rule(path) {
-                    let label = label_for(&root, path);
-                    out.push_measured(
-                        ctx,
-                        self.id(),
-                        path,
-                        label,
-                        rule.risk,
-                        Some(rule.kind.to_string()),
-                        false,
-                    );
+                    candidates.push(Candidate {
+                        label: label_for(&root, path),
+                        path: path.to_path_buf(),
+                        kind: rule.kind,
+                        risk: rule.risk,
+                    });
                     walker.skip_current_dir();
                     continue;
                 }
@@ -312,7 +354,7 @@ impl CleanupProvider for ProjectArtifacts {
                 }
             }
         }
-        out
+        (candidates, out)
     }
 }
 

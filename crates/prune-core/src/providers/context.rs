@@ -23,6 +23,84 @@ impl<'a> ScanContext<'a> {
     }
 }
 
+/// One measured candidate: the target if it turned out to be worth reporting, plus anything
+/// that went wrong while measuring it.
+#[derive(Debug, Default)]
+pub struct Measured {
+    pub target: Option<CleanupTarget>,
+    pub issues: Vec<ScanIssue>,
+}
+
+/// Measures one candidate path without touching any shared state.
+///
+/// Providers that discover many candidates (the project artifact walker finds hundreds) measure
+/// them in parallel, so this deliberately owns everything it returns rather than writing into a
+/// [`ScanOutput`].
+#[allow(clippy::too_many_arguments)]
+pub fn measure(
+    ctx: &ScanContext<'_>,
+    provider_id: &str,
+    path: &Path,
+    label: impl Into<String>,
+    risk: RiskLevel,
+    description: Option<String>,
+    permanent_only: bool,
+) -> Measured {
+    let mut issues = Vec::new();
+    let meta = match std::fs::symlink_metadata(path) {
+        Ok(m) => m,
+        Err(e) => {
+            issues.push(ScanIssue {
+                path: path.to_string_lossy().into(),
+                message: e.to_string(),
+            });
+            return Measured {
+                target: None,
+                issues,
+            };
+        }
+    };
+    let kind = if meta.is_dir() {
+        TargetKind::Directory
+    } else {
+        TargetKind::File
+    };
+    let mut size_ctx = SizeContext {
+        cancel: ctx.cancel,
+        on_progress: Some(ctx.progress),
+        issues: &mut issues,
+    };
+    let stats = entry_stats(path, &mut size_ctx);
+    (ctx.progress)(stats.files, stats.bytes, path);
+    if stats.bytes == 0 && stats.files == 0 {
+        return Measured {
+            target: None,
+            issues,
+        };
+    }
+    let risk = if ctx.policy.is_protected(path) {
+        RiskLevel::Protected
+    } else {
+        risk
+    };
+    Measured {
+        target: Some(CleanupTarget {
+            id: CleanupTarget::make_id(provider_id, path),
+            provider_id: provider_id.to_string(),
+            path: path.to_string_lossy().into_owned(),
+            kind,
+            size_bytes: stats.bytes,
+            file_count: stats.files,
+            risk,
+            label: label.into(),
+            description,
+            modified_at: meta.modified().ok().map(DateTime::<Utc>::from),
+            permanent_only,
+        }),
+        issues,
+    }
+}
+
 /// Targets plus non-fatal issues from one provider run.
 #[derive(Debug, Default)]
 pub struct ScanOutput {
@@ -53,47 +131,18 @@ impl ScanOutput {
         description: Option<String>,
         permanent_only: bool,
     ) -> Option<&CleanupTarget> {
-        let meta = match std::fs::symlink_metadata(path) {
-            Ok(m) => m,
-            Err(e) => {
-                self.issue(path, e.to_string());
-                return None;
-            }
-        };
-        let kind = if meta.is_dir() {
-            TargetKind::Directory
-        } else {
-            TargetKind::File
-        };
-        let mut size_ctx = SizeContext {
-            cancel: ctx.cancel,
-            on_progress: Some(ctx.progress),
-            issues: &mut self.issues,
-        };
-        let stats = entry_stats(path, &mut size_ctx);
-        (ctx.progress)(stats.files, stats.bytes, path);
-        if stats.bytes == 0 && stats.files == 0 {
-            return None;
-        }
-        let risk = if ctx.policy.is_protected(path) {
-            RiskLevel::Protected
-        } else {
-            risk
-        };
-        let modified_at: Option<DateTime<Utc>> = meta.modified().ok().map(DateTime::<Utc>::from);
-        self.targets.push(CleanupTarget {
-            id: CleanupTarget::make_id(provider_id, path),
-            provider_id: provider_id.to_string(),
-            path: path.to_string_lossy().into_owned(),
-            kind,
-            size_bytes: stats.bytes,
-            file_count: stats.files,
+        let measured = measure(
+            ctx,
+            provider_id,
+            path,
+            label,
             risk,
-            label: label.into(),
             description,
-            modified_at,
             permanent_only,
-        });
+        );
+        self.issues.extend(measured.issues);
+        let target = measured.target?;
+        self.targets.push(target);
         self.targets.last()
     }
 

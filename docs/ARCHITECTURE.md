@@ -133,6 +133,12 @@ folders.
 - Cancellation is an `Arc<AtomicBool>` checked every 64 entries during traversal.
 - Sizes are logical (`metadata.len()`), hard links counted once per `(dev, ino)`, symlinks not
   followed. This matches Finder's reported size.
+- Discovery and measurement are separate phases in the project artifact walker. The walk finds
+  candidate directories (cheap; it never descends into one it has reported), then all of them are
+  measured with rayon. Most of the hundreds found on a real machine are small, and measuring them
+  one after another left most cores idle even though each measurement is itself parallel. Results
+  are sorted by path afterwards, because parallel completion order is arbitrary and the list must
+  be stable.
 - Sizing one tree is itself parallel. `fs::dir_stats` descends up to four levels until it has at
   least 32 independent subtrees, then walks them with rayon; the directories and files it passes
   on the way are counted during the descent. Two consequences worth remembering when editing it:
@@ -347,6 +353,9 @@ confirmation step.
 - Windows: Recycle Bin size is not path-based and is not reported yet.
 - Sizes are logical bytes, not on-disk blocks (APFS clones and compression make "space freed"
   slightly lower than shown).
-- A full scan of this developer machine (6.1M files, 504 GB reclaimable) takes about 2 minutes,
-  dominated by the project-artifact walk. Individual providers are parallel; the remaining cost
-  is filesystem metadata throughput.
+- A full scan of this developer machine (6.1M files, 504 GB reclaimable) takes about two
+  minutes, dominated by the project-artifact walk (4.1M files across 789 artifacts, 100s). That
+  is close to the filesystem floor: on one 190k-file tree `du -sh` takes 8.1s and `prune disk`,
+  which also builds a directory tree, a largest-files list and per-extension statistics, takes
+  10.5s. Further speedups would have to come from not walking, i.e. caching, which would trade
+  accuracy for time — the wrong trade for a tool whose value is an accurate number.
