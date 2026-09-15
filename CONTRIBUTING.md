@@ -19,7 +19,7 @@ pnpm tauri dev
 ```
 
 `pnpm dev` alone opens the UI in a browser against an in-memory mock backend, which is handy
-for UI work. `cargo run -p prune-core --example scan` runs a read-only scan in the terminal.
+for UI work. `cargo run -p prune-cli -- scan` runs a read-only scan in the terminal.
 
 ## Checks
 
@@ -35,7 +35,8 @@ cargo test --workspace
 ## Project Layout
 
 ```
-crates/prune-core   Engine: models, safety, fs, providers, scan, ops, platform, system (no Tauri)
+crates/prune-core   Engine: models, safety, fs, providers, scan, analyzer, apps, ops, platform
+crates/prune-cli    The `prune` command line, built on the same engine
 src-tauri           Tauri shell: IPC commands + events only
 src                 React UI: features/, stores/, components/ui, lib/tauri.ts (only IPC entry)
 docs                Architecture notes

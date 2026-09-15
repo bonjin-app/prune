@@ -10,10 +10,9 @@ pnpm install && pnpm tauri dev            # desktop app
 pnpm dev                                  # UI in browser with mock backend
 pnpm typecheck && pnpm lint && pnpm test  # frontend checks
 cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
-cargo run -p prune-core --example scan --release   # read-only real scan
-cargo run -p prune-core --example disk --release -- ~/Projects
-cargo run -p prune-core --example apps --release -- "Visual Studio Code"
-cargo run -p prune-core --example startup --release
+cargo run -p prune-cli -- scan                      # read-only real scan
+cargo run -p prune-cli -- disk ~/Projects --large 500
+cargo run -p prune-cli -- apps --detail "Visual Studio Code"
 ```
 
 ## Hard rules
@@ -28,3 +27,5 @@ cargo run -p prune-core --example startup --release
   `src/types/models.ts` (camelCase fields, snake_case enum values).
 - New provider: prefer a `SimpleProvider` const, register in `providers/registry.rs` or
   `developer::ALL`; keep provider ids unique and stable.
+- `clean` on the CLI must stay a dry run without `--yes`, and must never auto-select anything
+  riskier than `Low`.

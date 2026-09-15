@@ -1,56 +1,16 @@
 //! End-to-end test of the safety pipeline against a sandboxed fake home directory.
 //! Never touches the real filesystem outside a temp dir.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
-use prune_core::models::{DeleteMode, Platform, RiskLevel};
+use prune_core::models::{DeleteMode, RiskLevel};
 use prune_core::ops::OperationLog;
-use prune_core::platform::{KnownPaths, PlatformService, ProtectedPaths};
+use prune_core::platform::sandbox::SandboxPlatform;
 use prune_core::providers::ProviderRegistry;
 use prune_core::scan::ScanRequest;
 use prune_core::PruneEngine;
-
-struct SandboxPlatform {
-    root: PathBuf,
-}
-
-impl PlatformService for SandboxPlatform {
-    fn platform(&self) -> Platform {
-        Platform::current()
-    }
-
-    fn known_paths(&self) -> KnownPaths {
-        let home = self.root.join("home");
-        KnownPaths {
-            user_cache: Some(home.join("Library/Caches")),
-            user_logs: Some(home.join("Library/Logs")),
-            app_support: Some(home.join("Library/Application Support")),
-            local_app_data: Some(home.join("Library/Application Support")),
-            temp: self.root.join("tmp"),
-            trash: Some(home.join(".Trash")),
-            downloads: Some(home.join("Downloads")),
-            project_roots: vec![home.join("Projects")],
-            home,
-        }
-    }
-
-    fn protected_paths(&self, known: &KnownPaths) -> ProtectedPaths {
-        let home = &known.home;
-        ProtectedPaths {
-            allowed_roots: vec![home.clone(), known.temp.clone()],
-            exact: vec![
-                home.clone(),
-                home.join("Library"),
-                home.join("Library/Caches"),
-                home.join("Documents"),
-            ],
-            trees: vec![home.join(".ssh"), home.join("Library/Keychains")],
-            app_bundle_roots: vec![],
-        }
-    }
-}
 
 fn write(path: &Path, size: usize) {
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -89,9 +49,7 @@ fn build_sandbox() -> tempfile::TempDir {
 
 fn engine_for(dir: &tempfile::TempDir) -> PruneEngine {
     PruneEngine::with_parts(
-        Box::new(SandboxPlatform {
-            root: dir.path().to_path_buf(),
-        }),
+        Box::new(SandboxPlatform::new(dir.path())),
         ProviderRegistry::with_defaults(),
     )
 }

@@ -12,6 +12,7 @@ use crate::Result;
 
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub mod generic;
+pub mod sandbox;
 pub mod startup_approved;
 
 #[cfg(target_os = "macos")]

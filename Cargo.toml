@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/prune-core", "src-tauri"]
+members = ["crates/prune-core", "crates/prune-cli", "src-tauri"]
 
 [workspace.package]
 version = "0.1.0"

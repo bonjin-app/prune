@@ -90,5 +90,6 @@ jobs:
           key: ${{ matrix.target }}
       - run: pnpm install --frozen-lockfile
       - run: cargo clippy -p prune --all-targets --target ${{ matrix.target }} -- -D warnings
+      - run: cargo clippy -p prune-cli --all-targets --target ${{ matrix.target }} -- -D warnings
       - name: Build (no bundle)
         run: pnpm tauri build --debug --no-bundle --target ${{ matrix.target }}

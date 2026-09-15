@@ -18,6 +18,7 @@ the first line of code (spec §39) and the reasoning behind them.
 ```
 prune/
 ├── Cargo.toml                 workspace: crates/prune-core, src-tauri
+├── crates/prune-cli/          the `prune` command line
 ├── crates/prune-core/         the engine (pure Rust)
 │   ├── src/
 │   │   ├── engine.rs          PruneEngine: scan / plan / execute
@@ -34,9 +35,8 @@ prune/
 │   │   ├── analyzer/          disk analyzer: directory tree, large files, extensions
 │   │   ├── apps/              uninstaller: app detail + leftovers as cleanup targets
 │   │   ├── ops/               OperationLog (JSONL)
-│   │   ├── platform/          PlatformService trait; macos/, windows/, generic/
+│   │   ├── platform/          PlatformService trait; macos/, windows/, generic/, sandbox
 │   │   └── system/            SystemMonitor (sysinfo)
-│   ├── examples/{scan,disk,apps,startup}.rs  read-only CLI prototypes
 │   └── tests/pipeline.rs      end-to-end against a sandboxed fake home
 ├── src-tauri/                 Tauri shell
 │   ├── src/commands/          app, system, cleaner, disk, apps, startup, settings, ops, fs
@@ -245,6 +245,24 @@ Three rules make this safe to get wrong:
 `AppState` keeps the engine behind an `RwLock<Arc<PruneEngine>>`: changing settings rebuilds it,
 while a scan already in flight keeps the `Arc` it started with and finishes against consistent
 paths.
+
+## 5g. Command line
+
+`crates/prune-cli` is a second front end over the same `PruneEngine`, not a reimplementation: it
+calls `scan`, `plan` and `execute` exactly as the desktop app does, so the safety pipeline,
+protected paths and operation log are shared.
+
+Two choices belong to the CLI itself, because a terminal has no confirmation dialog:
+
+- `clean` builds a plan and prints it, and only removes anything when `--yes` is given. A dry
+  run is the default, not an option.
+- `clean` auto-selects `Safe` targets only, or `Low` as well with `--include-low`. Medium and
+  higher are reported by `scan` but can only be chosen individually in the desktop app, where
+  each path and risk is visible. This is why there is no `--all`.
+
+`run()` takes the engine and a `Write`, which is what lets the tests drive whole commands
+against a [`SandboxPlatform`](#) and assert on both the output and the filesystem — including
+that a dry run changes nothing and that `node_modules` survives a plain `clean`.
 
 ## 6. Tauri layer
 

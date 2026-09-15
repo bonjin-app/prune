@@ -132,12 +132,9 @@ Prerequisites: Rust stable, Node 20+, pnpm, and the
 
 ```bash
 pnpm install
-pnpm tauri dev          # desktop app with hot reload
-pnpm dev                # UI only, in the browser, against a mock backend
-cargo run -p prune-core --example scan --release   # read-only cleanup scan in the terminal
-cargo run -p prune-core --example disk --release -- ~/Projects   # read-only disk analysis
-cargo run -p prune-core --example apps --release -- "Visual Studio Code"   # read-only app leftovers
-cargo run -p prune-core --example startup --release   # read-only startup items
+pnpm tauri dev                     # desktop app with hot reload
+pnpm dev                           # UI only, in the browser, against a mock backend
+cargo run -p prune-cli -- scan     # the command line, same engine
 ```
 
 Checks:
@@ -146,6 +143,34 @@ Checks:
 pnpm typecheck && pnpm lint && pnpm test
 cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
 ```
+
+## Command line
+
+The same engine, the same safety rules, in a terminal:
+
+```bash
+cargo install --path crates/prune-cli   # installs `prune`
+
+prune status                     # what Prune can see on this machine
+prune scan                       # find removable data (read-only)
+prune scan --only npm_cache --json | jq '.totalBytes'
+prune clean                      # show what would go — a dry run
+prune clean --yes                # move safe items to the trash
+prune clean --include-low --yes  # also node_modules, build directories, …
+prune disk ~/Projects --large 500
+prune apps --detail "Visual Studio Code"
+prune startup
+prune log
+```
+
+Two rules keep it safe to type quickly:
+
+- `clean` is a **dry run unless you pass `--yes`**. The default prints the plan and stops.
+- `clean` only ever selects `Safe` items on its own, or `Low` as well with `--include-low`.
+  Anything riskier is listed by `scan` but can only be chosen item by item in the desktop app,
+  where the path and the risk are in front of you.
+
+Exit codes: `0` success, `1` something failed, `2` nothing matched.
 
 ## Architecture
 
