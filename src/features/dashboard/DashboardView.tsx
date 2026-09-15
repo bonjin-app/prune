@@ -9,7 +9,7 @@ import { formatBytes, formatDuration, formatPercent, formatRelative } from "@/li
 import { useScan } from "@/stores/scan";
 import { startSnapshotPolling, useSystem } from "@/stores/system";
 import { useUi } from "@/stores/ui";
-import { CATEGORY_LABEL, type Category } from "@/types/models";
+import { CATEGORY_LABEL, CLEANER_CATEGORIES, type Category } from "@/types/models";
 import { backend } from "@/lib/tauri";
 import type { OperationRecord } from "@/types/models";
 
@@ -19,6 +19,7 @@ export function DashboardView() {
   const session = useScan((s) => s.session);
   const scanning = useScan((s) => s.scanning);
   const startScan = useScan((s) => s.startScan);
+  const selectRecommended = useScan((s) => s.selectRecommended);
   const setView = useUi((s) => s.setView);
 
   useEffect(() => startSnapshotPolling(3000), []);
@@ -151,7 +152,16 @@ export function DashboardView() {
             )}
             {session && session.totalBytes > 0 && (
               <div className="mt-3 flex justify-end">
-                <Button variant="primary" size="sm" onClick={() => setView("cleaner")}>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => {
+                    // Arrive with the safe items already ticked, so the next click is a
+                    // review rather than another round of selecting.
+                    selectRecommended(CLEANER_CATEGORIES);
+                    setView("cleaner");
+                  }}
+                >
                   Review & Clean <ArrowRight size={12} />
                 </Button>
               </div>

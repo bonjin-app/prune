@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { selectedTargets, sumBytes, useScan } from "./scan";
+import { filterResults, selectedTargets, sumBytes, useScan } from "./scan";
 import { useApps } from "./apps";
 import { useDisk } from "./disk";
 import type { Backend } from "@/lib/tauri";
@@ -157,6 +157,28 @@ describe("preview", () => {
     expect(useScan.getState().plan).toBeNull();
   });
 
+  it("plans only the ids it was given, not everything selected elsewhere", async () => {
+    const { session } = threeTargets();
+    mocked.cleanerPreview.mockResolvedValueOnce(factory.plan([]));
+    // "low" belongs to the Developer section; the Cleaner button must not include it.
+    useScan.setState({
+      session,
+      scanId: session.id,
+      selected: new Set(["safe", "low"]),
+    });
+
+    await useScan.getState().preview(["safe"]);
+
+    expect(mocked.cleanerPreview).toHaveBeenCalledWith("scan1", ["safe"], "trash");
+  });
+
+  it("does nothing when the given list is empty", async () => {
+    const { session } = threeTargets();
+    useScan.setState({ session, scanId: session.id, selected: new Set(["safe"]) });
+    await useScan.getState().preview([]);
+    expect(mocked.cleanerPreview).not.toHaveBeenCalled();
+  });
+
   it("sends the selected ids and the chosen mode", async () => {
     const { session } = threeTargets();
     const expected = factory.plan([]);
@@ -276,5 +298,79 @@ describe("delete mode", () => {
     useScan.getState().setDeleteMode("permanent");
     expect(useScan.getState().deleteMode).toBe("permanent");
     expect(localStorage.getItem("prune.deleteMode")).toBe("permanent");
+  });
+});
+
+describe("result filtering", () => {
+  const targets = [
+    factory.target({
+      id: "small",
+      label: "com.example.app",
+      path: "/home/u/Library/Caches/com.example.app",
+      sizeBytes: 1_000,
+      risk: "safe",
+    }),
+    factory.target({
+      id: "big",
+      label: "web/node_modules",
+      path: "/home/u/Projects/web/node_modules",
+      description: "node_modules",
+      sizeBytes: 9_000,
+      risk: "low",
+    }),
+    factory.target({
+      id: "locked",
+      label: "com.apple.bird",
+      path: "/home/u/Library/Caches/com.apple.bird",
+      sizeBytes: 5_000,
+      risk: "protected",
+    }),
+  ];
+  const results = [factory.result("user_cache", "application_cache", targets)];
+
+  it("puts the biggest items first", () => {
+    const [group] = filterResults(results, "", "all");
+    expect(group!.targets.map((t) => t.id)).toEqual(["big", "locked", "small"]);
+  });
+
+  it("matches on label, path and kind", () => {
+    expect(filterResults(results, "node_modules", "all")[0]!.targets.map((t) => t.id)).toEqual([
+      "big",
+    ]);
+    expect(filterResults(results, "Library/Caches", "all")[0]!.targets.map((t) => t.id)).toEqual([
+      "locked",
+      "small",
+    ]);
+    expect(filterResults(results, "com.apple", "all")[0]!.targets.map((t) => t.id)).toEqual([
+      "locked",
+    ]);
+  });
+
+  it("keeps a whole group when the provider name matches", () => {
+    const [group] = filterResults(results, "user_cache", "all");
+    expect(group!.targets).toHaveLength(3);
+  });
+
+  it("shows only safe items when asked", () => {
+    const [group] = filterResults(results, "", "safe");
+    expect(group!.targets.map((t) => t.id)).toEqual(["small"]);
+  });
+
+  it("recomputes the group totals from what is shown", () => {
+    const [group] = filterResults(results, "node_modules", "all");
+    expect(group!.totalBytes).toBe(9_000);
+    expect(group!.totalFiles).toBe(10);
+  });
+
+  it("drops groups that end up empty", () => {
+    expect(filterResults(results, "nothing-matches-this", "all")).toEqual([]);
+  });
+
+  it("keeps a group that only has issues to report, but not while filtering", () => {
+    const withIssue = [
+      { ...results[0]!, targets: [], issues: [{ path: "/x", message: "denied" }] },
+    ];
+    expect(filterResults(withIssue, "", "all")).toHaveLength(1);
+    expect(filterResults(withIssue, "anything", "all")).toEqual([]);
   });
 });

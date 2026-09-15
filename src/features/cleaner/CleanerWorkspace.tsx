@@ -1,10 +1,11 @@
-import { useMemo } from "react";
-import { Ban, RefreshCw, Sparkles } from "lucide-react";
+import { useEffect, useMemo } from "react";
+import { Ban, RefreshCw, Search, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { cn } from "@/lib/cn";
 import { PermissionBanner } from "@/components/ui/PermissionBanner";
 import { formatBytes } from "@/lib/format";
-import { selectedTargets, sumBytes, useScan } from "@/stores/scan";
+import { filterResults, selectedTargets, sumBytes, useScan } from "@/stores/scan";
 import type { Category, ProviderInfo } from "@/types/models";
 import { ProviderGroup } from "./ProviderGroup";
 import { ScanProgressBar } from "./ScanProgressBar";
@@ -33,15 +34,38 @@ export function CleanerWorkspace({
   const preview = useScan((s) => s.preview);
   const previewing = useScan((s) => s.previewing);
   const deleteMode = useScan((s) => s.deleteMode);
+  const filter = useScan((s) => s.filter);
+  const setFilter = useScan((s) => s.setFilter);
+  const riskFilter = useScan((s) => s.riskFilter);
+  const setRiskFilter = useScan((s) => s.setRiskFilter);
+  const setTargets = useScan((s) => s.setTargets);
 
   const scoped: ProviderInfo[] = useMemo(
     () => providers.filter((p) => categories.includes(p.category)),
     [providers, categories],
   );
   const scopedIds = useMemo(() => scoped.map((p) => p.id), [scoped]);
-  const results = useMemo(
+  // The filter is shared state, so carrying it from Cleaner into Developer would greet the
+  // user with "Nothing matches". Start each section clean.
+  const categoryKey = categories.join(",");
+  useEffect(() => {
+    setFilter("");
+    setRiskFilter("all");
+  }, [categoryKey, setFilter, setRiskFilter]);
+
+  const scopedResults = useMemo(
     () => session?.results.filter((r) => categories.includes(r.category)) ?? [],
     [session, categories],
+  );
+  const results = useMemo(
+    () => filterResults(scopedResults, filter, riskFilter),
+    [scopedResults, filter, riskFilter],
+  );
+  const filtering = filter.trim().length > 0 || riskFilter !== "all";
+  const shownTargets = useMemo(() => results.flatMap((r) => r.targets), [results]);
+  const selectableShown = useMemo(
+    () => shownTargets.filter((t) => t.risk !== "protected"),
+    [shownTargets],
   );
   const scopedSelected = useMemo(() => {
     const all = selectedTargets({ session, selected });
@@ -49,7 +73,8 @@ export function CleanerWorkspace({
   }, [session, selected, scopedIds]);
   const selectedBytes = sumBytes(scopedSelected);
   const scopedTotal = results.reduce((a, r) => a + r.totalBytes, 0);
-  const hasResults = results.some((r) => r.targets.length > 0);
+  const hasResults = scopedResults.some((r) => r.targets.length > 0);
+  const totalTargets = scopedResults.reduce((a, r) => a + r.targets.length, 0);
 
   return (
     <div className="flex h-full flex-col">
@@ -68,8 +93,20 @@ export function CleanerWorkspace({
         )}
         {hasResults && !scanning && (
           <>
-            <Button variant="ghost" size="md" onClick={() => selectRecommended(categories)}>
-              Select safe items
+            <Button
+              variant="ghost"
+              size="md"
+              onClick={() =>
+                filtering
+                  ? setTargets(
+                      selectableShown.map((t) => t.id),
+                      true,
+                    )
+                  : selectRecommended(categories)
+              }
+              disabled={filtering && selectableShown.length === 0}
+            >
+              {filtering ? `Select ${selectableShown.length} shown` : "Select safe items"}
             </Button>
             {scopedSelected.length > 0 && (
               <Button variant="ghost" size="md" onClick={clearSelection}>
@@ -98,7 +135,7 @@ export function CleanerWorkspace({
             variant={deleteMode === "permanent" ? "danger" : "primary"}
             disabled={scopedSelected.length === 0 || scanning}
             loading={previewing}
-            onClick={() => void preview()}
+            onClick={() => void preview(scopedSelected.map((t) => t.id))}
           >
             Review {selectedBytes > 0 ? formatBytes(selectedBytes) : ""}
           </Button>
@@ -106,6 +143,55 @@ export function CleanerWorkspace({
       </div>
 
       <PermissionBanner />
+
+      {hasResults && !scanning && (
+        <div className="flex items-center gap-2 px-7 pb-3">
+          <div className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md border border-line bg-surface px-2.5">
+            <Search size={13} className="shrink-0 text-fg-faint" />
+            <input
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder="Filter by name, path or kind"
+              aria-label="Filter results"
+              spellCheck={false}
+              className="min-w-0 flex-1 bg-transparent text-[12.5px] outline-none placeholder:text-fg-faint"
+            />
+            {filter.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setFilter("")}
+                aria-label="Clear filter"
+                className="rounded p-0.5 text-fg-faint hover:text-fg"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-0.5 rounded-md border border-line bg-surface-2 p-0.5">
+            {(["all", "safe"] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={riskFilter === value}
+                onClick={() => setRiskFilter(value)}
+                className={cn(
+                  "h-6 rounded-[5px] px-2 text-[11.5px] font-medium transition-colors",
+                  riskFilter === value
+                    ? "bg-surface text-fg shadow-sm"
+                    : "text-fg-muted hover:text-fg",
+                )}
+              >
+                {value === "all" ? "All risks" : "Safe only"}
+              </button>
+            ))}
+          </div>
+          {filtering && (
+            <span className="text-[11.5px] text-fg-faint tnum">
+              {shownTargets.length} of {totalTargets}
+            </span>
+          )}
+        </div>
+      )}
 
       {scanning && <ScanProgressBar providerIds={scopedIds} />}
 
@@ -126,13 +212,28 @@ export function CleanerWorkspace({
               )
             }
           />
+        ) : results.length === 0 ? (
+          <EmptyState
+            icon={Search}
+            title="Nothing matches"
+            description={`No items match that filter. ${totalTargets} were found in this section.`}
+            action={
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setFilter("");
+                  setRiskFilter("all");
+                }}
+              >
+                Clear filter
+              </Button>
+            }
+          />
         ) : (
           <div className="flex flex-col gap-3">
-            {results
-              .filter((r) => r.targets.length > 0 || r.issues.length > 0)
-              .map((r) => (
-                <ProviderGroup key={r.providerId} result={r} />
-              ))}
+            {results.map((r) => (
+              <ProviderGroup key={r.providerId} result={r} />
+            ))}
           </div>
         )}
       </div>

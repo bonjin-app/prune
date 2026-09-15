@@ -6,6 +6,10 @@ All notable changes to Prune are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- The Cleaner and Developer sections share one selection, but the Review button built its plan from everything selected anywhere. Selecting in Developer and then reviewing in Cleaner produced a plan bigger than the number on the button. Each section now plans only what it shows.
+
 ### Added
 
 - Tauri 2 + React + TypeScript + Tailwind foundation with dark/light theme and sidebar navigation (Phase 1).
@@ -18,6 +22,8 @@ All notable changes to Prune are documented here. The format follows
 - Startup manager: launch agents and daemons on macOS (with launchd's override database deciding the real state), `Run` registry keys and Start Menu Startup folders on Windows. Toggling is reversible and writes only to the override database / `StartupApproved`; nothing is deleted and items shared by all users stay read-only (Phase 7).
 - Monitor: CPU per core, memory, swap, disks, top processes (read-only).
 - Preview (dry run) → confirm → remove → operation log pipeline with `Move to Trash` / `Delete permanently` modes.
+- Scan results can be filtered by name, path or kind and narrowed to safe items only, and are listed biggest first. With thirty providers and hundreds of project artifacts, the list needed a way in.
+- Dashboard's Review & Clean arrives with the safe items already ticked.
 - Command palette (⌘K / Ctrl+K) and ⌘/Ctrl + digit shortcuts for every view.
 - Project folders are configurable: the developer scan searches the folders you name instead of the ones Prune guesses, persisted in `settings.json` next to the operation log. Folders must be inside your home directory, since that is the only place Prune can remove anything, and an unusable setting falls back to the guessed folders rather than silently disabling the scan. The Developer view says which folders it is searching and whether they were guessed.
 - Permission awareness on macOS: locations the OS hides (Trash, Safari data, Mail, Messages) are detected and reported with a banner and a shortcut to the Full Disk Access settings, instead of silently shrinking every scan total.

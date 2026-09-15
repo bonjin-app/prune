@@ -11,6 +11,7 @@ import type {
   DeleteMode,
   ProviderInfo,
   ScanProgress,
+  ScanResult,
   ScanSession,
 } from "@/types/models";
 
@@ -26,6 +27,9 @@ function loadMode(): DeleteMode {
   return "trash";
 }
 
+/** Which risks the result list shows. */
+export type RiskFilter = "all" | "safe";
+
 interface ScanState {
   providers: ProviderInfo[];
   scanId: string | null;
@@ -35,6 +39,9 @@ interface ScanState {
   session: ScanSession | null;
   selected: Set<string>;
   deleteMode: DeleteMode;
+  /** Substring typed into the result search box. */
+  filter: string;
+  riskFilter: RiskFilter;
   plan: CleanupPlan | null;
   previewing: boolean;
   executing: boolean;
@@ -54,8 +61,16 @@ interface ScanState {
   selectRecommended: (categories?: Category[]) => void;
   clearSelection: () => void;
   setDeleteMode: (mode: DeleteMode) => void;
+  setFilter: (filter: string) => void;
+  setRiskFilter: (riskFilter: RiskFilter) => void;
 
-  preview: () => Promise<void>;
+  /**
+   * Builds a plan for `targetIds`, or for everything selected when they are omitted.
+   *
+   * Views pass their own ids: the Cleaner and Developer sections share one selection, and a
+   * plan must never contain items the button the user pressed did not count.
+   */
+  preview: (targetIds?: string[]) => Promise<void>;
   closePreview: () => void;
   execute: () => Promise<void>;
   dismissResult: () => void;
@@ -70,6 +85,8 @@ export const useScan = create<ScanState>((set, get) => ({
   session: null,
   selected: new Set(),
   deleteMode: loadMode(),
+  filter: "",
+  riskFilter: "all",
   plan: null,
   previewing: false,
   executing: false,
@@ -161,12 +178,16 @@ export const useScan = create<ScanState>((set, get) => ({
     set({ deleteMode });
   },
 
-  preview: async () => {
+  setFilter: (filter) => set({ filter }),
+  setRiskFilter: (riskFilter) => set({ riskFilter }),
+
+  preview: async (targetIds) => {
     const { scanId, selected, deleteMode } = get();
-    if (!scanId || selected.size === 0) return;
+    const ids = targetIds ?? [...selected];
+    if (!scanId || ids.length === 0) return;
     set({ previewing: true, error: null });
     try {
-      const plan = await backend.cleanerPreview(scanId, [...selected], deleteMode);
+      const plan = await backend.cleanerPreview(scanId, ids, deleteMode);
       set({ plan, previewing: false, cleanupProgress: null });
     } catch (e) {
       set({ previewing: false, error: errorMessage(e) });
@@ -220,6 +241,46 @@ function pruneSession(session: ScanSession, removed: Set<string>): ScanSession {
     totalBytes: results.reduce((a, r) => a + r.totalBytes, 0),
     totalFiles: results.reduce((a, r) => a + r.totalFiles, 0),
   };
+}
+
+/**
+ * Applies the search box and risk filter to one provider's results.
+ *
+ * Targets come back biggest first: with hundreds of artifacts, size is the only order that
+ * puts the items worth deciding about at the top. Groups that end up empty are dropped, so a
+ * search narrows the page rather than leaving a wall of empty headings.
+ */
+export function filterResults(
+  results: ScanResult[],
+  filter: string,
+  riskFilter: RiskFilter,
+): ScanResult[] {
+  const needle = filter.trim().toLowerCase();
+  return results
+    .map((r) => {
+      const matchesProvider = needle.length > 0 && r.providerName.toLowerCase().includes(needle);
+      const targets = r.targets
+        .filter((t) => riskFilter === "all" || t.risk === "safe")
+        .filter(
+          (t) =>
+            needle.length === 0 ||
+            matchesProvider ||
+            t.label.toLowerCase().includes(needle) ||
+            t.path.toLowerCase().includes(needle) ||
+            (t.description ?? "").toLowerCase().includes(needle),
+        )
+        .slice()
+        .sort((a, b) => b.sizeBytes - a.sizeBytes);
+      return {
+        ...r,
+        targets,
+        totalBytes: targets.reduce((a, t) => a + t.sizeBytes, 0),
+        totalFiles: targets.reduce((a, t) => a + t.fileCount, 0),
+        // Issues explain gaps in the numbers, so keep them unless the user is searching.
+        issues: needle.length === 0 && riskFilter === "all" ? r.issues : [],
+      };
+    })
+    .filter((r) => r.targets.length > 0 || r.issues.length > 0);
 }
 
 /** Selected targets resolved from the session. */
