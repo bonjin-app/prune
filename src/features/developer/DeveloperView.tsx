@@ -52,6 +52,7 @@ export function DeveloperView() {
         <DockerCard />
       </div>
       <CleanerWorkspace
+        scope="developer"
         categories={DEVELOPER_CATEGORIES}
         emptyTitle="Prune your toolchain"
         emptyDescription="node_modules, Rust target/, Gradle and Maven caches, Xcode DerivedData, pnpm, npm, Cargo, pip and more. Everything here is rebuilt by your tools on demand."

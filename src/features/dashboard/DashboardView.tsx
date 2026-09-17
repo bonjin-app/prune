@@ -5,6 +5,7 @@ import { Card, CardHeader } from "@/components/ui/Card";
 import { Meter } from "@/components/ui/Meter";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PermissionBanner } from "@/components/ui/PermissionBanner";
+import { InsightsCard } from "./InsightsCard";
 import { formatBytes, formatDuration, formatPercent, formatRelative } from "@/lib/format";
 import { useScan } from "@/stores/scan";
 import { startSnapshotPolling, useSystem } from "@/stores/system";
@@ -169,7 +170,10 @@ export function DashboardView() {
           </div>
         </Card>
 
-        <RecentOperations />
+        <div className="flex flex-col gap-3">
+          <InsightsCard />
+          <RecentOperations />
+        </div>
       </div>
     </div>
   );

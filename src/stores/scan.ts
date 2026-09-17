@@ -42,6 +42,15 @@ interface ScanState {
   /** Substring typed into the result search box. */
   filter: string;
   riskFilter: RiskFilter;
+  /**
+   * Which section the current filter was meant for.
+   *
+   * Cleaner and Developer share one filter, so arriving in one with the other's search still
+   * applied would show "nothing matches". Each section clears a filter that was not meant for
+   * it — but a filter set deliberately for where the user is being sent has to survive, which
+   * is what this records.
+   */
+  filterScope: string | null;
   plan: CleanupPlan | null;
   previewing: boolean;
   executing: boolean;
@@ -61,7 +70,7 @@ interface ScanState {
   selectRecommended: (categories?: Category[]) => void;
   clearSelection: () => void;
   setDeleteMode: (mode: DeleteMode) => void;
-  setFilter: (filter: string) => void;
+  setFilter: (filter: string, scope?: string) => void;
   setRiskFilter: (riskFilter: RiskFilter) => void;
 
   /**
@@ -87,6 +96,7 @@ export const useScan = create<ScanState>((set, get) => ({
   deleteMode: loadMode(),
   filter: "",
   riskFilter: "all",
+  filterScope: null,
   plan: null,
   previewing: false,
   executing: false,
@@ -178,7 +188,7 @@ export const useScan = create<ScanState>((set, get) => ({
     set({ deleteMode });
   },
 
-  setFilter: (filter) => set({ filter }),
+  setFilter: (filter, scope) => set((s) => ({ filter, filterScope: scope ?? s.filterScope })),
   setRiskFilter: (riskFilter) => set({ riskFilter }),
 
   preview: async (targetIds) => {

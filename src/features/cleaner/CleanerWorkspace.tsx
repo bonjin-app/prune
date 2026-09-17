@@ -15,10 +15,13 @@ import { ScanProgressBar } from "./ScanProgressBar";
  * component scoped to different categories.
  */
 export function CleanerWorkspace({
+  scope,
   categories,
   emptyTitle,
   emptyDescription,
 }: {
+  /** Which section this is, so a filter meant for it is not cleared on arrival. */
+  scope: string;
   categories: Category[];
   emptyTitle: string;
   emptyDescription: string;
@@ -46,13 +49,14 @@ export function CleanerWorkspace({
     [providers, categories],
   );
   const scopedIds = useMemo(() => scoped.map((p) => p.id), [scoped]);
-  // The filter is shared state, so carrying it from Cleaner into Developer would greet the
-  // user with "Nothing matches". Start each section clean.
-  const categoryKey = categories.join(",");
+  // The filter is shared state, so carrying one from Cleaner into Developer would greet the
+  // user with "Nothing matches". Each section clears a filter that was not meant for it, and
+  // leaves alone one that was — which is how following an insight arrives already narrowed.
   useEffect(() => {
-    setFilter("");
+    if (useScan.getState().filterScope === scope) return;
+    setFilter("", scope);
     setRiskFilter("all");
-  }, [categoryKey, setFilter, setRiskFilter]);
+  }, [scope, setFilter, setRiskFilter]);
 
   const scopedResults = useMemo(
     () => session?.results.filter((r) => categories.includes(r.category)) ?? [],

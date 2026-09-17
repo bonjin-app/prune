@@ -315,6 +315,26 @@ the dialog says which is which.
 stops it both ways, and checks that pid 1, Prune itself and an unknown id are refused. The only
 process those tests stop is the one they started.
 
+## 5i. Turning a scan into advice
+
+`features/dashboard/insights.ts` reads a finished scan and picks at most three observations.
+The rule it follows is that a total is not advice: "504 GB reclaimable" only repeats what the
+disk gauge already showed, while "21 dormant projects are holding 9.45 GB" says where to start.
+
+Each insight names a view to open and, optionally, a filter to apply there. Two constraints
+keep it honest:
+
+- An insight counts only what its destination will show. Safe items exist in both the Cleaner
+  and Developer sections, so the safe-space insight picks whichever section holds more of them
+  and reports that number — a headline promising more than the page it opens is the same broken
+  promise as a button that under-counts its plan.
+- A project with no readable activity date is never called dormant.
+
+Following one sets `filter` together with a `filterScope`. The shared filter is otherwise
+cleared when a section loads, so that a search typed in Developer does not greet the user with
+"nothing matches" in Cleaner; the scope is what lets a filter set deliberately for a
+destination survive the trip.
+
 ## 6. Tauri layer
 
 Command naming: `<domain>_<verb>_<object>` in `snake_case`.

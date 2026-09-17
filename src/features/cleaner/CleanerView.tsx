@@ -12,6 +12,7 @@ export function CleanerView() {
         actions={<DeleteModeToggle />}
       />
       <CleanerWorkspace
+        scope="cleaner"
         categories={CLEANER_CATEGORIES}
         emptyTitle="Find what can go"
         emptyDescription="Prune looks through application caches, logs, temporary files, browser caches, the Trash and old installers. Nothing is removed without your review."
