@@ -5,12 +5,15 @@
 //! (e.g. `node_modules` next to `package.json`), so unrelated folders with the same name are
 //! left alone. Found artifacts are never descended into.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use rayon::prelude::*;
 use walkdir::WalkDir;
 
-use crate::models::{Category, RiskLevel};
+use chrono::{DateTime, Utc};
+
+use crate::models::{Category, RiskLevel, TargetGroup};
 use crate::platform::KnownPaths;
 use crate::providers::{CleanupProvider, ScanContext, ScanOutput};
 
@@ -272,7 +275,7 @@ impl CleanupProvider for ProjectArtifacts {
         let measured: Vec<crate::providers::Measured> = candidates
             .par_iter()
             .map(|c| {
-                crate::providers::measure(
+                let mut measured = crate::providers::measure(
                     ctx,
                     self.id(),
                     &c.path,
@@ -280,7 +283,11 @@ impl CleanupProvider for ProjectArtifacts {
                     c.risk,
                     Some(c.kind.to_string()),
                     false,
-                )
+                );
+                if let Some(target) = measured.target.as_mut() {
+                    target.group = c.group.clone();
+                }
+                measured
             })
             .collect();
         for m in measured {
@@ -302,6 +309,78 @@ struct Candidate {
     label: String,
     kind: &'static str,
     risk: RiskLevel,
+    group: Option<TargetGroup>,
+}
+
+/// Finds the project an artifact belongs to, and when that project was last worked on.
+///
+/// The answer for `queryx/apps/desktop/src-tauri/target` is `queryx`, not `src-tauri`: the
+/// project is the nearest ancestor holding a `.git` directory. Without walking up, a monorepo
+/// or a Tauri app scatters its artifacts across a dozen unrelated-looking rows.
+struct ProjectLookup {
+    root: PathBuf,
+    /// One answer per directory, because sibling artifacts share a project.
+    cache: HashMap<PathBuf, Option<TargetGroup>>,
+}
+
+impl ProjectLookup {
+    fn new(root: &Path) -> Self {
+        Self {
+            root: root.to_path_buf(),
+            cache: HashMap::new(),
+        }
+    }
+
+    fn group_for(&mut self, artifact: &Path) -> Option<TargetGroup> {
+        let start = artifact.parent()?.to_path_buf();
+        if let Some(cached) = self.cache.get(&start) {
+            return cached.clone();
+        }
+        let group = self.compute(&start);
+        self.cache.insert(start, group.clone());
+        group
+    }
+
+    fn compute(&self, start: &Path) -> Option<TargetGroup> {
+        let mut current = Some(start);
+        while let Some(dir) = current {
+            if dir.join(".git").exists() {
+                return Some(Self::describe(dir));
+            }
+            if dir == self.root {
+                break;
+            }
+            current = dir.parent();
+        }
+        // No repository above it: the directory the artifact sits in is as good as it gets.
+        Some(Self::describe(start))
+    }
+
+    fn describe(dir: &Path) -> TargetGroup {
+        TargetGroup {
+            key: dir.to_string_lossy().into_owned(),
+            label: dir
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_else(|| dir.to_string_lossy().into_owned()),
+            last_active_at: Self::last_active(dir),
+        }
+    }
+
+    /// When someone last did something in this repository.
+    ///
+    /// `.git/index` moves on every stage, commit, checkout or status that refreshes it, which
+    /// tracks real work far better than the mtime of the directory itself. `HEAD` is the
+    /// fallback, and a project with no repository has no answer at all — which is reported as
+    /// unknown rather than as "never", because guessing here would age a project wrongly.
+    fn last_active(dir: &Path) -> Option<DateTime<Utc>> {
+        ["index", "HEAD"]
+            .iter()
+            .filter_map(|name| std::fs::metadata(dir.join(".git").join(name)).ok())
+            .filter_map(|meta| meta.modified().ok())
+            .map(DateTime::<Utc>::from)
+            .max()
+    }
 }
 
 impl ProjectArtifacts {
@@ -312,6 +391,7 @@ impl ProjectArtifacts {
         let mut candidates = Vec::new();
         let mut visited: u64 = 0;
         for root in Self::roots(ctx.known) {
+            let mut projects = ProjectLookup::new(&root);
             let mut walker = WalkDir::new(&root)
                 .follow_links(false)
                 .max_depth(MAX_DEPTH)
@@ -341,6 +421,7 @@ impl ProjectArtifacts {
                 if let Some(rule) = matching_rule(path) {
                     candidates.push(Candidate {
                         label: label_for(&root, path),
+                        group: projects.group_for(path),
                         path: path.to_path_buf(),
                         kind: rule.kind,
                         risk: rule.risk,
@@ -373,6 +454,77 @@ mod tests {
             matching_rule(&project.join("node_modules")).unwrap().kind,
             "node_modules"
         );
+    }
+
+    #[test]
+    fn an_artifact_belongs_to_the_repository_above_it_not_its_own_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().to_path_buf();
+        // A monorepo: the repository is at the top, the artifact is three levels down.
+        let repo = root.join("queryx");
+        std::fs::create_dir_all(repo.join(".git")).unwrap();
+        std::fs::write(repo.join(".git/index"), b"x").unwrap();
+        let artifact = repo.join("apps/desktop/src-tauri/target");
+        std::fs::create_dir_all(&artifact).unwrap();
+
+        let mut lookup = ProjectLookup::new(&root);
+        let group = lookup.group_for(&artifact).unwrap();
+
+        assert_eq!(group.label, "queryx");
+        assert_eq!(group.key, repo.to_string_lossy());
+        assert!(
+            group.last_active_at.is_some(),
+            "the repository's own activity should be readable"
+        );
+    }
+
+    #[test]
+    fn artifacts_in_one_project_share_a_group() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().to_path_buf();
+        let repo = root.join("app");
+        std::fs::create_dir_all(repo.join(".git")).unwrap();
+        std::fs::create_dir_all(repo.join("node_modules")).unwrap();
+        std::fs::create_dir_all(repo.join("packages/ui/dist")).unwrap();
+
+        let mut lookup = ProjectLookup::new(&root);
+        let a = lookup.group_for(&repo.join("node_modules")).unwrap();
+        let b = lookup.group_for(&repo.join("packages/ui/dist")).unwrap();
+
+        assert_eq!(a.key, b.key, "both belong to the same project");
+        assert_eq!(a.label, "app");
+    }
+
+    #[test]
+    fn a_project_without_a_repository_still_gets_a_group_but_no_date() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().to_path_buf();
+        let project = root.join("loose/thing");
+        std::fs::create_dir_all(project.join("node_modules")).unwrap();
+
+        let mut lookup = ProjectLookup::new(&root);
+        let group = lookup.group_for(&project.join("node_modules")).unwrap();
+
+        assert_eq!(group.label, "thing");
+        assert_eq!(
+            group.last_active_at, None,
+            "an unknown date must not be reported as a very old one"
+        );
+    }
+
+    #[test]
+    fn the_search_stops_at_the_scan_root() {
+        let dir = tempfile::tempdir().unwrap();
+        // A repository *above* the directory being scanned must not swallow everything in it.
+        std::fs::create_dir_all(dir.path().join(".git")).unwrap();
+        let root = dir.path().join("projects");
+        let project = root.join("app");
+        std::fs::create_dir_all(project.join("node_modules")).unwrap();
+
+        let mut lookup = ProjectLookup::new(&root);
+        let group = lookup.group_for(&project.join("node_modules")).unwrap();
+
+        assert_eq!(group.label, "app", "grouping must not escape the scan root");
     }
 
     #[test]

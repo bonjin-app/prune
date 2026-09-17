@@ -96,6 +96,7 @@ pub fn measure(
             description,
             modified_at: meta.modified().ok().map(DateTime::<Utc>::from),
             permanent_only,
+            group: None,
         }),
         issues,
     }

@@ -21,6 +21,13 @@ export type DeleteMode = "trash" | "permanent";
 
 export type TargetKind = "file" | "directory";
 
+export interface TargetGroup {
+  key: string;
+  label: string;
+  /** When the project was last worked on, from its version control metadata. */
+  lastActiveAt?: string;
+}
+
 export interface CleanupTarget {
   id: string;
   providerId: string;
@@ -33,6 +40,8 @@ export interface CleanupTarget {
   description?: string;
   modifiedAt?: string;
   permanentOnly: boolean;
+  /** What this belongs to, when the provider knows. */
+  group?: TargetGroup;
 }
 
 export interface ScanIssue {

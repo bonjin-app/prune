@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AlertCircle, ChevronRight, FolderOpen } from "lucide-react";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { RiskBadge } from "@/components/ui/RiskBadge";
@@ -9,9 +9,15 @@ import { useScan } from "@/stores/scan";
 import { useSystem } from "@/stores/system";
 import type { CleanupTarget, ScanResult } from "@/types/models";
 import { CATEGORY_LABEL } from "@/types/models";
+import { ProjectSection } from "./ProjectSection";
+import { groupByProject } from "./projects";
 
 export function ProviderGroup({ result }: { result: ScanResult }) {
   const [open, setOpen] = useState(true);
+  // Providers that know which project each target belongs to are shown by project; a few
+  // hundred build directories in one flat list cannot be judged.
+  const { projects, ungrouped } = useMemo(() => groupByProject(result.targets), [result.targets]);
+  const grouped = projects.length > 0;
   const [showIssues, setShowIssues] = useState(false);
   const selected = useScan((s) => s.selected);
   const setTargets = useScan((s) => s.setTargets);
@@ -105,16 +111,25 @@ export function ProviderGroup({ result }: { result: ScanResult }) {
               )}
             </ul>
           )}
-          {result.targets.map((t) => (
-            <TargetRow key={t.id} target={t} />
-          ))}
+          {grouped ? (
+            <>
+              {projects.map((project) => (
+                <ProjectSection key={project.group.key} project={project} />
+              ))}
+              {ungrouped.map((t) => (
+                <TargetRow key={t.id} target={t} />
+              ))}
+            </>
+          ) : (
+            result.targets.map((t) => <TargetRow key={t.id} target={t} />)
+          )}
         </div>
       )}
     </section>
   );
 }
 
-function TargetRow({ target }: { target: CleanupTarget }) {
+export function TargetRow({ target, indent = false }: { target: CleanupTarget; indent?: boolean }) {
   const checked = useScan((s) => s.selected.has(target.id));
   const toggle = useScan((s) => s.toggleTarget);
   const home = useSystem((s) => s.info?.homeDir);
@@ -124,6 +139,7 @@ function TargetRow({ target }: { target: CleanupTarget }) {
     <div
       className={cn(
         "group flex items-center gap-2.5 border-t border-line/60 px-3 py-[7px] first:border-t-0",
+        indent && "pl-10",
         protectedItem ? "opacity-60" : "hover:bg-surface-2/60",
         checked && "bg-accent-soft/40",
       )}

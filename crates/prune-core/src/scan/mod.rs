@@ -232,6 +232,7 @@ mod tests {
             description: None,
             modified_at: None,
             permanent_only: false,
+            group: None,
         }
     }
 

@@ -127,6 +127,15 @@ tool cache move out of the anonymous "Application Caches" pile and into the Deve
 its own name, description and risk, without being counted twice — verified against a real
 machine as well as in tests.
 
+**Project grouping.** Each artifact carries the project it belongs to: the nearest ancestor
+holding a `.git` directory, bounded by the scan root. Without walking up, a monorepo's
+`apps/desktop/src-tauri/target` looks like a project called `src-tauri`, and one repository
+appears as a dozen unrelated rows. The group also carries when that project was last worked on,
+taken from `.git/index` (which moves on every stage, commit or checkout) and falling back to
+`.git/HEAD`. A project with no repository reports an unknown date rather than a very old one,
+because guessing there would age a live project wrongly. This is what turns 797 artifact
+directories into 112 project rows that can actually be judged.
+
 **Project artifacts.** The walker only reports a directory when a marker proves it is a build
 artifact (`node_modules` next to `package.json`, `target` next to `Cargo.toml`, `.venv`
 containing `pyvenv.cfg`, …) and never descends into a reported directory, `.git`, or hidden

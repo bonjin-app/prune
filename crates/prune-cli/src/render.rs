@@ -4,7 +4,7 @@ use std::io::Write;
 
 use prune_core::analyzer::{DiskAnalysis, DiskSummary};
 use prune_core::apps::AppDetail;
-use prune_core::models::{CleanupPlan, RiskLevel, ScanSession};
+use prune_core::models::{CleanupPlan, RiskLevel, ScanResult, ScanSession};
 use prune_core::PruneEngine;
 
 /// Decimal units, matching Finder and Windows Settings.
@@ -82,19 +82,23 @@ pub fn scan_table(
                 format!("  ({} skipped)", result.issues.len())
             }
         )?;
-        let mut targets: Vec<_> = result.targets.iter().collect();
-        targets.sort_by_key(|t| std::cmp::Reverse(t.size_bytes));
-        for target in targets.iter().take(3) {
-            writeln!(
-                out,
-                "    {:>10}  {:<10} {}",
-                human_bytes(target.size_bytes),
-                risk(target.risk),
-                target.path
-            )?;
-        }
-        if targets.len() > 3 {
-            writeln!(out, "    … and {} more", targets.len() - 3)?;
+        if result.targets.iter().any(|t| t.group.is_some()) {
+            grouped_rows(out, result)?;
+        } else {
+            let mut targets: Vec<_> = result.targets.iter().collect();
+            targets.sort_by_key(|t| std::cmp::Reverse(t.size_bytes));
+            for target in targets.iter().take(3) {
+                writeln!(
+                    out,
+                    "    {:>10}  {:<10} {}",
+                    human_bytes(target.size_bytes),
+                    risk(target.risk),
+                    target.path
+                )?;
+            }
+            if targets.len() > 3 {
+                writeln!(out, "    … and {} more", targets.len() - 3)?;
+            }
         }
     }
     if !any {
@@ -117,6 +121,89 @@ pub fn scan_table(
         human_bytes(session.total_bytes),
         session.total_files
     )
+}
+
+/// Rows for a provider whose targets know what project they belong to.
+///
+/// Hundreds of build directories in one list cannot be judged. One line per project, biggest
+/// first, with how long since anyone worked on it, can be.
+fn grouped_rows(out: &mut impl Write, result: &ScanResult) -> std::io::Result<()> {
+    struct Project<'a> {
+        label: &'a str,
+        bytes: u64,
+        items: usize,
+        /// What the project is holding: node_modules, a Rust target, and so on.
+        kinds: Vec<&'a str>,
+        last_active: Option<chrono::DateTime<chrono::Utc>>,
+    }
+
+    let mut projects: Vec<Project<'_>> = Vec::new();
+    let mut ungrouped = (0u64, 0usize);
+    for target in &result.targets {
+        let Some(group) = target.group.as_ref() else {
+            ungrouped.0 += target.size_bytes;
+            ungrouped.1 += 1;
+            continue;
+        };
+        let kind = target.description.as_deref().unwrap_or("");
+        match projects.iter_mut().find(|p| p.label == group.label) {
+            Some(project) => {
+                project.bytes += target.size_bytes;
+                project.items += 1;
+                if !kind.is_empty() && !project.kinds.contains(&kind) {
+                    project.kinds.push(kind);
+                }
+            }
+            None => projects.push(Project {
+                label: &group.label,
+                bytes: target.size_bytes,
+                items: 1,
+                kinds: if kind.is_empty() {
+                    Vec::new()
+                } else {
+                    vec![kind]
+                },
+                last_active: group.last_active_at,
+            }),
+        }
+    }
+    projects.sort_by_key(|p| std::cmp::Reverse(p.bytes));
+
+    let now = chrono::Utc::now();
+    for project in projects.iter().take(8) {
+        let age = match project.last_active {
+            Some(at) => {
+                let days = (now - at).num_days().max(0);
+                format!("{days}d since work")
+            }
+            None => "no repository".to_string(),
+        };
+        let mut kinds = project.kinds.join(", ");
+        if kinds.len() > 34 {
+            kinds = truncate(&kinds, 34);
+        }
+        writeln!(
+            out,
+            "    {:>10}  {:>3} items  {:>16}  {:<24} {}",
+            human_bytes(project.bytes),
+            project.items,
+            age,
+            truncate(project.label, 24),
+            kinds
+        )?;
+    }
+    if projects.len() > 8 {
+        writeln!(out, "    … and {} more projects", projects.len() - 8)?;
+    }
+    if ungrouped.1 > 0 {
+        writeln!(
+            out,
+            "    {:>10}  {:>3} items  elsewhere",
+            human_bytes(ungrouped.0),
+            ungrouped.1
+        )?;
+    }
+    Ok(())
 }
 
 pub fn plan_table(out: &mut impl Write, plan: &CleanupPlan) -> std::io::Result<()> {

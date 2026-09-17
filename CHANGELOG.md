@@ -31,6 +31,7 @@ All notable changes to Prune are documented here. The format follows
 - Preview (dry run) → confirm → remove → operation log pipeline with `Move to Trash` / `Delete permanently` modes.
 - A stopped scan now says its results are partial instead of presenting a smaller total as the whole picture.
 - Releasing is documented and scripted: `scripts/set-version.sh` writes the version everywhere, and tagging builds the desktop bundles and the CLI for macOS and Windows into a draft release.
+- Project artifacts are grouped by the project they belong to, with how long since anyone worked on it. A real machine produced 797 artifact directories; as 112 project rows, sorted by size and marked when nothing has touched them in three months, the list becomes something a developer can act on. The project is the nearest ancestor holding a `.git` directory, so a monorepo's scattered build folders count as one project, and the date comes from that repository's own metadata — an unknown date is reported as unknown, never as very old.
 - Scan results can be filtered by name, path or kind and narrowed to safe items only, and are listed biggest first. With thirty providers and hundreds of project artifacts, the list needed a way in.
 - Dashboard's Review & Clean arrives with the safe items already ticked.
 - Command palette (⌘K / Ctrl+K) and ⌘/Ctrl + digit shortcuts for every view.

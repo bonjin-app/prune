@@ -230,6 +230,7 @@ impl DiskAnalysis {
                 description: Some(f.extension.clone()),
                 modified_at: f.modified_at,
                 permanent_only: false,
+                group: None,
             })
             .collect();
         let mut r = ScanResult {

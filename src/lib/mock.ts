@@ -145,6 +145,8 @@ const PROVIDERS: ProviderInfo[] = [
   },
 ];
 
+const daysAgo = (days: number) => new Date(Date.now() - days * 86400e3).toISOString();
+
 let idCounter = 0;
 function target(
   providerId: string,
@@ -251,12 +253,29 @@ function fakeResults(providerIds?: string[]): ScanResult[] {
       target("project_artifacts", `${HOME}/Projects/web/node_modules`, 1.7 * gb, "low", {
         label: "web/node_modules",
         description: "node_modules",
+        group: { key: `${HOME}/Projects/web`, label: "web", lastActiveAt: daysAgo(3) },
+      }),
+      target("project_artifacts", `${HOME}/Projects/web/dist`, 220e6, "low", {
+        label: "web/dist",
+        description: "dist",
+        group: { key: `${HOME}/Projects/web`, label: "web", lastActiveAt: daysAgo(3) },
       }),
       target("project_artifacts", `${HOME}/Projects/prune/target`, 6.2 * gb, "low", {
         label: "prune/target",
         description: "Rust target",
+        group: { key: `${HOME}/Projects/prune`, label: "prune", lastActiveAt: daysAgo(1) },
+      }),
+      target("project_artifacts", `${HOME}/Projects/old-prototype/node_modules`, 3.4 * gb, "low", {
+        label: "old-prototype/node_modules",
+        description: "node_modules",
+        group: {
+          key: `${HOME}/Projects/old-prototype`,
+          label: "old-prototype",
+          lastActiveAt: daysAgo(287),
+        },
       }),
       target("project_artifacts", `${HOME}/Projects/api/.venv`, 480e6, "medium", {
+        group: { key: `${HOME}/Projects/api`, label: "api", lastActiveAt: daysAgo(64) },
         label: "api/.venv",
         description: "Python virtualenv",
       }),

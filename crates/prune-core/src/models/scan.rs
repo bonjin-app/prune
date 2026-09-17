@@ -13,6 +13,25 @@ pub enum TargetKind {
     Directory,
 }
 
+/// What a target belongs to, when a provider can say.
+///
+/// The project artifact walker finds hundreds of directories on a real machine — 797 across 112
+/// projects on the one this was measured on — and a flat list of that size cannot be judged.
+/// Grouped by the project they belong to, with the date that project was last worked on, the
+/// question becomes answerable: this one has not been touched in eight months and holds 11 GB.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TargetGroup {
+    /// Stable identity, normally the project's path.
+    pub key: String,
+    /// Short name for display.
+    pub label: String,
+    /// When the project was last worked on, from its version control metadata. `None` when
+    /// there is nothing to read it from, which is not the same as "never".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_active_at: Option<DateTime<Utc>>,
+}
+
 /// A single removable item discovered by a provider.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -35,6 +54,9 @@ pub struct CleanupTarget {
     /// `true` when the item cannot be moved to the trash (e.g. it already *is* trash).
     #[serde(default)]
     pub permanent_only: bool,
+    /// What this belongs to, when the provider knows. Only the UI uses it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<TargetGroup>,
 }
 
 impl CleanupTarget {
