@@ -549,6 +549,13 @@ forty processes — which includes the WebView redrawing live meters, not only t
 - Windows: Recycle Bin size is not path-based and is not reported yet.
 - Sizes are logical bytes, not on-disk blocks (APFS clones and compression make "space freed"
   slightly lower than shown).
+- The disk analyzer walks a single thread, at roughly `du`'s speed (10.5s against 8.1s on a
+  190k-file tree, while also building a drill-down tree, a largest-files list and per-extension
+  statistics). A 7.2M-file, 994k-folder tree takes ~590s and peaks at 142 MB. The tree itself is
+  what is held afterwards, so it stores no paths: a node knows its name and its parent, and a
+  full path is rebuilt by walking up when one is needed. Keeping a path on every node and a
+  `HashMap<PathBuf, usize>` beside it cost 564 MB on that same tree — four times as much, for an
+  answer the tree already contained.
 - A full scan of this developer machine (6.4M files, 536 GB reclaimable across 114 projects)
   takes 189s and peaks at 31 MB resident. The time is nearly all kernel time spent on
   `readdir`/`stat` — 452s of system time against 22s of user time, so the work is spread over

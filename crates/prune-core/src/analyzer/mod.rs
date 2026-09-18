@@ -9,6 +9,7 @@
 
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashMap};
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
@@ -123,7 +124,6 @@ pub struct DiskSummary {
 
 struct NodeInner {
     name: String,
-    path: PathBuf,
     parent: Option<usize>,
     size: u64,
     files: u64,
@@ -140,18 +140,51 @@ pub struct DiskAnalysis {
     pub started_at: DateTime<Utc>,
     pub duration_ms: u64,
     nodes: Vec<NodeInner>,
-    index: HashMap<PathBuf, usize>,
     large_files: Vec<LargeFile>,
     extensions: Vec<ExtensionStat>,
     pub issues: Vec<ScanIssue>,
 }
 
 impl DiskAnalysis {
+    /// The node at `path`, found by walking down from the root.
+    ///
+    /// This replaces a `HashMap<PathBuf, usize>`, which cost one full path per directory — on a
+    /// tree with a million folders, a couple of hundred megabytes held for the life of the
+    /// analysis, to answer a question the tree already contains. Walking is O(depth), with a
+    /// scan of each level's children, and it happens once per drill-down click.
+    fn locate(&self, path: &Path) -> Option<usize> {
+        let relative = path.strip_prefix(&self.root).ok()?;
+        let mut idx = 0usize;
+        for part in relative.components() {
+            let name = part.as_os_str();
+            idx = *self.nodes[idx]
+                .children
+                .iter()
+                .find(|&&c| OsStr::new(&self.nodes[c].name) == name)?;
+        }
+        Some(idx)
+    }
+
+    /// The full path of a node, rebuilt from its ancestors for the same reason.
+    fn path_of(&self, idx: usize) -> PathBuf {
+        let mut names: Vec<&str> = Vec::new();
+        let mut cur = idx;
+        while let Some(parent) = self.nodes[cur].parent {
+            names.push(&self.nodes[cur].name);
+            cur = parent;
+        }
+        let mut path = self.root.clone();
+        for name in names.iter().rev() {
+            path.push(name);
+        }
+        path
+    }
+
     fn view_of(&self, idx: usize) -> DiskNode {
         let n = &self.nodes[idx];
         DiskNode {
             name: n.name.clone(),
-            path: n.path.to_string_lossy().into_owned(),
+            path: self.path_of(idx).to_string_lossy().into_owned(),
             size_bytes: n.size,
             file_count: n.files,
             dir_count: n.dirs,
@@ -167,9 +200,9 @@ impl DiskAnalysis {
     pub fn node(&self, path: Option<&Path>) -> Option<DiskNodeView> {
         let idx = match path {
             None => 0,
-            Some(p) => match self.index.get(p) {
-                Some(i) => *i,
-                None => *self.index.get(&std::fs::canonicalize(p).ok()?)?,
+            Some(p) => match self.locate(p) {
+                Some(i) => i,
+                None => self.locate(&std::fs::canonicalize(p).ok()?)?,
             },
         };
         let mut children: Vec<DiskNode> = self.nodes[idx]
@@ -271,7 +304,7 @@ impl DiskAnalysis {
             .retain(|f| !target_ids.contains(&f.target_id));
         for f in removed {
             let path = PathBuf::from(&f.path);
-            let mut dir = path.parent().and_then(|p| self.index.get(p).copied());
+            let mut dir = path.parent().and_then(|p| self.locate(p));
             let mut first = true;
             while let Some(idx) = dir {
                 let n = &mut self.nodes[idx];
@@ -326,7 +359,6 @@ pub fn analyze(
 
     let mut nodes: Vec<NodeInner> = vec![NodeInner {
         name: root_name,
-        path: root.to_path_buf(),
         parent: None,
         size: 0,
         files: 0,
@@ -334,8 +366,6 @@ pub fn analyze(
         own_file_bytes: 0,
         children: Vec::new(),
     }];
-    let mut index: HashMap<PathBuf, usize> = HashMap::new();
-    index.insert(root.to_path_buf(), 0);
     // stack[d] = node index of the directory at depth d on the current DFS path
     let mut stack: Vec<usize> = vec![0];
     let mut heap: BinaryHeap<Reverse<LargeCandidate>> = BinaryHeap::new();
@@ -395,7 +425,6 @@ pub fn analyze(
             let idx = nodes.len();
             nodes.push(NodeInner {
                 name: entry.file_name().to_string_lossy().into_owned(),
-                path: path.to_path_buf(),
                 parent: Some(parent),
                 size: 0,
                 files: 0,
@@ -404,7 +433,6 @@ pub fn analyze(
                 children: Vec::new(),
             });
             nodes[parent].children.push(idx);
-            index.insert(path.to_path_buf(), idx);
             stack.push(idx);
             // dir_count propagates to all ancestors
             let mut cur = Some(parent);
@@ -521,7 +549,6 @@ pub fn analyze(
         started_at,
         duration_ms: started.elapsed().as_millis() as u64,
         nodes,
-        index,
         large_files: large,
         extensions: ext_stats,
         issues,
