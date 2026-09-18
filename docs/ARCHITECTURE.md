@@ -495,6 +495,23 @@ The same path was exercised against a stub `docker` on `PATH` to confirm the rea
 exactly those arguments. **It has not been run against a real Docker daemon**, which is the one
 gap left in this feature.
 
+### Being usable without a mouse or a screen
+
+Interactive elements all carry an accessible name (checked across every view), dialogs trap and
+restore focus, and the sidebar is a labelled `nav` whose current item is marked `aria-current`.
+
+Three things are announced, and only three, because a live region that reports everything
+reports nothing: a failure (`role="alert"` on the error toast — otherwise a failed command is
+completely silent), which place a running scan is searching, and what a finished scan found.
+The scan's file counter and current path are deliberately left out; they change several times a
+second and would talk over the user.
+
+The palette is checked rather than eyeballed. `src/contrast.test.ts` reads the tokens out of
+`src/index.css` and asserts that every text colour clears WCAG AA (4.5:1) against every surface
+it can appear on, in both themes, and that the three levels of text stay far enough apart to
+still read as a hierarchy. The faintest level carries file paths and dates, so it is content and
+gets the content threshold.
+
 ### Cost of being open
 
 A system monitor that is expensive to run is self-defeating, so the live readings are priced

@@ -21,6 +21,7 @@ interface SystemState {
   refreshProcesses: (limit?: number) => Promise<void>;
   /** Asks a process to stop, or forces it. Returns true when the system accepted. */
   stopProcess: (pid: number, mode: StopMode) => Promise<boolean>;
+  clearError: () => void;
 }
 
 export const useSystem = create<SystemState>((set) => ({
@@ -70,6 +71,8 @@ export const useSystem = create<SystemState>((set) => ({
       set({ error: errorMessage(e) });
     }
   },
+
+  clearError: () => set({ error: null }),
 }));
 
 /**

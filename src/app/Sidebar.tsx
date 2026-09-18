@@ -70,7 +70,7 @@ export function Sidebar() {
         </button>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-0.5 px-3 pt-4">
+      <nav aria-label="Sections" className="flex flex-1 flex-col gap-0.5 px-3 pt-4">
         {ROUTES.map((r) => (
           <NavItem key={r.id} route={r} />
         ))}

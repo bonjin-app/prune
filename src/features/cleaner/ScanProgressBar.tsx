@@ -23,7 +23,15 @@ export function ScanProgressBar({ providerIds }: { providerIds: string[] }) {
           {formatCount(files)} files · {formatBytes(bytes)}
         </span>
       </div>
-      <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-black/[0.07] dark:bg-white/[0.08]">
+      <div
+        role="progressbar"
+        aria-label="Scan progress"
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-valuenow={done}
+        aria-valuetext={`${done} of ${total} places searched`}
+        className="mt-2 h-1 w-full overflow-hidden rounded-full bg-black/[0.07] dark:bg-white/[0.08]"
+      >
         <div
           className="h-full rounded-full bg-accent transition-[width] duration-300"
           style={{ width: `${Math.max(3, pct)}%` }}
@@ -32,6 +40,14 @@ export function ScanProgressBar({ providerIds }: { providerIds: string[] }) {
       <div className="mt-1.5 truncate font-mono text-[11px] text-fg-faint">
         {latest?.currentPath ?? " "}
       </div>
+      {/*
+        A scan can run for two minutes. Announce which place is being searched, and nothing
+        else: the file count and the current path change several times a second, and a live
+        region fed from those would talk over everything the user does.
+      */}
+      <span className="sr-only" aria-live="polite">
+        {name ? `Searching ${name}` : "Searching"}
+      </span>
     </div>
   );
 }

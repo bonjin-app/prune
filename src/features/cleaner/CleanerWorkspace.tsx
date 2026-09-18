@@ -228,6 +228,20 @@ export function CleanerWorkspace({
 
       {scanning && <ScanProgressBar providerIds={scopedIds} />}
 
+      {/*
+        What a sighted user reads off the header when a scan lands. Said once, when the scan
+        finishes, rather than on every render: `session` only changes when a scan completes.
+      */}
+      <span className="sr-only" role="status">
+        {scanning
+          ? ""
+          : session
+            ? hasResults
+              ? `Scan finished. ${formatBytes(scopedTotal)} in ${totalTargets} items.`
+              : "Scan finished. Nothing to remove here."
+            : ""}
+      </span>
+
       <div className="min-h-0 flex-1 px-7 pb-8">
         {!hasResults && !scanning ? (
           <EmptyState
