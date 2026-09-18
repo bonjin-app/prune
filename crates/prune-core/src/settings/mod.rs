@@ -80,11 +80,24 @@ impl Settings {
         }
     }
 
+    /// Writes the settings, replacing the file in one step.
+    ///
+    /// Writing in place truncates first, so a crash or a full disk between the truncate and the
+    /// write leaves an empty file where the user's configuration was. Writing a temporary file
+    /// and renaming it over the original means the file on disk is always either the old
+    /// settings or the new ones, never half of either.
     pub fn save(&self, dir: &Path) -> Result<()> {
         std::fs::create_dir_all(dir).map_err(|e| PruneError::io(dir, e))?;
         let path = dir.join(FILE_NAME);
         let text = serde_json::to_string_pretty(self)?;
-        std::fs::write(&path, text).map_err(|e| PruneError::io(&path, e))
+
+        let temp = path.with_extension("json.writing");
+        std::fs::write(&temp, text).map_err(|e| PruneError::io(&temp, e))?;
+        std::fs::rename(&temp, &path).map_err(|e| {
+            // Do not leave the half-written file behind for the next run to trip over.
+            let _ = std::fs::remove_file(&temp);
+            PruneError::io(&path, e)
+        })
     }
 
     /// Keeps only roots that are still usable, dropping duplicates and nested ones so no tree
@@ -120,6 +133,40 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join(FILE_NAME), b"{ not json").unwrap();
         assert_eq!(Settings::load(dir.path()), Settings::default());
+    }
+
+    #[test]
+    fn saving_replaces_the_file_in_one_step() {
+        let dir = tempfile::tempdir().unwrap();
+        let settings = Settings {
+            project_roots: vec![PathBuf::from("/home/u/code")],
+        };
+        settings.save(dir.path()).unwrap();
+
+        // Nothing half-written is left lying about for the next run to read.
+        let leftovers: Vec<String> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .filter(|n| n != FILE_NAME)
+            .collect();
+        assert!(leftovers.is_empty(), "unexpected files: {leftovers:?}");
+    }
+
+    #[test]
+    fn saving_over_existing_settings_keeps_them_readable_throughout() {
+        let dir = tempfile::tempdir().unwrap();
+        let first = Settings {
+            project_roots: vec![PathBuf::from("/home/u/one")],
+        };
+        first.save(dir.path()).unwrap();
+
+        let second = Settings {
+            project_roots: vec![PathBuf::from("/home/u/two")],
+        };
+        second.save(dir.path()).unwrap();
+
+        assert_eq!(Settings::load(dir.path()), second);
     }
 
     #[test]

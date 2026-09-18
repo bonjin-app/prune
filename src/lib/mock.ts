@@ -185,7 +185,78 @@ function target(
   };
 }
 
+/**
+ * A scan the size of a real machine, for checking the interface holds up.
+ *
+ * The measured one had 797 project artifacts across 112 projects and 99 application caches.
+ * Turn it on with `?scale=real` — the ordinary mock stays small so the UI is quick to read.
+ */
+function atRealScale(): ScanResult[] {
+  const gb = 1_000_000_000;
+  const projects = Array.from({ length: 112 }, (_, p) => `project-${String(p).padStart(3, "0")}`);
+  const kinds = [
+    "node_modules",
+    "Rust target",
+    "build",
+    "dist",
+    "Expo cache",
+    "Gradle project cache",
+  ];
+  const artifacts: CleanupTarget[] = [];
+  for (const [p, project] of projects.entries()) {
+    const count = 1 + (p % 8);
+    for (let i = 0; i < count; i++) {
+      artifacts.push(
+        target(
+          "project_artifacts",
+          `${HOME}/code/${project}/${kinds[i % kinds.length]}`,
+          ((p % 17) + 1) * 0.4 * gb,
+          "low",
+          {
+            label: `${project}/${kinds[i % kinds.length]}`,
+            description: kinds[i % kinds.length],
+            group: {
+              key: `${HOME}/code/${project}`,
+              label: project,
+              lastActiveAt: daysAgo((p * 7) % 400),
+            },
+          },
+        ),
+      );
+    }
+  }
+  const caches: CleanupTarget[] = Array.from({ length: 99 }, (_, i) =>
+    target(
+      "user_cache",
+      `${HOME}/Library/Caches/com.vendor.app${i}`,
+      ((i % 23) + 1) * 90e6,
+      i % 17 === 0 ? "protected" : "safe",
+    ),
+  );
+  const build = (
+    providerId: string,
+    category: ScanResult["category"],
+    targets: CleanupTarget[],
+  ): ScanResult => ({
+    providerId,
+    providerName: providerId,
+    category,
+    targets,
+    totalBytes: targets.reduce((a, t) => a + t.sizeBytes, 0),
+    totalFiles: targets.reduce((a, t) => a + t.fileCount, 0),
+    durationMs: 100,
+    issues: [],
+  });
+  return [
+    build("user_cache", "application_cache", caches),
+    build("project_artifacts", "developer_files", artifacts),
+  ];
+}
+
 function fakeResults(providerIds?: string[]): ScanResult[] {
+  if (new URLSearchParams(location.search).get("scale") === "real") {
+    return atRealScale();
+  }
   const gb = 1_000_000_000;
   const all: Record<string, CleanupTarget[]> = {
     user_cache: [

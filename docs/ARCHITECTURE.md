@@ -388,7 +388,16 @@ write, an unreadable history reads as empty, and `AppState::new` cannot fail.
 Long-lived results are bounded. `Recent<T>` keeps only the newest few scan sessions, plans and
 disk analyses: an analysis holds one node per directory, so keeping every one of them for the
 life of the process was a slow leak. Asking for an evicted scan returns `unknown_scan`, which
-the UI already handles.
+the UI already handles. The operation log is bounded the same way but on disk: past
+`MAX_BYTES` it is rewritten with the newest `KEEP_RECORDS` entries, so a machine cleaned
+regularly for years does not carry a history that has to be read in full every time.
+
+Both files Prune owns are written whole or not at all. Writing in place truncates first, so a
+crash or a full disk between the truncate and the write leaves an empty file where the user's
+settings or history were — and an empty settings file reads as "no project folders", which
+silently changes what a scan covers. `Settings::save` and the log's compaction both write a
+`.writing` sibling and rename it over the original, which is atomic on both platforms, and
+remove the sibling if the rename fails so the next run has nothing half-written to trip over.
 
 Errors cross IPC as `{ code, message }` (`CommandError`), with stable codes from
 `PruneError::code()`.
@@ -397,13 +406,24 @@ Long-running work uses `tauri::async_runtime::spawn_blocking`; the UI thread is 
 
 ## 7. Frontend
 
-- **State:** three zustand stores — `ui` (view, theme, palette), `system` (meta, info,
-  snapshot, processes), `scan` (providers, session, selection, plan, result).
+- **State:** seven zustand stores — `ui` (view, theme, palette), `system` (meta, info,
+  snapshot, processes), `scan` (providers, session, selection, plan, result), `disk`, `apps`,
+  `startup`, `settings`.
 - **IPC:** `lib/tauri.ts` exposes a typed `Backend`; in a plain browser `lib/mock.ts` is used so
-  the UI is developable and testable without native code.
+  the UI is developable and testable without native code. `?scale=real` makes that mock produce
+  what a real machine does — a hundred projects, five hundred artifacts, a hundred caches —
+  which is the only way to see the list behave at the size users will meet.
 - **Theme:** Tailwind v4 with CSS variable tokens; `.dark` class toggled from the
   system / light / dark preference stored in `localStorage`.
 - **Views:** Cleaner and Developer share `CleanerWorkspace`, scoped by category.
+- **Rendering at scale:** the results list is the one place where the frontend can be slow, and
+  the filter field sits directly above it. Three things keep typing responsive: the filter is
+  read through `useDeferredValue`, so the field updates immediately and the list follows;
+  `ProviderGroup`, `ProjectSection` and `TargetRow` are memoised, so a render whose scan results
+  are unchanged does no work at all; and each group subscribes to its own selected count and
+  bytes rather than to the selection itself, so ticking one checkbox does not re-render every
+  other group. Without these the median keystroke was 35ms and the worst 157ms at real scale;
+  with them, 2ms and 7ms.
 
 ## 8. Testing
 

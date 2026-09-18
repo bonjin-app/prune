@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useDeferredValue, useEffect, useMemo } from "react";
 import { AlertTriangle, Ban, RefreshCw, Search, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -62,11 +62,16 @@ export function CleanerWorkspace({
     () => session?.results.filter((r) => categories.includes(r.category)) ?? [],
     [session, categories],
   );
+  // Filtering five hundred targets and re-rendering them took long enough per keystroke to
+  // make typing feel sticky. The field stays live; the list is allowed to arrive a frame or
+  // two later.
+  const deferredFilter = useDeferredValue(filter);
   const results = useMemo(
-    () => filterResults(scopedResults, filter, riskFilter),
-    [scopedResults, filter, riskFilter],
+    () => filterResults(scopedResults, deferredFilter, riskFilter),
+    [scopedResults, deferredFilter, riskFilter],
   );
-  const filtering = filter.trim().length > 0 || riskFilter !== "all";
+  const catchingUp = deferredFilter !== filter;
+  const filtering = deferredFilter.trim().length > 0 || riskFilter !== "all";
   const shownTargets = useMemo(() => results.flatMap((r) => r.targets), [results]);
   const selectableShown = useMemo(
     () => shownTargets.filter((t) => t.risk !== "protected"),
@@ -209,7 +214,12 @@ export function CleanerWorkspace({
             ))}
           </div>
           {filtering && (
-            <span className="text-[11.5px] text-fg-faint tnum">
+            <span
+              className={cn(
+                "text-[11.5px] text-fg-faint tnum transition-opacity",
+                catchingUp && "opacity-50",
+              )}
+            >
               {shownTargets.length} of {totalTargets}
             </span>
           )}

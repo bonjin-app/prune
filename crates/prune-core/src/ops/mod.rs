@@ -9,6 +9,14 @@ use crate::models::OperationRecord;
 use crate::sync::LockExt;
 use crate::{PruneError, Result};
 
+/// When the log is shortened, and to how much.
+///
+/// Generous enough that nobody loses history they would actually look at — a machine cleaned
+/// every week reaches a thousand entries after twenty years — and small enough that reading it
+/// stays instant.
+const MAX_BYTES: u64 = 512 * 1024;
+const KEEP_RECORDS: usize = 1_000;
+
 pub struct OperationLog {
     dir: PathBuf,
     path: PathBuf,
@@ -45,7 +53,47 @@ impl OperationLog {
         let mut line = serde_json::to_string(record)?;
         line.push('\n');
         file.write_all(line.as_bytes())
-            .map_err(|e| PruneError::io(&self.path, e))
+            .map_err(|e| PruneError::io(&self.path, e))?;
+        drop(file);
+
+        // Nothing ever removed entries, so a machine cleaned weekly for years would grow a log
+        // that `list` reads from end to end every time the history is opened.
+        if self.size().is_some_and(|size| size > MAX_BYTES) {
+            if let Err(e) = self.compact() {
+                tracing::warn!(error = %e, "could not shorten the operation log");
+            }
+        }
+        Ok(())
+    }
+
+    fn size(&self) -> Option<u64> {
+        std::fs::metadata(&self.path).ok().map(|m| m.len())
+    }
+
+    /// Rewrites the log with only the most recent entries.
+    ///
+    /// Written to a temporary file and renamed, so an interrupted compaction leaves the
+    /// previous log intact rather than a truncated one.
+    fn compact(&self) -> Result<()> {
+        let text =
+            std::fs::read_to_string(&self.path).map_err(|e| PruneError::io(&self.path, e))?;
+        let lines: Vec<&str> = text.lines().filter(|l| !l.trim().is_empty()).collect();
+        if lines.len() <= KEEP_RECORDS {
+            return Ok(());
+        }
+        let kept = lines[lines.len() - KEEP_RECORDS..].join("\n");
+        let temp = self.path.with_extension("jsonl.writing");
+        std::fs::write(&temp, format!("{kept}\n")).map_err(|e| PruneError::io(&temp, e))?;
+        std::fs::rename(&temp, &self.path).map_err(|e| {
+            let _ = std::fs::remove_file(&temp);
+            PruneError::io(&self.path, e)
+        })?;
+        tracing::info!(
+            kept = KEEP_RECORDS,
+            dropped = lines.len() - KEEP_RECORDS,
+            "shortened the operation log"
+        );
+        Ok(())
     }
 
     /// Most recent first. Corrupt lines are skipped.
@@ -160,5 +208,69 @@ mod resilience_tests {
 
         assert!(nested.exists());
         assert_eq!(log.list(10).unwrap().len(), 1);
+    }
+}
+
+#[cfg(test)]
+mod growth_tests {
+    use super::*;
+    use chrono::Utc;
+
+    fn record(id: usize) -> OperationRecord {
+        OperationRecord {
+            id: format!("op{id}"),
+            at: Utc::now(),
+            // Padded so the log reaches the compaction threshold without writing a million
+            // entries in a test.
+            title: format!("Clean {}", "x".repeat(400)),
+            mode: crate::models::DeleteMode::Trash,
+            status: crate::models::CleanupStatus::Success,
+            removed_targets: 1,
+            removed_files: 1,
+            removed_bytes: id as u64,
+            failed_count: 0,
+            providers: vec![],
+        }
+    }
+
+    #[test]
+    fn the_log_stops_growing_and_keeps_the_newest_entries() {
+        let dir = tempfile::tempdir().unwrap();
+        let log = OperationLog::open(dir.path());
+
+        // Enough to cross the size threshold several times over.
+        let total = KEEP_RECORDS + 400;
+        for i in 0..total {
+            log.append(&record(i)).unwrap();
+        }
+
+        let size = std::fs::metadata(dir.path().join("operations.jsonl"))
+            .unwrap()
+            .len();
+        assert!(size <= MAX_BYTES * 2, "the log kept growing: {size} bytes");
+
+        // The most recent operation is still the first thing the user sees...
+        let listed = log.list(5).unwrap();
+        assert_eq!(listed[0].id, format!("op{}", total - 1));
+        // ...and the oldest have been let go rather than kept forever.
+        let all = log.list(usize::MAX).unwrap();
+        assert!(all.len() <= KEEP_RECORDS + 400);
+        assert!(!all.iter().any(|r| r.id == "op0"));
+    }
+
+    #[test]
+    fn a_short_log_is_left_exactly_as_it_is() {
+        let dir = tempfile::tempdir().unwrap();
+        let log = OperationLog::open(dir.path());
+        for i in 0..5 {
+            log.append(&record(i)).unwrap();
+        }
+
+        let listed = log.list(10).unwrap();
+        assert_eq!(listed.len(), 5);
+        assert_eq!(listed[0].id, "op4");
+        assert_eq!(listed[4].id, "op0");
+        // No temporary file left behind.
+        assert!(!dir.path().join("operations.jsonl.writing").exists());
     }
 }

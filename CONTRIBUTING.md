@@ -19,7 +19,11 @@ pnpm tauri dev
 ```
 
 `pnpm dev` alone opens the UI in a browser against an in-memory mock backend, which is handy
-for UI work. `cargo run -p prune-cli -- scan` runs a read-only scan in the terminal.
+for UI work. Add `?scale=real` to that URL and the mock produces what a real machine does — a
+hundred projects, five hundred artifacts, a hundred caches — which is the size any change to
+the results list should be judged at; the handful of sample rows the mock shows by default will
+make almost anything look fast. `cargo run -p prune-cli -- scan` runs a read-only scan in the
+terminal.
 
 ## Checks
 

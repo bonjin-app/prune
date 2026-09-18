@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { AlertCircle, ChevronRight, FolderOpen } from "lucide-react";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { RiskBadge } from "@/components/ui/RiskBadge";
@@ -12,25 +12,39 @@ import { CATEGORY_LABEL } from "@/types/models";
 import { ProjectSection } from "./ProjectSection";
 import { groupByProject } from "./projects";
 
-export function ProviderGroup({ result }: { result: ScanResult }) {
+/**
+ * Memoised because the filter field lives above it.
+ *
+ * Every keystroke re-renders the workspace, and without this each of those renders walked a
+ * hundred project sections and five hundred rows to produce exactly the same output. The scan
+ * results a render is given are the same objects until the filter actually changes, so a
+ * reference check is enough to skip all of it.
+ */
+export const ProviderGroup = memo(function ProviderGroup({ result }: { result: ScanResult }) {
   const [open, setOpen] = useState(true);
   // Providers that know which project each target belongs to are shown by project; a few
   // hundred build directories in one flat list cannot be judged.
   const { projects, ungrouped } = useMemo(() => groupByProject(result.targets), [result.targets]);
   const grouped = projects.length > 0;
   const [showIssues, setShowIssues] = useState(false);
-  const selected = useScan((s) => s.selected);
   const setTargets = useScan((s) => s.setTargets);
   const providers = useScan((s) => s.providers);
   const description = providers.find((p) => p.id === result.providerId)?.description;
 
-  const selectable = result.targets.filter((t) => t.risk !== "protected");
-  const selectedCount = selectable.filter((t) => selected.has(t.id)).length;
+  const selectable = useMemo(
+    () => result.targets.filter((t) => t.risk !== "protected"),
+    [result.targets],
+  );
+  // Subscribing to the selection itself would re-render every group each time one checkbox is
+  // ticked. These two numbers are all the header shows, and they usually do not change.
+  const selectedCount = useScan(
+    (s) => selectable.reduce((n, t) => n + (s.selected.has(t.id) ? 1 : 0), 0),
+  );
+  const selectedBytes = useScan((s) =>
+    selectable.reduce((n, t) => n + (s.selected.has(t.id) ? t.sizeBytes : 0), 0),
+  );
   const all = selectable.length > 0 && selectedCount === selectable.length;
   const some = selectedCount > 0 && !all;
-  const selectedBytes = selectable
-    .filter((t) => selected.has(t.id))
-    .reduce((a, t) => a + t.sizeBytes, 0);
 
   return (
     <section className="overflow-hidden rounded-lg border border-line bg-surface">
@@ -127,9 +141,9 @@ export function ProviderGroup({ result }: { result: ScanResult }) {
       )}
     </section>
   );
-}
+});
 
-export function TargetRow({ target, indent = false }: { target: CleanupTarget; indent?: boolean }) {
+export const TargetRow = memo(function TargetRow({ target, indent = false }: { target: CleanupTarget; indent?: boolean }) {
   const checked = useScan((s) => s.selected.has(target.id));
   const toggle = useScan((s) => s.toggleTarget);
   const home = useSystem((s) => s.info?.homeDir);
@@ -192,4 +206,4 @@ export function TargetRow({ target, indent = false }: { target: CleanupTarget; i
       </div>
     </div>
   );
-}
+});
