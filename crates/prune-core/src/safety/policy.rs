@@ -13,6 +13,37 @@ impl ValidatedPath {
     pub fn as_path(&self) -> &Path {
         &self.normalized
     }
+
+    /// Confirms the path still leads where it did when it was validated.
+    ///
+    /// Validation resolves every directory above the target, so a symlinked ancestor is followed
+    /// once, at that moment, and judged on where it actually points. Removal happens later —
+    /// after a preview the user reads, and after every other item in the plan. In between,
+    /// anything with write access to the user's home could replace one of those directories with
+    /// a link somewhere else, and `remove_dir_all` would walk through it. Resolving the parent
+    /// again and comparing costs one `canonicalize` per removal and closes that window: if the
+    /// answer differs from the one validation recorded, the path is no longer the thing that was
+    /// approved, and nothing is removed.
+    ///
+    /// This cannot be made airtight without holding a directory handle open across the whole
+    /// operation, which the standard library does not offer portably. It does mean an attacker
+    /// has to win a race measured in microseconds rather than in however long the user spends
+    /// reading a confirmation dialog.
+    pub fn still_resolves_where_it_did(&self) -> Result<()> {
+        let Some(parent) = self.normalized.parent() else {
+            return Ok(());
+        };
+        let now = std::fs::canonicalize(parent)
+            .map(strip_verbatim)
+            .map_err(|e| PruneError::io(parent, e))?;
+        if now != parent {
+            return Err(PruneError::safety(
+                &self.normalized,
+                "a folder above this path changed between the check and the removal",
+            ));
+        }
+        Ok(())
+    }
 }
 
 /// Validates paths against protected locations for the current platform.

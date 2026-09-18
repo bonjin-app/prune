@@ -86,6 +86,17 @@ shows it.
 
 The lists live in `platform/{macos,windows}` and are canonicalized at policy creation.
 
+Validation resolves the directories above the target, so a symlinked ancestor is followed once
+and judged on where it actually points. That answer is recorded in the `ValidatedPath`, and
+`fs::remove` checks it again immediately before removing: `still_resolves_where_it_did`
+re-canonicalizes the parent and refuses if it now leads somewhere else. Without that, the gap
+between the confirmation the user reads and the removal itself — seconds, or longer for a plan
+with many items — is long enough for anything with write access to the home directory to
+replace a folder in the path with a link, and `remove_dir_all` would walk through it. The check
+cannot be made airtight without holding directory handles open for the whole operation, which
+the standard library does not offer portably; what it does is reduce the window from "as long
+as the dialog is open" to microseconds.
+
 ### IPC boundary
 
 The frontend never sends a filesystem path for deletion:

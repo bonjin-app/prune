@@ -24,6 +24,10 @@ pub fn remove(path: &ValidatedPath, mode: DeleteMode) -> Result<RemoveOutcome> {
         Err(e) => return Err(PruneError::io(p, e)),
     };
 
+    // The path was approved earlier, possibly several confirmations ago. Make sure the route to
+    // it has not been rewritten since.
+    path.still_resolves_where_it_did()?;
+
     match mode {
         DeleteMode::Trash => {
             move_to_trash(p)?;
@@ -86,6 +90,56 @@ mod tests {
         assert_eq!(
             remove(&v, DeleteMode::Permanent).unwrap(),
             RemoveOutcome::AlreadyGone
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn refuses_a_path_whose_parent_was_swapped_for_a_link_after_the_check() {
+        let dir = tempfile::tempdir().unwrap();
+        let home = std::fs::canonicalize(dir.path()).unwrap().join("home");
+        std::fs::create_dir_all(home.join("caches/app")).unwrap();
+        std::fs::write(home.join("caches/app/f"), b"x").unwrap();
+        // Somewhere the user would mind losing, outside the approved path.
+        std::fs::create_dir_all(home.join("documents")).unwrap();
+        std::fs::write(home.join("documents/thesis.txt"), b"years of work").unwrap();
+
+        let policy = SafetyPolicy::from_protected(ProtectedPaths {
+            allowed_roots: vec![home.clone()],
+            ..Default::default()
+        });
+        let validated = policy.validate(&home.join("caches/app")).unwrap();
+
+        // Between the confirmation and the removal, `caches` becomes a link to `documents`.
+        std::fs::remove_dir_all(home.join("caches")).unwrap();
+        std::os::unix::fs::symlink(home.join("documents"), home.join("caches")).unwrap();
+        std::fs::create_dir_all(home.join("documents/app")).unwrap();
+
+        let err = remove(&validated, DeleteMode::Permanent).unwrap_err();
+        assert!(
+            err.to_string().contains("changed between the check"),
+            "unexpected error: {err}"
+        );
+        assert!(
+            home.join("documents/thesis.txt").exists(),
+            "the swapped-in directory must be left alone"
+        );
+        assert!(home.join("documents/app").exists());
+    }
+
+    #[test]
+    fn an_untouched_path_passes_the_second_check() {
+        let dir = tempfile::tempdir().unwrap();
+        let home = std::fs::canonicalize(dir.path()).unwrap().join("home");
+        std::fs::create_dir_all(home.join("caches/app")).unwrap();
+        let policy = SafetyPolicy::from_protected(ProtectedPaths {
+            allowed_roots: vec![home.clone()],
+            ..Default::default()
+        });
+        let validated = policy.validate(&home.join("caches/app")).unwrap();
+        assert_eq!(
+            remove(&validated, DeleteMode::Permanent).unwrap(),
+            RemoveOutcome::DeletedPermanently
         );
     }
 }
