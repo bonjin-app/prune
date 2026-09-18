@@ -38,6 +38,9 @@ safety as the primary feature.
 
 ## Why Prune?
 
+- **Extensible without a rebuild.** Point Prune at a cache it does not know by adding it to
+  `providers.json`; it joins the built-in list with the same safety rules. See
+  [CONTRIBUTING.md](CONTRIBUTING.md).
 - **Developer cleanup as a first-class feature.** Thirty-odd tool caches — npm, pnpm, Yarn, Bun,
   node-gyp, Deno, Playwright, Puppeteer, Cypress, Electron, Gradle, Maven, Cargo, Go, NuGet,
   CocoaPods, Swift Package Manager, pub, RubyGems, Composer, JetBrains, Homebrew, Xcode

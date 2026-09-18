@@ -173,4 +173,7 @@ pub struct ProviderInfo {
     pub default_risk: RiskLevel,
     /// Whether this provider has anything to look at on the current machine.
     pub available: bool,
+    /// Whether it came from the user's `providers.json` rather than from Prune.
+    #[serde(default)]
+    pub custom: bool,
 }

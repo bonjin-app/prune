@@ -38,6 +38,7 @@ const PROVIDERS: ProviderInfo[] = [
     description: "Per-application cache folders. Apps rebuild them on next launch.",
     defaultRisk: "safe",
     available: true,
+    custom: false,
   },
   {
     id: "user_logs",
@@ -46,6 +47,7 @@ const PROVIDERS: ProviderInfo[] = [
     description: "Diagnostic logs written by applications.",
     defaultRisk: "safe",
     available: true,
+    custom: false,
   },
   {
     id: "temp_files",
@@ -54,6 +56,7 @@ const PROVIDERS: ProviderInfo[] = [
     description: "Temporary files older than a day.",
     defaultRisk: "low",
     available: true,
+    custom: false,
   },
   {
     id: "trash",
@@ -62,6 +65,7 @@ const PROVIDERS: ProviderInfo[] = [
     description: "Items already in the Trash.",
     defaultRisk: "safe",
     available: true,
+    custom: false,
   },
   {
     id: "old_installers",
@@ -70,6 +74,7 @@ const PROVIDERS: ProviderInfo[] = [
     description: "Installer images in Downloads older than a week.",
     defaultRisk: "low",
     available: true,
+    custom: false,
   },
   {
     id: "chromium_cache",
@@ -78,6 +83,7 @@ const PROVIDERS: ProviderInfo[] = [
     description: "HTTP and code caches of Chrome, Brave, Edge, Arc.",
     defaultRisk: "safe",
     available: true,
+    custom: false,
   },
   {
     id: "firefox_cache",
@@ -86,6 +92,7 @@ const PROVIDERS: ProviderInfo[] = [
     description: "Firefox HTTP cache per profile.",
     defaultRisk: "safe",
     available: false,
+    custom: false,
   },
   {
     id: "npm_cache",
@@ -94,6 +101,7 @@ const PROVIDERS: ProviderInfo[] = [
     description: "Downloaded package tarballs.",
     defaultRisk: "safe",
     available: true,
+    custom: false,
   },
   {
     id: "pnpm_store",
@@ -102,6 +110,7 @@ const PROVIDERS: ProviderInfo[] = [
     description: "Content-addressable pnpm store.",
     defaultRisk: "low",
     available: true,
+    custom: false,
   },
   {
     id: "gradle_cache",
@@ -110,6 +119,7 @@ const PROVIDERS: ProviderInfo[] = [
     description: "Dependency and build caches in ~/.gradle.",
     defaultRisk: "low",
     available: true,
+    custom: false,
   },
   {
     id: "cargo_cache",
@@ -118,6 +128,7 @@ const PROVIDERS: ProviderInfo[] = [
     description: "Downloaded crates and git checkouts.",
     defaultRisk: "low",
     available: true,
+    custom: false,
   },
   {
     id: "xcode_derived_data",
@@ -126,6 +137,7 @@ const PROVIDERS: ProviderInfo[] = [
     description: "Intermediate build products, per project.",
     defaultRisk: "safe",
     available: true,
+    custom: false,
   },
   {
     id: "xcode_archives",
@@ -134,6 +146,7 @@ const PROVIDERS: ProviderInfo[] = [
     description: "App archives. Needed to symbolicate crash logs.",
     defaultRisk: "medium",
     available: true,
+    custom: false,
   },
   {
     id: "project_artifacts",
@@ -142,6 +155,7 @@ const PROVIDERS: ProviderInfo[] = [
     description: "node_modules, target/, build/, dist/ inside your projects.",
     defaultRisk: "low",
     available: true,
+    custom: false,
   },
 ];
 

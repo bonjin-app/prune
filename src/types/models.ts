@@ -89,6 +89,8 @@ export interface ProviderInfo {
   description: string;
   defaultRisk: RiskLevel;
   available: boolean;
+  /** Whether it came from the user's providers.json rather than from Prune. */
+  custom: boolean;
 }
 
 export interface BlockedTarget {

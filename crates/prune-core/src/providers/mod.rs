@@ -3,14 +3,16 @@
 //! [`registry::default_providers`].
 
 mod context;
+pub mod custom;
 mod registry;
-mod simple;
+pub(crate) mod simple;
 
 pub mod browser;
 pub mod developer;
 pub mod system;
 
 pub use context::{measure, Measured, ScanContext, ScanOutput};
+pub use custom::{CustomIssue, CustomProvider, CustomProviderSpec, CustomProviders};
 pub use registry::{default_providers, ProviderRegistry};
 pub use simple::{Root, RootMode, SimpleProvider};
 
@@ -20,10 +22,10 @@ use crate::platform::KnownPaths;
 /// A source of removable data.
 pub trait CleanupProvider: Send + Sync {
     /// Stable identifier, `snake_case`. Part of every target id.
-    fn id(&self) -> &'static str;
-    fn name(&self) -> &'static str;
+    fn id(&self) -> &str;
+    fn name(&self) -> &str;
     fn category(&self) -> Category;
-    fn description(&self) -> &'static str;
+    fn description(&self) -> &str;
     /// Risk assigned to targets unless the provider decides otherwise per target.
     fn default_risk(&self) -> RiskLevel;
     /// When two providers report overlapping paths the higher priority wins.
@@ -31,6 +33,10 @@ pub trait CleanupProvider: Send + Sync {
     /// specialised providers (e.g. "npm cache") take precedence.
     fn priority(&self) -> u8 {
         50
+    }
+    /// Whether this came from the user's `providers.json` rather than from Prune.
+    fn is_custom(&self) -> bool {
+        false
     }
     /// Whether there is anything to look at on this machine (cheap, no traversal).
     fn is_available(&self, known: &KnownPaths) -> bool;

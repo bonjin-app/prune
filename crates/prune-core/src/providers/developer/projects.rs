@@ -244,16 +244,16 @@ impl ProjectArtifacts {
 }
 
 impl CleanupProvider for ProjectArtifacts {
-    fn id(&self) -> &'static str {
+    fn id(&self) -> &str {
         "project_artifacts"
     }
-    fn name(&self) -> &'static str {
+    fn name(&self) -> &str {
         "Project Artifacts"
     }
     fn category(&self) -> Category {
         Category::DeveloperFiles
     }
-    fn description(&self) -> &'static str {
+    fn description(&self) -> &str {
         "node_modules, target/, build/, dist/, Python caches and similar regenerable folders inside your project directories."
     }
     fn default_risk(&self) -> RiskLevel {

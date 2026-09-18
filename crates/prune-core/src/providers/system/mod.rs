@@ -106,16 +106,16 @@ impl OldInstallers {
 }
 
 impl super::CleanupProvider for OldInstallers {
-    fn id(&self) -> &'static str {
+    fn id(&self) -> &str {
         "old_installers"
     }
-    fn name(&self) -> &'static str {
+    fn name(&self) -> &str {
         "Old Installers"
     }
     fn category(&self) -> Category {
         Category::OldInstallers
     }
-    fn description(&self) -> &'static str {
+    fn description(&self) -> &str {
         "Installer images and packages in Downloads that are older than a week."
     }
     fn default_risk(&self) -> RiskLevel {

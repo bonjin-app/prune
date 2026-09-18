@@ -42,12 +42,15 @@ fn clone_simple(p: &super::SimpleProvider) -> super::SimpleProvider {
 /// Lookup table over providers.
 pub struct ProviderRegistry {
     ordered: Vec<Arc<dyn CleanupProvider>>,
-    by_id: HashMap<&'static str, Arc<dyn CleanupProvider>>,
+    by_id: HashMap<String, Arc<dyn CleanupProvider>>,
 }
 
 impl ProviderRegistry {
     pub fn new(providers: Vec<Arc<dyn CleanupProvider>>) -> Self {
-        let by_id = providers.iter().map(|p| (p.id(), Arc::clone(p))).collect();
+        let by_id = providers
+            .iter()
+            .map(|p| (p.id().to_string(), Arc::clone(p)))
+            .collect();
         Self {
             ordered: providers,
             by_id,
@@ -56,6 +59,28 @@ impl ProviderRegistry {
 
     pub fn with_defaults() -> Self {
         Self::new(default_providers())
+    }
+
+    /// The built-in providers plus the ones the user defined in `providers.json`.
+    ///
+    /// Custom providers are appended, so a built-in always keeps its id; `custom::load` refuses
+    /// one that tries to take it.
+    pub fn with_custom(custom: Vec<crate::providers::CustomProvider>) -> Self {
+        let mut providers = default_providers();
+        providers.extend(
+            custom
+                .into_iter()
+                .map(|p| Arc::new(p) as Arc<dyn CleanupProvider>),
+        );
+        Self::new(providers)
+    }
+
+    /// Ids the user's file may not reuse.
+    pub fn built_in_ids() -> Vec<String> {
+        default_providers()
+            .iter()
+            .map(|p| p.id().to_string())
+            .collect()
     }
 
     pub fn get(&self, id: &str) -> Option<&Arc<dyn CleanupProvider>> {
@@ -76,6 +101,7 @@ impl ProviderRegistry {
                 description: p.description().to_string(),
                 default_risk: p.default_risk(),
                 available: p.is_available(known),
+                custom: p.is_custom(),
             })
             .collect()
     }
@@ -84,6 +110,38 @@ impl ProviderRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_custom_provider_joins_the_built_in_ones_and_outranks_the_generic_cache() {
+        let loaded = crate::providers::custom::parse(
+            r#"{"providers":[{"id":"mine","name":"Mine","category":"developer_files",
+                "risk":"safe","paths":["~/mine"]}]}"#,
+            &ProviderRegistry::built_in_ids()
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+        );
+        assert!(loaded.issues.is_empty(), "{:?}", loaded.issues);
+
+        let registry = ProviderRegistry::with_custom(loaded.providers);
+        let mine = registry
+            .get("mine")
+            .expect("the custom provider is registered");
+
+        assert!(mine.is_custom());
+        // Above `user_cache`, so a location someone named by hand is reported under that name
+        // rather than as an anonymous cache folder.
+        assert!(mine.priority() > registry.get("user_cache").unwrap().priority());
+        // The built-in ones are all still there.
+        assert!(registry.get("npm_cache").is_some());
+    }
+
+    #[test]
+    fn built_in_ids_are_what_a_custom_file_may_not_reuse() {
+        let ids = ProviderRegistry::built_in_ids();
+        assert!(ids.iter().any(|id| id == "npm_cache"));
+        assert_eq!(ids.len(), default_providers().len());
+    }
 
     #[test]
     fn provider_ids_are_unique() {

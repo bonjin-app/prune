@@ -22,7 +22,21 @@ fn main() -> ExitCode {
 
     let dir = data_dir();
     let settings = dir.as_deref().map(Settings::load).unwrap_or_default();
-    let engine = PruneEngine::with_settings(&settings);
+    let engine = match dir.as_deref() {
+        Some(dir) => PruneEngine::configured(&settings, dir),
+        None => PruneEngine::with_settings(&settings),
+    };
+    for issue in engine.custom_provider_issues() {
+        eprintln!(
+            "warning: providers.json: {}{}",
+            issue
+                .id
+                .as_deref()
+                .map(|id| format!("{id}: "))
+                .unwrap_or_default(),
+            issue.message
+        );
+    }
     let log = dir.as_deref().and_then(|d| OperationLog::open(d).ok());
 
     let stdout = std::io::stdout();

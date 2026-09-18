@@ -57,7 +57,7 @@ pub struct AppState {
 impl AppState {
     pub fn new(data_dir: &Path) -> Result<Self, Box<dyn std::error::Error>> {
         let settings = Settings::load(data_dir);
-        let engine = PruneEngine::with_settings(&settings);
+        let engine = PruneEngine::configured(&settings, data_dir);
         let monitor = SystemMonitor::new(&engine.known_paths().home);
         let ops = OperationLog::open(data_dir)?;
         Ok(Self {
@@ -83,7 +83,7 @@ impl AppState {
     /// Persists new settings and rebuilds the engine around them.
     pub fn apply_settings(&self, settings: Settings) -> prune_core::Result<()> {
         settings.save(&self.data_dir)?;
-        let engine = Arc::new(PruneEngine::with_settings(&settings));
+        let engine = Arc::new(PruneEngine::configured(&settings, &self.data_dir));
         *self.engine.write().unwrap() = engine;
         *self.settings.lock().unwrap() = settings;
         Ok(())

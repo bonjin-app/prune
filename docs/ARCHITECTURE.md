@@ -119,6 +119,17 @@ a mode (`Whole` root = one target, or every `Child` = one target), an optional a
 exclusions. Custom providers exist for Chromium profiles, Firefox profiles, installers, and the
 project artifact walker.
 
+**User-defined providers.** `providers.json` in the application data directory is parsed at
+start-up into `CustomProvider`s that join the registry. They sit at priority 90, above the
+generic built-ins, so a location someone named by hand is reported under that name rather than
+as an anonymous cache folder. A file chooses _where to look_ and nothing else: the paths it
+produces go through `SafetyPolicy` exactly like a built-in provider's, so it cannot point Prune
+at the system, and every target still needs a preview and a confirmation. Ids are rejected when
+they collide with a built-in one, repeat, or contain anything but `[a-z0-9_]`; unknown fields
+are rejected too, since a typo that changed nothing and said nothing would be worse than an
+error. Problems are carried on the engine and shown, never swallowed — a provider that failed
+to load looks exactly like one that found nothing.
+
 **Overlap de-duplication.** A generic provider (`user_cache`, priority 10) may report
 `~/Library/Caches/Homebrew` while `homebrew_cache` (priority 60) reports the same directory.
 After all providers finish, `scan::dedupe_overlaps` keeps the higher-priority target for any

@@ -25,12 +25,40 @@ pub struct PruneEngine {
     known: KnownPaths,
     policy: SafetyPolicy,
     registry: ProviderRegistry,
+    custom_issues: Vec<crate::providers::CustomIssue>,
 }
 
 impl PruneEngine {
     /// Engine for the running OS with the built-in providers and default settings.
     pub fn new() -> Self {
         Self::with_parts(platform::current(), ProviderRegistry::with_defaults())
+    }
+
+    /// Engine for the running OS, honouring the user's settings and their `providers.json`.
+    ///
+    /// `data_dir` is where both live. Problems with the providers file are kept on the engine
+    /// rather than returned, because a bad entry must not stop the app from starting — but the
+    /// user still has to be told, so nothing silently finds less than it should.
+    pub fn configured(settings: &crate::settings::Settings, data_dir: &std::path::Path) -> Self {
+        let platform = platform::current();
+        let known = platform.known_paths();
+        let built_in = ProviderRegistry::built_in_ids();
+        let built_in: Vec<&str> = built_in.iter().map(String::as_str).collect();
+        let loaded = crate::providers::custom::load(data_dir, &built_in);
+
+        let mut engine =
+            Self::with_parts(platform, ProviderRegistry::with_custom(loaded.providers));
+        let configured = settings.sanitized_roots(&known.home);
+        if !configured.is_empty() {
+            engine.known.project_roots = configured;
+        }
+        engine.custom_issues = loaded.issues;
+        engine
+    }
+
+    /// Anything wrong with the user's `providers.json`.
+    pub fn custom_provider_issues(&self) -> &[crate::providers::CustomIssue] {
+        &self.custom_issues
     }
 
     /// Engine for the running OS, honouring the user's settings.
@@ -60,6 +88,7 @@ impl PruneEngine {
             known,
             policy,
             registry,
+            custom_issues: Vec::new(),
         }
     }
 

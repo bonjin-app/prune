@@ -44,6 +44,40 @@ docs                Architecture notes
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for details.
 
+## Adding a cache location without touching the code
+
+Most additions do not need Rust at all. `providers.json` in the application data directory
+(`~/Library/Application Support/app.bonjin.prune/` on macOS,
+`%APPDATA%\app.bonjin.prune\` on Windows) is read at start-up:
+
+```json
+{
+  "providers": [
+    {
+      "id": "zig_cache",
+      "name": "Zig cache",
+      "description": "Compiler cache. Rebuilt on the next build.",
+      "category": "developer_files",
+      "risk": "safe",
+      "mode": "whole",
+      "paths": ["{cache}/zig", "~/.cache/zig"]
+    }
+  ]
+}
+```
+
+`paths` understands `~` and `{home}`, `{cache}`, `{appSupport}`, `{localAppData}`, `{temp}`,
+`{downloads}` and `{logs}`; a location the current platform does not have is skipped, so one
+file can serve macOS and Windows. `mode` is `whole` (each path is one item) or `children` (each
+entry inside it is). `minAgeDays` and `exclude` are optional.
+
+A file cannot bypass anything: every path it produces goes through the same safety layer, and
+every target still needs a preview and a confirmation. Ids must not collide with a built-in
+one, and a malformed entry is reported rather than silently skipped.
+
+If the tool is one most developers have, please open a pull request adding it as a built-in
+provider instead, using the section below.
+
 ## Adding a Cleanup Provider
 
 Most providers are one declaration in `crates/prune-core/src/providers/`:

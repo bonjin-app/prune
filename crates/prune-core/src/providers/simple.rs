@@ -135,16 +135,16 @@ pub fn file_name(path: &Path) -> String {
 }
 
 impl CleanupProvider for SimpleProvider {
-    fn id(&self) -> &'static str {
+    fn id(&self) -> &str {
         self.id
     }
-    fn name(&self) -> &'static str {
+    fn name(&self) -> &str {
         self.name
     }
     fn category(&self) -> Category {
         self.category
     }
-    fn description(&self) -> &'static str {
+    fn description(&self) -> &str {
         self.description
     }
     fn default_risk(&self) -> RiskLevel {

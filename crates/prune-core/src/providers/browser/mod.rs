@@ -127,16 +127,16 @@ impl ChromiumCache {
 }
 
 impl CleanupProvider for ChromiumCache {
-    fn id(&self) -> &'static str {
+    fn id(&self) -> &str {
         "chromium_cache"
     }
-    fn name(&self) -> &'static str {
+    fn name(&self) -> &str {
         "Chromium Browsers"
     }
     fn category(&self) -> Category {
         Category::BrowserCache
     }
-    fn description(&self) -> &'static str {
+    fn description(&self) -> &str {
         "HTTP and code caches of Chrome, Brave, Edge, Arc, Vivaldi, Opera. Logins are untouched."
     }
     fn default_risk(&self) -> RiskLevel {
@@ -201,16 +201,16 @@ impl FirefoxCache {
 }
 
 impl CleanupProvider for FirefoxCache {
-    fn id(&self) -> &'static str {
+    fn id(&self) -> &str {
         "firefox_cache"
     }
-    fn name(&self) -> &'static str {
+    fn name(&self) -> &str {
         "Firefox"
     }
     fn category(&self) -> Category {
         Category::BrowserCache
     }
-    fn description(&self) -> &'static str {
+    fn description(&self) -> &str {
         "Firefox HTTP cache per profile. Bookmarks, history and logins are untouched."
     }
     fn default_risk(&self) -> RiskLevel {
