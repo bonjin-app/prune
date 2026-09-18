@@ -128,6 +128,34 @@ are planned.
 
 Until then, build from source (below).
 
+## First run
+
+Prune asks for nothing on start-up and sends nothing anywhere. Two things are worth knowing
+before the first scan.
+
+**macOS hides some places until you say otherwise.** The Trash, Safari's data, Mail and
+Messages are invisible to any application without Full Disk Access, so a scan without it
+reports less than is really there. Prune says so rather than quietly showing a smaller number,
+and the banner links straight to the setting. Add Prune under System Settings → Privacy &
+Security → Full Disk Access, then reopen it.
+
+**Nothing is removed without you.** A scan only reads. Selecting items builds a plan, the plan
+is shown in full before anything happens, and removal moves things to the Trash unless you
+explicitly choose otherwise. Every item carries a risk level, and items Prune refuses to touch
+are shown as Protected rather than hidden.
+
+## Where Prune keeps its own things
+
+Everything is local, in one directory:
+
+| macOS | `~/Library/Application Support/app.bonjin.prune/` |
+| Windows | `%APPDATA%\app.bonjin.prune\` |
+
+It holds `settings.json` (the folders searched for project artifacts), `operations.jsonl` (what
+was removed and when), `providers.json` if you added your own cache locations, and the window
+position. Removing that directory resets Prune completely; removing the application and that
+directory leaves nothing behind.
+
 ## Development
 
 Prerequisites: Rust stable, Node 20+, pnpm, and the

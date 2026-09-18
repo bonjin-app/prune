@@ -119,6 +119,22 @@ body {
   background: transparent;
 }
 
+/*
+ * Some people get motion sick from interface animation, and the system has a switch for it.
+ * Everything here is decorative — a spinner that does not spin still says "working", and a
+ * panel that appears without sliding still appears — so honouring it costs nothing.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 @keyframes prune-spin {
   to {
     transform: rotate(360deg);

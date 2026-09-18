@@ -6,6 +6,13 @@
 //!
 //! Everything happens inside a temporary directory. The only real system data touched is
 //! read-only (provider catalogue, system info, startup items).
+//!
+//! Twenty-eight of the thirty commands are exercised here. The two that are not would act on
+//! the machine running the tests: `docker_prune` would really prune Docker, and
+//! `app_open_privacy_settings` would open System Settings in the tester's face. Both are
+//! covered where they can be — Docker against a fake command runner in `prune-core`, and the
+//! settings pane is a single spawn. If a new command is added, add it here rather than growing
+//! that list.
 
 use std::path::Path;
 
@@ -407,4 +414,128 @@ fn the_window_position_is_remembered_between_runs() {
         saved.get("main").is_some(),
         "the main window should be in {saved}"
     );
+}
+
+#[test]
+fn the_read_only_commands_added_late_answer_too() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_app, webview) = build_app(dir.path());
+
+    // Permissions: a plain answer on any machine, granted or not.
+    let permissions = ok(&webview, "app_get_permissions", json!({}));
+    assert!(permissions["blocked"].is_array());
+    assert!(["granted", "denied", "not_applicable"]
+        .contains(&permissions["fullDiskAccess"].as_str().unwrap()));
+
+    // A fresh profile has no providers.json, so nothing is wrong with it.
+    assert!(ok(&webview, "providers_custom_issues", json!({}))
+        .as_array()
+        .unwrap()
+        .is_empty());
+
+    // Docker: "not installed" and "not running" are answers, not errors.
+    let docker = ok(&webview, "docker_status", json!({}));
+    assert!(["not_installed", "not_running", "ready"].contains(&docker["state"].as_str().unwrap()));
+
+    // Applications: read-only, and every entry says whether Prune would touch it.
+    let apps = ok(&webview, "apps_start_scan", json!({}));
+    for app in apps.as_array().unwrap() {
+        assert!(app["id"].is_string());
+        assert!(app["isSystem"].is_boolean());
+    }
+}
+
+#[test]
+fn the_commands_that_change_something_refuse_what_they_do_not_know() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_app, webview) = build_app(dir.path());
+
+    // Each of these would act on the real machine, so the test only drives the refusals. The
+    // paths that do act are covered against a sandbox in prune-core.
+    let cases = [
+        (
+            "apps_get_detail",
+            json!({ "appId": "nothing-like-this" }),
+            "unknown_app",
+        ),
+        (
+            "apps_run_uninstaller",
+            json!({ "appId": "nothing-like-this" }),
+            "unknown_app",
+        ),
+        (
+            "startup_set_enabled",
+            json!({ "itemId": "nothing-like-this", "enabled": false }),
+            "unknown_startup_item",
+        ),
+        (
+            "cleaner_get_scan",
+            json!({ "scanId": "no-such-scan" }),
+            "unknown_scan",
+        ),
+        (
+            "cleaner_cancel_scan",
+            json!({ "scanId": "no-such-scan" }),
+            "unknown_scan",
+        ),
+        (
+            "disk_cancel_scan",
+            json!({ "scanId": "no-such-scan" }),
+            "unknown_scan",
+        ),
+        (
+            "cleaner_execute",
+            json!({ "planId": "no-such-plan" }),
+            "unknown_plan",
+        ),
+    ];
+    for (cmd, args, expected) in cases {
+        match invoke(&webview, cmd, args) {
+            Err(err) => assert_eq!(err["code"], expected, "{cmd}"),
+            Ok(value) => panic!("{cmd} should have refused, got {value}"),
+        }
+    }
+
+    // Stopping a process is refused by name, not by id, so the message has to say which.
+    let err = invoke(
+        &webview,
+        "system_stop_process",
+        json!({ "pid": 1, "mode": "force" }),
+    )
+    .unwrap_err();
+    assert!(
+        err["message"]
+            .as_str()
+            .unwrap()
+            .contains("cannot be stopped"),
+        "{err}"
+    );
+}
+
+#[test]
+fn a_scan_can_be_started_read_back_and_cancelled() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_app, webview) = build_app(dir.path());
+
+    // Limited to one provider so the test does not walk the machine it runs on.
+    let scan_id = ok(
+        &webview,
+        "cleaner_start_scan",
+        json!({ "providerIds": ["maven_repo"] }),
+    );
+    let scan_id = scan_id.as_str().unwrap().to_string();
+
+    // Cancelling is accepted whether or not it arrives before the scan finishes.
+    ok(
+        &webview,
+        "cleaner_cancel_scan",
+        json!({ "scanId": scan_id }),
+    );
+
+    let session = wait_for(&webview, "cleaner_get_scan", json!({ "scanId": scan_id }));
+    assert!(["completed", "cancelled"].contains(&session["status"].as_str().unwrap()));
+    // Only the provider that was asked for, whatever it found.
+    for result in session["results"].as_array().unwrap() {
+        assert_eq!(result["providerId"], "maven_repo");
+    }
 }
