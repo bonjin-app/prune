@@ -588,6 +588,12 @@ fn processes(
         };
     }
 
+    // A process's CPU share is the work it did between two readings, so a single-shot command
+    // has to take both. Without this every process reports 0.0% and the "busiest first" order
+    // silently becomes "largest first", which is a different question than the one asked.
+    let _ = monitor.processes(1);
+    std::thread::sleep(prune_core::system::CPU_SAMPLE_INTERVAL);
+
     let list = monitor.processes(limit.min(2000));
     if json {
         write_json(out, &list)?;

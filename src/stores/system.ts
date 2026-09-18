@@ -72,10 +72,39 @@ export const useSystem = create<SystemState>((set) => ({
   },
 }));
 
-/** Polls the live snapshot while mounted. */
+/**
+ * Runs `tick` on a timer while the window is actually being looked at.
+ *
+ * A snapshot is not free — it reads every process and, periodically, every mounted volume — and
+ * a monitor nobody can see has nothing to report. Without this, leaving Prune open behind
+ * another window costs the user battery for a view they are not reading, which is a poor
+ * trade for a tool whose whole purpose is to leave the machine in better shape. Returning to
+ * the window ticks immediately, so what appears is current rather than however old the last
+ * reading was.
+ */
+export function startPolling(tick: () => void, intervalMs: number): () => void {
+  let id: number | undefined;
+
+  const stop = () => {
+    if (id !== undefined) window.clearInterval(id);
+    id = undefined;
+  };
+  const start = () => {
+    if (id !== undefined) return;
+    tick();
+    id = window.setInterval(tick, intervalMs);
+  };
+  const onVisibility = () => (document.hidden ? stop() : start());
+
+  if (!document.hidden) start();
+  document.addEventListener("visibilitychange", onVisibility);
+  return () => {
+    document.removeEventListener("visibilitychange", onVisibility);
+    stop();
+  };
+}
+
+/** Polls the live snapshot while mounted and visible. */
 export function startSnapshotPolling(intervalMs: number): () => void {
-  const tick = () => void useSystem.getState().refreshSnapshot();
-  tick();
-  const id = window.setInterval(tick, intervalMs);
-  return () => window.clearInterval(id);
+  return startPolling(() => void useSystem.getState().refreshSnapshot(), intervalMs);
 }

@@ -495,6 +495,22 @@ The same path was exercised against a stub `docker` on `PATH` to confirm the rea
 exactly those arguments. **It has not been run against a real Docker daemon**, which is the one
 gap left in this feature.
 
+### Cost of being open
+
+A system monitor that is expensive to run is self-defeating, so the live readings are priced
+individually rather than taken together every tick:
+
+| reading | cost on a 2,600-process machine | how often |
+| --- | --- | --- |
+| CPU, memory, network | under 1ms | every poll |
+| process table walk | ~60ms | at most every 4s, and reused by the process list |
+| mounted volumes | ~140ms | at most every 10s, or at once after a removal |
+| process list with details | ~55ms | only while the Monitor view is open |
+
+That takes a snapshot from 439ms to under a millisecond in the steady state. On top of it,
+`startPolling` in the frontend stops the timers entirely while the window is hidden and takes a
+fresh reading when it returns, because a monitor nobody can see has nothing to report.
+
 ## 11. Known limitations
 
 - macOS: `~/.Trash`, Safari, Mail and Messages are TCC-protected. Prune detects this and says so

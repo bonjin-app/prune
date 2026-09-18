@@ -4,7 +4,7 @@ import { Meter } from "@/components/ui/Meter";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Ban, Lock } from "lucide-react";
 import { formatBytes, formatPercent } from "@/lib/format";
-import { startSnapshotPolling, useSystem } from "@/stores/system";
+import { startPolling, startSnapshotPolling, useSystem } from "@/stores/system";
 import type { ProcessInfo } from "@/types/models";
 import { StopProcessDialog } from "./StopProcessDialog";
 
@@ -15,12 +15,11 @@ export function MonitorView() {
   const [stopping, setStopping] = useState<ProcessInfo | null>(null);
 
   useEffect(() => {
-    const stop = startSnapshotPolling(2000);
-    void refreshProcesses(40);
-    const id = window.setInterval(() => void refreshProcesses(40), 3000);
+    const stopSnapshots = startSnapshotPolling(2000);
+    const stopProcesses = startPolling(() => void refreshProcesses(40), 3000);
     return () => {
-      stop();
-      window.clearInterval(id);
+      stopSnapshots();
+      stopProcesses();
     };
   }, [refreshProcesses]);
 

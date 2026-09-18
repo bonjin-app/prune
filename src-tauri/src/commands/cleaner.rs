@@ -161,5 +161,8 @@ pub async fn cleaner_execute<R: Runtime>(
             analysis.forget_removed(&removed);
         }
     }
+    // Free space is read on a timer, because enumerating volumes is expensive. This is the one
+    // moment where a reading a few seconds old would be obviously wrong.
+    state.monitor.invalidate_disks();
     Ok(result)
 }

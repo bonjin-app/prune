@@ -43,5 +43,7 @@ pub async fn docker_prune(
     if let Err(e) = state.ops.append(&record) {
         tracing::warn!(error = %e, "could not record the Docker cleanup");
     }
+    // Docker frees real disk space, so the cached free-space reading is now wrong.
+    state.monitor.invalidate_disks();
     Ok(result)
 }
