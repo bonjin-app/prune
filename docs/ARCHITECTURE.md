@@ -511,6 +511,10 @@ That takes a snapshot from 439ms to under a millisecond in the steady state. On 
 `startPolling` in the frontend stops the timers entirely while the window is hidden and takes a
 fresh reading when it returns, because a monitor nobody can see has nothing to report.
 
+Measured on the built application on the same 2,600-process machine: 0.0% behind another
+window, a few percent on the Dashboard, and 0.7–9.9% with the Monitor view open and listing
+forty processes — which includes the WebView redrawing live meters, not only the readings.
+
 ## 11. Known limitations
 
 - macOS: `~/.Trash`, Safari, Mail and Messages are TCC-protected. Prune detects this and says so
