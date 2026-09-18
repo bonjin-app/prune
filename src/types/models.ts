@@ -375,6 +375,8 @@ export interface AppDetail {
   items: AppDataItem[];
   totalBytes: number;
   leftoverBytes: number;
+  /** Paths of other installed copies answering to the same bundle identifier. */
+  sharedWith?: string[];
 }
 
 export interface AppsProgress {

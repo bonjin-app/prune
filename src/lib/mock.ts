@@ -552,6 +552,17 @@ const MOCK_APPS: ApplicationInfo[] = [
     source: "applications",
     isSystem: false,
   },
+  // Kept alongside the current one, which is ordinary and is exactly the case where the
+  // leftovers belong to neither copy on its own.
+  {
+    id: "app-vscode-old",
+    name: "Visual Studio Code-1.98-backup",
+    path: "/Applications/Visual Studio Code-1.98-backup.app",
+    version: "1.98.2",
+    bundleId: "com.microsoft.VSCode",
+    source: "applications",
+    isSystem: false,
+  },
   {
     id: "app-docker",
     name: "Docker",
@@ -665,8 +676,24 @@ function mockAppDetail(app: ApplicationInfo): AppDetail {
     t("web_kit", "WebKit Storage", `${lib}/WebKit/${bid}`, 8e6, "safe"),
     t("logs", "Logs", `${lib}/Logs/${app.name}`, 30e6, "safe"),
   ];
+  // Other installed copies answering to the same identifier. Their shared data belongs to no
+  // single copy, so it is reported as protected.
+  const sharedWith = MOCK_APPS.filter(
+    (other) => other.id !== app.id && other.bundleId && other.bundleId === app.bundleId,
+  ).map((other) => other.path);
+  if (sharedWith.length > 0) {
+    for (const item of items) {
+      if (item.kind !== "application") item.target.risk = "protected";
+    }
+  }
   const totalBytes = items.reduce((a, i) => a + i.target.sizeBytes, 0);
-  return { app: { ...app, sizeBytes: size }, items, totalBytes, leftoverBytes: totalBytes - size };
+  return {
+    app: { ...app, sizeBytes: size },
+    items,
+    totalBytes,
+    leftoverBytes: totalBytes - size,
+    sharedWith,
+  };
 }
 
 function mockLargeFiles(root: string): LargeFile[] {

@@ -316,7 +316,22 @@ pub fn app_detail(out: &mut impl Write, detail: &AppDetail) -> std::io::Result<(
         "\n  {} total, {} outside the application.",
         human_bytes(detail.total_bytes),
         human_bytes(detail.leftover_bytes)
-    )
+    )?;
+    if !detail.shared_with.is_empty() {
+        writeln!(
+            out,
+            "\n  Another copy of this application is installed, and they share the same data:"
+        )?;
+        for path in &detail.shared_with {
+            writeln!(out, "    {path}")?;
+        }
+        writeln!(
+            out,
+            "  The data above is left alone while that copy exists; removing it would take the\n  \
+             other copy's settings with it. Remove the other copy first, then scan again."
+        )?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]

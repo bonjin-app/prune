@@ -277,6 +277,12 @@ no content read) and reports which are blocked plus how to grant access.
 dashboard and above every scan, and Settings lists the state. Windows has no equivalent gate, so
 it reports `NotApplicable`.
 
+Leftovers are matched by bundle identifier, which is also why two installed copies of one
+application cannot each claim them. `AppDetail::shared_with` names any other installed copy with
+the same identifier, and while it is non-empty every leftover is reported `Protected`: the data
+belongs to no single copy, and the copy the user asked to remove can still go. Removing the
+others and scanning again offers the data normally, so nothing is permanently unreachable.
+
 ## 5f. Settings
 
 `settings.json` in the application data directory holds only what the engine needs; theme and

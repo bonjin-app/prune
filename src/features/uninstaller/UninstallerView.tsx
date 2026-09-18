@@ -1,5 +1,13 @@
 import { useEffect, useMemo } from "react";
-import { AppWindow, FolderOpen, PackageMinus, RefreshCw, Search, ShieldAlert } from "lucide-react";
+import {
+  AlertTriangle,
+  AppWindow,
+  FolderOpen,
+  PackageMinus,
+  RefreshCw,
+  Search,
+  ShieldAlert,
+} from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -229,6 +237,26 @@ function AppDetailPane() {
           <FolderOpen size={14} />
         </button>
       </div>
+
+      {(detail.sharedWith?.length ?? 0) > 0 && (
+        <div className="flex items-start gap-2.5 border-b border-line bg-warn-soft/40 px-4 py-2.5 text-[12.5px]">
+          <AlertTriangle size={14} className="mt-0.5 shrink-0 text-warn" />
+          <div className="min-w-0">
+            Another copy of this application is installed, and both read the same data:
+            <ul className="mt-1 space-y-0.5 font-mono text-[11.5px] text-fg-muted">
+              {detail.sharedWith?.map((path) => (
+                <li key={path} className="truncate">
+                  {abbreviatePath(path, home)}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-1 text-fg-muted">
+              So the data below is left alone: removing it here would take that copy's settings
+              with it. Remove the other copy first, then scan again.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center gap-2 border-b border-line px-4 py-2 text-[12px]">
         <Checkbox
