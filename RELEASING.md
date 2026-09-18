@@ -33,6 +33,8 @@ pnpm lint && pnpm typecheck && pnpm test && pnpm exec vite build
 cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
+./scripts/check-no-network.sh
+./scripts/check-binary-names.sh
 ```
 
 Then run the real thing once, because a release is the wrong place to discover that the app
@@ -42,6 +44,11 @@ does not start:
 pnpm tauri build && open target/release/bundle/macos/Prune.app
 cargo run -p prune-cli -- scan
 ```
+
+The two binaries are named apart — `target/release/prune` is the command line,
+`target/release/prune-desktop` is what goes inside `Prune.app` — so a build of one never leaves
+the other's name pointing at the wrong file. Check what you are about to ship rather than
+trusting the path: `./target/release/prune --version` should answer, not open a window.
 
 ### If the DMG step fails
 

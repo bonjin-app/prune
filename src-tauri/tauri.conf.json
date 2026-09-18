@@ -58,5 +58,6 @@
     "publisher": "Prune contributors",
     "homepage": "https://github.com/bonjin-app/prune",
     "licenseFile": "../LICENSE"
-  }
+  },
+  "mainBinaryName": "prune-desktop"
 }

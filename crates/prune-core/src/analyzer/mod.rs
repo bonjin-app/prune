@@ -25,6 +25,17 @@ pub const LARGE_FILES_PROVIDER: &str = "large_files";
 
 /// How many of the largest files to keep.
 const LARGE_FILE_CAPACITY: usize = 2000;
+
+/// One candidate for the largest-files list, ordered by size then by path.
+///
+/// The path lives in the heap rather than in a side table indexed from it. A side table can
+/// only grow: every file that was ever briefly in the top two thousand stays in it, so a tree
+/// whose files happen to be walked smallest-first would accumulate one entry per file — on a
+/// home directory with millions of them, hundreds of megabytes to produce a list of two
+/// thousand. Keeping the path in the heap bounds the memory to the capacity, and ties at the
+/// cut-off are then broken by path, which is stable, rather than by discovery order, which is
+/// whatever the filesystem happened to return.
+type LargeCandidate = (u64, PathBuf, Option<DateTime<Utc>>);
 const TOP_EXTENSIONS: usize = 40;
 const PROGRESS_EVERY: u64 = 2048;
 
@@ -327,8 +338,7 @@ pub fn analyze(
     index.insert(root.to_path_buf(), 0);
     // stack[d] = node index of the directory at depth d on the current DFS path
     let mut stack: Vec<usize> = vec![0];
-    let mut heap: BinaryHeap<Reverse<(u64, usize)>> = BinaryHeap::new();
-    let mut heap_entries: Vec<(PathBuf, u64, Option<DateTime<Utc>>)> = Vec::new();
+    let mut heap: BinaryHeap<Reverse<LargeCandidate>> = BinaryHeap::new();
     let mut extensions: HashMap<String, (u64, u64)> = HashMap::new();
     let mut issues: Vec<ScanIssue> = Vec::new();
     #[cfg(unix)]
@@ -436,11 +446,10 @@ pub fn analyze(
             e.1 += 1;
         }
 
-        if heap.len() < LARGE_FILE_CAPACITY || heap.peek().is_some_and(|Reverse((s, _))| size > *s)
+        if heap.len() < LARGE_FILE_CAPACITY || heap.peek().is_some_and(|Reverse((s, ..))| size > *s)
         {
             let modified = meta.modified().ok().map(DateTime::<Utc>::from);
-            heap_entries.push((path.to_path_buf(), size, modified));
-            heap.push(Reverse((size, heap_entries.len() - 1)));
+            heap.push(Reverse((size, path.to_path_buf(), modified)));
             if heap.len() > LARGE_FILE_CAPACITY {
                 heap.pop();
             }
@@ -459,8 +468,8 @@ pub fn analyze(
 
     let mut large: Vec<LargeFile> = heap
         .into_iter()
-        .map(|Reverse((_, i))| {
-            let (path, size, modified) = &heap_entries[i];
+        .map(|Reverse((size, path, modified))| {
+            let (path, size, modified) = (&path, &size, &modified);
             let risk = if policy.is_protected(path) {
                 RiskLevel::Protected
             } else {
@@ -535,6 +544,38 @@ mod tests {
     fn write(path: &Path, size: usize) {
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(path, vec![0u8; size]).unwrap();
+    }
+
+    #[test]
+    fn keeps_the_right_files_when_every_one_beats_the_last() {
+        // The worst case for a top-N heap: each file is bigger than the one before, so every
+        // single file enters the running list. Correctness has to hold, and the memory used to
+        // produce a list of two thousand must not grow with the number of files walked.
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("home");
+        let count = LARGE_FILE_CAPACITY + 50;
+        for i in 0..count {
+            // Zero-padded so the walk order matches the size order.
+            write(&root.join(format!("f{i:05}.bin")), 100 + i);
+        }
+        let policy = SafetyPolicy::from_protected(ProtectedPaths {
+            allowed_roots: vec![root.clone()],
+            ..Default::default()
+        });
+        let cancel = AtomicBool::new(false);
+        let analysis = analyze("t", &root, &policy, &cancel, &|_| {});
+
+        let large = analysis.large_files(0, usize::MAX);
+        assert_eq!(large.len(), LARGE_FILE_CAPACITY, "the list stays capped");
+        assert_eq!(large[0].name, format!("f{:05}.bin", count - 1));
+        assert_eq!(large[0].size_bytes as usize, 100 + count - 1);
+        // The smallest kept is the capacity-th largest, not whatever arrived first.
+        let smallest_kept = large.last().unwrap();
+        assert_eq!(
+            smallest_kept.size_bytes as usize,
+            100 + count - LARGE_FILE_CAPACITY
+        );
+        assert_eq!(analysis.node(None).unwrap().node.file_count as usize, count);
     }
 
     #[test]

@@ -35,6 +35,7 @@ cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ./scripts/check-no-network.sh
+./scripts/check-binary-names.sh
 ```
 
 That last one is not a formality. Prune's whole claim is that it never talks to a network, and

@@ -299,6 +299,16 @@ paths.
 
 ## 5g. Command line
 
+The two binaries are named apart on purpose. The command line is `prune`, because that is what
+a person types; the desktop app's binary is `prune-desktop`, set in both `src-tauri/Cargo.toml`
+and `tauri.conf.json`. When both were called `prune` they wrote to the same
+`target/<profile>/prune` and the last build silently won — `pnpm tauri build` followed by
+`./target/release/prune scan` opened the GUI and ignored the arguments, and a release cut from
+one directory could have shipped the desktop app under the command line's name. Cargo warns
+about it, but a warning in the middle of a five-minute build is not a check, so
+`scripts/check-binary-names.sh` runs in CI. Nothing a user sees changed: the bundle is still
+`Prune.app` and the command is still `prune`.
+
 `crates/prune-cli` is a second front end over the same `PruneEngine`, not a reimplementation: it
 calls `scan`, `plan` and `execute` exactly as the desktop app does, so the safety pipeline,
 protected paths and operation log are shared.

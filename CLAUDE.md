@@ -10,6 +10,7 @@ pnpm install && pnpm tauri dev            # desktop app
 pnpm dev                                  # UI in browser with mock backend
 pnpm typecheck && pnpm lint && pnpm test  # frontend checks
 cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
+./scripts/check-no-network.sh && ./scripts/check-binary-names.sh   # promises CI enforces
 cargo run -p prune-cli -- scan                      # read-only real scan
 cargo run -p prune-cli -- disk ~/Projects --large 500
 cargo run -p prune-cli -- apps --detail "Visual Studio Code"
@@ -29,3 +30,5 @@ cargo run -p prune-cli -- apps --detail "Visual Studio Code"
   `developer::ALL`; keep provider ids unique and stable.
 - `clean` on the CLI must stay a dry run without `--yes`, and must never auto-select anything
   riskier than `Low`.
+- `target/release/prune` is the CLI; the desktop binary is `prune-desktop`. Two binaries with
+  one name overwrite each other, so keep them distinct.

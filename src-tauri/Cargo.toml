@@ -12,6 +12,15 @@ authors.workspace = true
 name = "prune_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+# Not `prune`: `crates/prune-cli` already produces a binary of that name, and two targets in one
+# workspace writing the same file means the last build silently wins. Cargo warns about it, and
+# the result is a `target/release/prune` that is the desktop app on one machine and the command
+# line on another. The command line keeps the short name because that is what a user types; this
+# one is only ever seen inside `Prune.app`, where `tauri.conf.json` says what to look for.
+[[bin]]
+name = "prune-desktop"
+path = "src/main.rs"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 

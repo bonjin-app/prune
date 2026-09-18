@@ -60,6 +60,11 @@ jobs:
       - name: No network dependencies
         shell: bash
         run: ./scripts/check-no-network.sh
+      # The desktop app and the command line both used to be called `prune`, so they overwrote
+      # each other in target/. Cargo warns, but a warning inside a long build is not a check.
+      - name: Binary names do not collide
+        shell: bash
+        run: ./scripts/check-binary-names.sh
 
   build:
     name: Build (${{ matrix.name }})
