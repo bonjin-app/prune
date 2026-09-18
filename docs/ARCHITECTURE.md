@@ -7,7 +7,7 @@ the first line of code (spec §39) and the reasoning behind them.
 
 | Principle                   | Consequence in code                                                                                     |
 | --------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Local-first / Privacy-first | No network crate anywhere in the workspace. Operation log is JSON lines on disk.                        |
+| Local-first / Privacy-first | The engine has no network crate at all; the app carries only what Tauri needs, and no HTTP client or TLS stack on any shipped target. Enforced by `scripts/check-no-network.sh` and `src/lib/no-network.test.ts` in CI. Operation log is JSON lines on disk. |
 | Safe-by-default             | All deletion goes through `SafetyPolicy::validate` → `fs::remove`. Only `ValidatedPath` can be removed. |
 | Developer-first             | Developer providers are the largest provider group and have their own view.                             |
 | CLI-ready                   | `prune-core` has no Tauri dependency. `examples/scan.rs` is the CLI prototype.                          |

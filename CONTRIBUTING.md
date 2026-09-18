@@ -34,7 +34,14 @@ pnpm typecheck && pnpm lint && pnpm test
 cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
+./scripts/check-no-network.sh
 ```
+
+That last one is not a formality. Prune's whole claim is that it never talks to a network, and
+the script refuses any HTTP client or TLS stack in the workspace and anything socket-capable at
+all in the engine, printing the dependency path that introduced it. `pnpm test` makes the same
+check of the interface. If you need something the check refuses, it needs a decision, not a
+dependency bump.
 
 ## Project Layout
 
