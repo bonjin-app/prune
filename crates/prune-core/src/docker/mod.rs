@@ -219,6 +219,7 @@ pub fn prune(runner: &dyn CommandRunner, action: DockerAction) -> crate::Result<
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::sync::LockExt;
     use std::sync::Mutex;
 
     /// Builds an exit status without running anything. The raw value means different things on
@@ -254,13 +255,13 @@ mod tests {
         }
 
         fn calls(&self) -> Vec<Vec<String>> {
-            self.calls.lock().unwrap().clone()
+            self.calls.lock_recover().clone()
         }
     }
 
     impl CommandRunner for FakeDocker {
         fn run(&self, program: &str, args: &[&str]) -> std::io::Result<Output> {
-            self.calls.lock().unwrap().push(
+            self.calls.lock_recover().push(
                 std::iter::once(program.to_string())
                     .chain(args.iter().map(|a| a.to_string()))
                     .collect(),

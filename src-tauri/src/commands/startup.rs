@@ -1,4 +1,5 @@
 use prune_core::platform::StartupItem;
+use prune_core::sync::LockExt;
 use tauri::State;
 
 use crate::error::{CommandError, CommandResult};
@@ -11,7 +12,7 @@ pub async fn startup_list(state: State<'_, AppState>) -> CommandResult<Vec<Start
     let items = tauri::async_runtime::spawn_blocking(move || engine.startup_items())
         .await
         .map_err(|e| CommandError::new("join", e.to_string()))??;
-    *state.startup.lock().unwrap() = items.clone();
+    *state.startup.lock_recover() = items.clone();
     Ok(items)
 }
 

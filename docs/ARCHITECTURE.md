@@ -371,6 +371,15 @@ anything of the user's. Single instance is registered only in `run`, never in
 `register_plugins`, because it exits the process when another copy exists — which a test
 harness must never do.
 
+Nothing is allowed to break permanently either. A thread that panics while holding a `Mutex`
+poisons it, and `lock().unwrap()` would then panic on every later use — one bug in one scan
+leaving the whole application dead until the user quits and reopens. `sync::LockExt` recovers
+instead. That is only sound because of where the locks are: everything they guard is a cache of
+scan results, and nothing about removal depends on it, since `SafetyPolicy` re-validates every
+path at the moment of deletion rather than trusting anything cached. The frontend has the same
+guard in `ErrorBoundary`, because a thrown render error otherwise unmounts the tree and leaves
+an empty window that looks, to the person in front of it, exactly like a crash.
+
 Nothing in start-up is allowed to refuse. A bundled application that fails to open has no
 console to explain itself, so a data directory that cannot be used costs the user their
 settings and history, not the application: the operation log creates its directory on first

@@ -4,6 +4,7 @@ use std::sync::Arc;
 use prune_core::apps::{self, AppDetail, AppsProgress};
 use prune_core::models::{ScanSession, ScanStatus};
 use prune_core::platform::ApplicationInfo;
+use prune_core::sync::LockExt;
 use tauri::{AppHandle, Emitter, Manager, Runtime, State};
 
 use crate::error::{CommandError, CommandResult};
@@ -21,7 +22,7 @@ pub fn apps_start_scan<R: Runtime>(
     let list = state.engine().applications()?;
     let scan_id = uuid::Uuid::new_v4().to_string();
     {
-        let mut apps_state = state.apps.lock().unwrap();
+        let mut apps_state = state.apps.lock_recover();
         apps_state.scan_id = Some(scan_id.clone());
         apps_state.list = list.clone();
     }
@@ -47,7 +48,7 @@ pub fn apps_start_scan<R: Runtime>(
                     },
                 );
                 if let Some(state) = app.try_state::<AppState>() {
-                    let mut apps_state = state.apps.lock().unwrap();
+                    let mut apps_state = state.apps.lock_recover();
                     if apps_state.scan_id.as_deref() == Some(scan_id.as_str()) {
                         if let Some(slot) = apps_state.list.iter_mut().find(|a| a.id == info.id) {
                             slot.size_bytes = info.size_bytes;
@@ -96,7 +97,7 @@ pub async fn apps_get_detail(
         total_files: 0,
     };
     session.recompute_totals();
-    state.scans.lock().unwrap().insert(
+    state.scans.lock_recover().insert(
         session_id,
         ScanEntry {
             cancel: Arc::new(AtomicBool::new(false)),

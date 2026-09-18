@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use prune_core::analyzer::{self, DiskNodeView, DiskProgress, DiskSummary, LargeFile};
 use prune_core::models::{ScanSession, ScanStatus};
+use prune_core::sync::LockExt;
 use tauri::{AppHandle, Emitter, Manager, Runtime, State};
 
 use crate::error::{CommandError, CommandResult};
@@ -33,7 +34,7 @@ pub fn disk_start_scan<R: Runtime>(
 
     let scan_id = uuid::Uuid::new_v4().to_string();
     let cancel = Arc::new(AtomicBool::new(false));
-    state.disks.lock().unwrap().insert(
+    state.disks.lock_recover().insert(
         scan_id.clone(),
         DiskEntry {
             cancel: cancel.clone(),
@@ -64,14 +65,14 @@ pub fn disk_start_scan<R: Runtime>(
                 total_files: 0,
             };
             session.recompute_totals();
-            state.scans.lock().unwrap().insert(
+            state.scans.lock_recover().insert(
                 id.clone(),
                 ScanEntry {
                     cancel: Arc::new(AtomicBool::new(false)),
                     session: Some(session),
                 },
             );
-            if let Some(entry) = state.disks.lock().unwrap().get_mut(&id) {
+            if let Some(entry) = state.disks.lock_recover().get_mut(&id) {
                 entry.analysis = Some(analysis);
             }
         }
@@ -82,7 +83,7 @@ pub fn disk_start_scan<R: Runtime>(
 
 #[tauri::command]
 pub fn disk_cancel_scan(state: State<'_, AppState>, scan_id: String) -> CommandResult<()> {
-    let disks = state.disks.lock().unwrap();
+    let disks = state.disks.lock_recover();
     let entry = disks
         .get(&scan_id)
         .ok_or_else(|| CommandError::new("unknown_scan", scan_id.clone()))?;
@@ -92,7 +93,7 @@ pub fn disk_cancel_scan(state: State<'_, AppState>, scan_id: String) -> CommandR
 
 #[tauri::command]
 pub fn disk_get_summary(state: State<'_, AppState>, scan_id: String) -> CommandResult<DiskSummary> {
-    let disks = state.disks.lock().unwrap();
+    let disks = state.disks.lock_recover();
     let entry = disks
         .get(&scan_id)
         .ok_or_else(|| CommandError::new("unknown_scan", scan_id.clone()))?;
@@ -110,7 +111,7 @@ pub fn disk_get_node(
     scan_id: String,
     path: Option<String>,
 ) -> CommandResult<DiskNodeView> {
-    let disks = state.disks.lock().unwrap();
+    let disks = state.disks.lock_recover();
     let entry = disks
         .get(&scan_id)
         .ok_or_else(|| CommandError::new("unknown_scan", scan_id.clone()))?;
@@ -130,7 +131,7 @@ pub fn disk_large_files(
     min_bytes: Option<u64>,
     limit: Option<usize>,
 ) -> CommandResult<Vec<LargeFile>> {
-    let disks = state.disks.lock().unwrap();
+    let disks = state.disks.lock_recover();
     let entry = disks
         .get(&scan_id)
         .ok_or_else(|| CommandError::new("unknown_scan", scan_id.clone()))?;

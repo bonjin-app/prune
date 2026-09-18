@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use crate::models::OperationRecord;
+use crate::sync::LockExt;
 use crate::{PruneError, Result};
 
 pub struct OperationLog {
@@ -34,7 +35,7 @@ impl OperationLog {
     }
 
     pub fn append(&self, record: &OperationRecord) -> Result<()> {
-        let _guard = self.lock.lock().unwrap();
+        let _guard = self.lock.lock_recover();
         std::fs::create_dir_all(&self.dir).map_err(|e| PruneError::io(&self.dir, e))?;
         let mut file = OpenOptions::new()
             .create(true)
@@ -49,7 +50,7 @@ impl OperationLog {
 
     /// Most recent first. Corrupt lines are skipped.
     pub fn list(&self, limit: usize) -> Result<Vec<OperationRecord>> {
-        let _guard = self.lock.lock().unwrap();
+        let _guard = self.lock.lock_recover();
         // A log that cannot be opened has no history to show: nothing could have been written
         // to it either. Reporting an error here would put a failure in front of the user on
         // every visit to a screen that would have been empty anyway.

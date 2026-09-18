@@ -90,7 +90,22 @@ skips signing when they are absent.
 | `APPLE_SIGNING_IDENTITY`                      | e.g. `Developer ID Application: Name (TEAMID)`             |
 | `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` | notarization, using an app-specific password               |
 
+The macOS build already sets the hardened runtime and ships `src-tauri/entitlements.plist`,
+which notarization requires. Both only take effect when a signing identity is present: without
+one Tauri produces an ad-hoc signature and neither is applied, so `codesign -d --entitlements -`
+on a local build shows nothing. That is expected, not a misconfiguration. That file asks for the two exceptions a WebView needs and nothing
+else: no network, camera, microphone or location entitlement, and no sandbox — a cleanup tool
+confined to its own container would have nothing to clean. Reading the user's files stays
+governed by the macOS privacy prompts at runtime, not by an entitlement.
+
 Windows code signing is not wired up yet.
+
+### What an unsigned build looks like
+
+Worth knowing before publishing one. macOS marks a downloaded unsigned app as quarantined and
+Gatekeeper refuses to open it on a double-click; the user has to allow it in System Settings →
+Privacy & Security. Windows SmartScreen shows a similar warning. Neither is a failure of the
+build, but both are a reason to sign before a release anyone else is expected to install.
 
 ## 6. Afterwards
 

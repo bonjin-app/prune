@@ -17,6 +17,7 @@ use crate::{PruneError, Result};
 
 pub mod protection;
 
+use crate::sync::LockExt;
 use protection::Candidate;
 
 /// Keeps a `sysinfo::System` alive so CPU usage can be measured between calls.
@@ -40,7 +41,7 @@ impl SystemMonitor {
     }
 
     pub fn info(&self) -> SystemInfo {
-        let mut sys = self.inner.lock().unwrap();
+        let mut sys = self.inner.lock_recover();
         sys.refresh_cpu_list(sysinfo::CpuRefreshKind::nothing());
         sys.refresh_memory();
         let cpu_brand = sys
@@ -64,7 +65,7 @@ impl SystemMonitor {
     }
 
     pub fn snapshot(&self) -> SystemSnapshot {
-        let mut sys = self.inner.lock().unwrap();
+        let mut sys = self.inner.lock_recover();
         sys.refresh_cpu_usage();
         sys.refresh_memory();
         sys.refresh_processes(ProcessesToUpdate::All, true);
@@ -123,7 +124,7 @@ impl SystemMonitor {
     /// The first call after start-up has nothing to compare against, so it reports zero rather
     /// than dividing the totals by the uptime and inventing a number.
     fn network(&self) -> NetworkStatus {
-        let mut guard = self.networks.lock().unwrap();
+        let mut guard = self.networks.lock_recover();
         let (networks, last) = &mut *guard;
         networks.refresh(true);
         let elapsed = last.elapsed().as_secs_f64();
@@ -156,7 +157,7 @@ impl SystemMonitor {
 
     /// Top processes by CPU, then memory.
     pub fn processes(&self, limit: usize) -> Vec<ProcessInfo> {
-        let mut sys = self.inner.lock().unwrap();
+        let mut sys = self.inner.lock_recover();
         sys.refresh_processes(ProcessesToUpdate::All, true);
         let users = sysinfo::Users::new_with_refreshed_list();
         let self_pid = std::process::id();
@@ -206,7 +207,7 @@ impl SystemMonitor {
     /// The protection rules are applied here, not trusted from the caller: the UI sends a
     /// process id, and by the time it arrives that id may belong to something else entirely.
     pub fn stop_process(&self, pid: u32, mode: StopMode) -> Result<()> {
-        let mut sys = self.inner.lock().unwrap();
+        let mut sys = self.inner.lock_recover();
         let target = Pid::from_u32(pid);
         sys.refresh_processes(ProcessesToUpdate::Some(&[target]), true);
         let users = sysinfo::Users::new_with_refreshed_list();

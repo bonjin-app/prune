@@ -12,6 +12,7 @@ use crate::models::{CleanupTarget, ScanProgress, ScanResult, ScanSession, ScanSt
 use crate::platform::KnownPaths;
 use crate::providers::{CleanupProvider, ProviderRegistry, ScanContext};
 use crate::safety::SafetyPolicy;
+use crate::sync::LockExt;
 
 /// Which providers to run. `None` = every available provider.
 #[derive(Debug, Clone, Default)]
@@ -60,7 +61,7 @@ impl<'a> Scanner<'a> {
             let last_emit = Mutex::new(Instant::now());
             let progress = |files: u64, bytes: u64, path: &Path| {
                 // Throttle to ~10 events / second per provider.
-                let mut last = last_emit.lock().unwrap();
+                let mut last = last_emit.lock_recover();
                 if last.elapsed().as_millis() < 100 {
                     return;
                 }
@@ -103,7 +104,7 @@ impl<'a> Scanner<'a> {
                 providers_done: finished,
                 providers_total: total,
             });
-            results.lock().unwrap().push(result);
+            results.lock_recover().push(result);
         });
 
         let mut results = results.into_inner().unwrap();

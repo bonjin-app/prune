@@ -8,6 +8,8 @@ All notable changes to Prune are documented here. The format follows
 
 ### Fixed
 
+- One panic could leave the application broken until it was quit and reopened. Rust poisons a lock when a thread panics holding it, and every later use panicked in turn; the locks now recover, which is safe here because everything they guard is a cache of scan results and removal re-validates every path at the moment of deletion rather than trusting anything cached.
+- A rendering error blanked the window with nothing to read and nothing to click. An error boundary now explains that nothing was removed and offers a way back.
 - Prune refused to start when its data directory could not be used. A bundled app has no console, so it simply did not open and nothing explained why. Opening the operation log can no longer fail: the directory is created on first write, an unreadable history reads as empty, and the application starts either way — losing the history is a degraded state, not a reason to refuse to run.
 
 - `prune clean` emptied the Trash while promising to move things there. Items already in the trash can only be deleted outright, so a run that reads as reversible must leave them alone; it now does, and says why instead of reporting "nothing to remove".

@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { ROUTES, SETTINGS_ROUTE } from "./app/routes";
+import { ErrorBoundary } from "./app/ErrorBoundary";
 import { Shell } from "./app/Shell";
 import { CommandPalette } from "./features/palette/CommandPalette";
 import { bindAppsEvents } from "./stores/apps";
@@ -45,9 +46,9 @@ export default function App() {
   }, [setPaletteOpen]);
 
   return (
-    <>
+    <ErrorBoundary>
       <Shell />
       <CommandPalette />
-    </>
+    </ErrorBoundary>
   );
 }

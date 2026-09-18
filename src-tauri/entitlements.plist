@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Entitlements for a Developer ID build of Prune.
+
+  Notarization requires the hardened runtime, which switches on protections that a WebView
+  needs exceptions for. Only those exceptions are here: Prune asks for no network access, no
+  camera, no microphone and no location, and it is not sandboxed, because a cleanup tool that
+  could only see its own container would have nothing to clean. Reading the user's files is
+  governed by macOS privacy prompts (Full Disk Access) at runtime, not by an entitlement.
+-->
+<plist version="1.0">
+<dict>
+    <!-- WKWebView's JIT. Without these the interface fails to start under the hardened runtime. -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+</dict>
+</plist>

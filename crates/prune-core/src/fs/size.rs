@@ -17,6 +17,8 @@ use rayon::prelude::*;
 use walkdir::WalkDir;
 
 use crate::models::ScanIssue;
+#[cfg(unix)]
+use crate::sync::LockExt;
 
 /// Aggregate size of a directory tree.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -290,7 +292,7 @@ impl InodeSet {
         }
         let (dev, ino) = (meta.dev(), meta.ino());
         let shard = &self.shards[(ino as usize) % SHARDS];
-        shard.lock().unwrap().insert((dev, ino))
+        shard.lock_recover().insert((dev, ino))
     }
 
     /// Windows hard links are rare and `std` does not expose the link count, so every file

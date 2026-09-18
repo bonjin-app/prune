@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use prune_core::settings::{self, Settings};
+use prune_core::sync::LockExt;
 use serde::Serialize;
 use tauri::State;
 
@@ -21,7 +22,7 @@ pub struct SettingsView {
 
 fn view(state: &AppState) -> SettingsView {
     let engine = state.engine();
-    let settings = state.settings.lock().unwrap().clone();
+    let settings = state.settings.lock_recover().clone();
     SettingsView {
         project_roots_configured: engine.project_roots_are_configured(&settings),
         effective_project_roots: engine

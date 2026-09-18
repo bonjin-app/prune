@@ -7,6 +7,7 @@ use prune_core::models::{CleanupPlan, ScanSession};
 use prune_core::ops::OperationLog;
 use prune_core::platform::{ApplicationInfo, StartupItem};
 use prune_core::settings::Settings;
+use prune_core::sync::{LockExt, RwLockExt};
 use prune_core::system::SystemMonitor;
 use prune_core::PruneEngine;
 
@@ -79,15 +80,15 @@ impl AppState {
     /// The current engine. Held by `Arc` so a long scan keeps working on the engine it started
     /// with even if settings change underneath it.
     pub fn engine(&self) -> Arc<PruneEngine> {
-        self.engine.read().unwrap().clone()
+        self.engine.read_recover().clone()
     }
 
     /// Persists new settings and rebuilds the engine around them.
     pub fn apply_settings(&self, settings: Settings) -> prune_core::Result<()> {
         settings.save(&self.data_dir)?;
         let engine = Arc::new(PruneEngine::configured(&settings, &self.data_dir));
-        *self.engine.write().unwrap() = engine;
-        *self.settings.lock().unwrap() = settings;
+        *self.engine.write_recover() = engine;
+        *self.settings.lock_recover() = settings;
         Ok(())
     }
 }

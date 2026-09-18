@@ -5,6 +5,7 @@ use prune_core::models::{
     CleanupPlan, CleanupResult, DeleteMode, ProviderInfo, ScanProgress, ScanSession, ScanStatus,
 };
 use prune_core::scan::ScanRequest;
+use prune_core::sync::LockExt;
 use tauri::{AppHandle, Emitter, Manager, Runtime, State};
 
 use crate::error::{CommandError, CommandResult};
@@ -27,7 +28,7 @@ pub fn cleaner_start_scan<R: Runtime>(
 ) -> CommandResult<String> {
     let scan_id = uuid::Uuid::new_v4().to_string();
     let cancel = Arc::new(AtomicBool::new(false));
-    state.scans.lock().unwrap().insert(
+    state.scans.lock_recover().insert(
         scan_id.clone(),
         ScanEntry {
             cancel: cancel.clone(),
@@ -45,7 +46,7 @@ pub fn cleaner_start_scan<R: Runtime>(
         };
         let session = engine.scan(&id, &request, cancel, &on_progress);
         if let Some(state) = app.try_state::<AppState>() {
-            if let Some(entry) = state.scans.lock().unwrap().get_mut(&id) {
+            if let Some(entry) = state.scans.lock_recover().get_mut(&id) {
                 entry.session = Some(session.clone());
             }
         }
@@ -57,7 +58,7 @@ pub fn cleaner_start_scan<R: Runtime>(
 
 #[tauri::command]
 pub fn cleaner_cancel_scan(state: State<'_, AppState>, scan_id: String) -> CommandResult<()> {
-    let scans = state.scans.lock().unwrap();
+    let scans = state.scans.lock_recover();
     let entry = scans
         .get(&scan_id)
         .ok_or_else(|| CommandError::new("unknown_scan", scan_id.clone()))?;
@@ -67,7 +68,7 @@ pub fn cleaner_cancel_scan(state: State<'_, AppState>, scan_id: String) -> Comma
 
 #[tauri::command]
 pub fn cleaner_get_scan(state: State<'_, AppState>, scan_id: String) -> CommandResult<ScanSession> {
-    let scans = state.scans.lock().unwrap();
+    let scans = state.scans.lock_recover();
     let entry = scans
         .get(&scan_id)
         .ok_or_else(|| CommandError::new("unknown_scan", scan_id.clone()))?;
@@ -86,7 +87,7 @@ pub fn cleaner_preview(
     mode: Option<DeleteMode>,
 ) -> CommandResult<CleanupPlan> {
     let session = {
-        let scans = state.scans.lock().unwrap();
+        let scans = state.scans.lock_recover();
         let entry = scans
             .get(&scan_id)
             .ok_or_else(|| CommandError::new("unknown_scan", scan_id.clone()))?;
@@ -146,7 +147,7 @@ pub async fn cleaner_execute<R: Runtime>(
         .into_iter()
         .filter(|id| !failed.contains(id.as_str()))
         .collect();
-    if let Some(entry) = state.scans.lock().unwrap().get_mut(&scan_id) {
+    if let Some(entry) = state.scans.lock_recover().get_mut(&scan_id) {
         if let Some(session) = entry.session.as_mut() {
             for r in &mut session.results {
                 r.targets.retain(|t| !removed.contains(&t.id));
@@ -155,7 +156,7 @@ pub async fn cleaner_execute<R: Runtime>(
             session.recompute_totals();
         }
     }
-    if let Some(entry) = state.disks.lock().unwrap().get_mut(&scan_id) {
+    if let Some(entry) = state.disks.lock_recover().get_mut(&scan_id) {
         if let Some(analysis) = entry.analysis.as_mut() {
             analysis.forget_removed(&removed);
         }
