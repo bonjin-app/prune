@@ -502,9 +502,12 @@ gap left in this feature.
 - Windows: Recycle Bin size is not path-based and is not reported yet.
 - Sizes are logical bytes, not on-disk blocks (APFS clones and compression make "space freed"
   slightly lower than shown).
-- A full scan of this developer machine (6.1M files, 504 GB reclaimable) takes about two
-  minutes, dominated by the project-artifact walk (4.1M files across 789 artifacts, 100s). That
-  is close to the filesystem floor: on one 190k-file tree `du -sh` takes 8.1s and `prune disk`,
-  which also builds a directory tree, a largest-files list and per-extension statistics, takes
-  10.5s. Further speedups would have to come from not walking, i.e. caching, which would trade
-  accuracy for time — the wrong trade for a tool whose value is an accurate number.
+- A full scan of this developer machine (6.4M files, 536 GB reclaimable across 114 projects)
+  takes 189s and peaks at 31 MB resident. The time is nearly all kernel time spent on
+  `readdir`/`stat` — 452s of system time against 22s of user time, so the work is spread over
+  the cores and then waits on the filesystem. That is close to the floor: on one 190k-file tree
+  `du -sh` takes 8.1s and `prune disk`, which also builds a directory tree, a largest-files list
+  and per-extension statistics, takes 10.5s. Further speedups would have to come from not
+  walking, i.e. caching, which would trade accuracy for time — the wrong trade for a tool whose
+  value is an accurate number. Memory is not the constraint and is not expected to become one:
+  nothing holds a file list, only running totals per directory.
