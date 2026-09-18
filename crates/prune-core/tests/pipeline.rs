@@ -157,7 +157,7 @@ fn plan_blocks_unknown_ids_and_execute_removes_only_planned_targets() {
         .exists());
 
     let log_dir = dir.path().join("log");
-    let log = OperationLog::open(&log_dir).unwrap();
+    let log = OperationLog::open(&log_dir);
     let progress_events = std::sync::atomic::AtomicUsize::new(0);
     let result = engine
         .execute(&plan, Some(&log), &|_| {
@@ -258,21 +258,13 @@ fn a_cleanup_still_counts_when_the_log_cannot_be_written() {
     std::fs::write(&blocked, b"not a directory").unwrap();
     let log = OperationLog::open(&blocked);
 
-    let result = match log {
-        // Some platforms refuse at open time, which is equally fine: the cleanup simply runs
-        // without a log.
-        Err(_) => engine.execute(&plan, None, &|_| {}).unwrap(),
-        Ok(log) => {
-            let result = engine
-                .execute(&plan, Some(&log), &|_| {})
-                .expect("a log failure must not fail the cleanup");
-            assert!(
-                result.log_error.is_some(),
-                "the user should be told the history was not recorded"
-            );
-            result
-        }
-    };
+    let result = engine
+        .execute(&plan, Some(&log), &|_| {})
+        .expect("a log failure must not fail the cleanup");
+    assert!(
+        result.log_error.is_some(),
+        "the user should be told the history was not recorded"
+    );
 
     // What matters: the files really are gone and the caller was told so.
     assert_eq!(result.removed_targets, 1);
@@ -299,7 +291,7 @@ fn a_successful_cleanup_reports_no_log_problem() {
         .id
         .clone();
     let plan = engine.plan(&session, &[id], DeleteMode::Permanent);
-    let log = OperationLog::open(&dir.path().join("goodlog")).unwrap();
+    let log = OperationLog::open(&dir.path().join("goodlog"));
 
     let result = engine.execute(&plan, Some(&log), &|_| {}).unwrap();
 

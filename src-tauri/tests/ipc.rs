@@ -9,15 +9,15 @@
 
 use std::path::Path;
 
-use prune_lib::{register_commands, AppState};
+use prune_lib::{register_commands, register_plugins, AppState};
 use serde_json::{json, Value};
 use tauri::test::{mock_builder, mock_context, noop_assets, MockRuntime, INVOKE_KEY};
 use tauri::webview::InvokeRequest;
 use tauri::{Manager, WebviewWindow, WebviewWindowBuilder};
 
 fn build_app(data_dir: &Path) -> (tauri::App<MockRuntime>, WebviewWindow<MockRuntime>) {
-    let state = AppState::new(data_dir).expect("app state");
-    let app = register_commands(mock_builder())
+    let state = AppState::new(data_dir);
+    let app = register_commands(register_plugins(mock_builder()))
         .build(mock_context(noop_assets()))
         .expect("mock app");
     app.manage(state);
@@ -353,5 +353,58 @@ fn only_the_most_recent_scans_are_kept_in_memory() {
     assert_eq!(
         err["code"], "unknown_scan",
         "the oldest analysis should have been released"
+    );
+}
+
+#[test]
+fn the_app_still_starts_when_its_data_directory_cannot_be_used() {
+    // An unwritable or full data directory costs the user their history, not the application.
+    let dir = tempfile::tempdir().unwrap();
+    let blocked = dir.path().join("a-file");
+    std::fs::write(&blocked, b"x").unwrap();
+    let (_app, webview) = build_app(&blocked.join("data"));
+
+    // The window is up and answering.
+    assert_eq!(ok(&webview, "app_get_meta", json!({}))["name"], "Prune");
+    // Reading the history is empty rather than an error.
+    assert!(ok(&webview, "ops_list", json!({}))
+        .as_array()
+        .unwrap()
+        .is_empty());
+    // And scanning still works.
+    assert!(
+        ok(&webview, "cleaner_list_providers", json!({}))
+            .as_array()
+            .unwrap()
+            .len()
+            > 10
+    );
+}
+
+#[test]
+fn the_window_position_is_remembered_between_runs() {
+    // Reopening where it was left is the least a desktop app can do, and the plugin that does
+    // it is only useful if it is actually wired into the builder the application runs.
+    use tauri_plugin_window_state::{AppHandleExt, StateFlags};
+
+    let dir = tempfile::tempdir().unwrap();
+    let (app, _webview) = build_app(&dir.path().join("appdata"));
+
+    app.handle()
+        .save_window_state(StateFlags::all())
+        .expect("the window state plugin is registered");
+
+    let file = app
+        .path()
+        .app_config_dir()
+        .unwrap()
+        .join(app.handle().filename());
+    assert!(file.exists(), "expected window state at {}", file.display());
+
+    let saved: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
+    assert!(
+        saved.get("main").is_some(),
+        "the main window should be in {saved}"
     );
 }

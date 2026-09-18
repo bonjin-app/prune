@@ -1,5 +1,6 @@
 use prune_core::models::Platform;
 use prune_core::platform::Permissions;
+use prune_core::providers::CustomIssue;
 use serde::Serialize;
 use tauri::State;
 
@@ -42,4 +43,13 @@ pub fn app_get_permissions(state: State<'_, AppState>) -> CommandResult<Permissi
 pub fn app_open_privacy_settings(state: State<'_, AppState>) -> CommandResult<()> {
     state.engine().open_privacy_settings()?;
     Ok(())
+}
+
+/// Anything wrong with the user's `providers.json`.
+///
+/// Shown rather than swallowed: a provider that failed to load looks exactly like one that
+/// found nothing, and a mistake in the file would read as "that cache is already clean".
+#[tauri::command]
+pub fn providers_custom_issues(state: State<'_, AppState>) -> CommandResult<Vec<CustomIssue>> {
+    Ok(state.engine().custom_provider_issues().to_vec())
 }

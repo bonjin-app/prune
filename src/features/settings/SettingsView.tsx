@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Card, CardHeader } from "@/components/ui/Card";
+import { CustomProviders } from "./CustomProviders";
 import { ProjectRoots } from "./ProjectRoots";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { cn } from "@/lib/cn";
@@ -47,6 +48,8 @@ export function SettingsView() {
         </Card>
 
         <ProjectRoots />
+
+        <CustomProviders />
 
         <Card>
           <CardHeader

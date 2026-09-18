@@ -15,6 +15,7 @@ import type {
   CleanupPlan,
   CleanupProgress,
   CleanupResult,
+  CustomIssue,
   DeleteMode,
   DiskNodeView,
   DockerAction,
@@ -63,6 +64,7 @@ export interface Backend {
   appGetMeta(): Promise<AppMeta>;
   appGetPermissions(): Promise<Permissions>;
   appOpenPrivacySettings(): Promise<void>;
+  providersCustomIssues(): Promise<CustomIssue[]>;
   systemGetInfo(): Promise<SystemInfo>;
   systemGetSnapshot(): Promise<SystemSnapshot>;
   systemListProcesses(limit?: number): Promise<ProcessInfo[]>;
@@ -96,6 +98,7 @@ const tauriBackend: Backend = {
   appGetMeta: () => invoke<AppMeta>("app_get_meta"),
   appGetPermissions: () => invoke<Permissions>("app_get_permissions"),
   appOpenPrivacySettings: () => invoke<void>("app_open_privacy_settings"),
+  providersCustomIssues: () => invoke<CustomIssue[]>("providers_custom_issues"),
   systemGetInfo: () => invoke<SystemInfo>("system_get_info"),
   systemGetSnapshot: () => invoke<SystemSnapshot>("system_get_snapshot"),
   systemListProcesses: (limit) => invoke<ProcessInfo[]>("system_list_processes", { limit }),

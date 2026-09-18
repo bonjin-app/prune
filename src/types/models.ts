@@ -496,3 +496,9 @@ export const DOCKER_ACTION_DESCRIPTION: Record<DockerAction, string> = {
     "Stopped containers, unused networks, dangling images and build cache. Images still in use and all volumes are kept.",
   builder_prune: "Layers cached from past builds. Images and containers are untouched.",
 };
+
+/** A problem in the user's providers.json. */
+export interface CustomIssue {
+  id?: string;
+  message: string;
+}

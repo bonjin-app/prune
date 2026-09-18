@@ -26,10 +26,20 @@ pub mod events {
 ///
 /// Split out of [`run`] so the integration tests can build the same command surface on
 /// Tauri's mock runtime and exercise the real IPC path.
+/// The plugins that make Prune behave like a desktop application rather than a process.
+///
+/// Neither can see anything of the user's: one remembers where the window was, the other keeps
+/// a second copy from scanning the same machine in parallel and disagreeing with the first.
+/// Separated from `run` so the tests can build an app with the same plugin stack.
+pub fn register_plugins<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
+    builder.plugin(tauri_plugin_window_state::Builder::default().build())
+}
+
 pub fn register_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
     builder.invoke_handler(tauri::generate_handler![
         commands::app_get_meta,
         commands::app_get_permissions,
+        commands::providers_custom_issues,
         commands::app_open_privacy_settings,
         commands::system_get_info,
         commands::system_get_snapshot,
@@ -71,12 +81,30 @@ pub fn run() {
         .with_target(false)
         .init();
 
-    register_commands(tauri::Builder::default())
+    // Single instance has to be registered first, and only in the real application: it exits
+    // the process when another copy is already running, which a test harness must never do.
+    let builder =
+        tauri::Builder::default().plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }));
+
+    register_commands(register_plugins(builder))
         .setup(|app| {
-            let data_dir = app.path().app_data_dir()?;
-            let state = AppState::new(&data_dir)?;
-            app.manage(state);
-            tracing::info!(version = env!("CARGO_PKG_VERSION"), "Prune started");
+            // Everything below degrades rather than refuses. A window that never appears,
+            // with no console behind it, is the worst failure a bundled app can have.
+            let data_dir = app.path().app_data_dir().unwrap_or_else(|e| {
+                tracing::warn!(error = %e, "no application data directory; settings and history will not persist");
+                std::env::temp_dir().join("app.bonjin.prune")
+            });
+            app.manage(AppState::new(&data_dir));
+            tracing::info!(
+                version = env!("CARGO_PKG_VERSION"),
+                data_dir = %data_dir.display(),
+                "Prune started"
+            );
             Ok(())
         })
         .run(tauri::generate_context!())

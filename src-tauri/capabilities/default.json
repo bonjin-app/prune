@@ -1,13 +1,16 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Prune main window. Only core IPC — no shell, no fs plugin, no network.",
-  "windows": ["main"],
+  "description": "Prune main window. Core IPC plus window-state \u2014 no shell, no fs plugin, no network.",
+  "windows": [
+    "main"
+  ],
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",
     "core:window:allow-minimize",
     "core:window:allow-toggle-maximize",
-    "core:window:allow-close"
+    "core:window:allow-close",
+    "window-state:default"
   ]
 }

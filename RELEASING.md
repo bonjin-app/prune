@@ -39,9 +39,24 @@ Then run the real thing once, because a release is the wrong place to discover t
 does not start:
 
 ```bash
-pnpm tauri build --debug --no-bundle && ./target/debug/prune
+pnpm tauri build && open target/release/bundle/macos/Prune.app
 cargo run -p prune-cli -- scan
 ```
+
+### If the DMG step fails
+
+`bundle_dmg.sh` fails when a disk image from an earlier build is still mounted — which happens
+if a previous build was interrupted, or if someone launched the app straight out of the mounted
+image and left it running:
+
+```bash
+ls /Volumes                       # look for a dmg.XXXXXX volume
+lsof +D /Volumes/dmg.XXXXXX       # what is holding it, often Prune itself
+hdiutil detach /Volumes/dmg.XXXXXX -force
+```
+
+The `.app` bundle is produced before the DMG, so a failure here means the application built
+fine and only the installer did not.
 
 ## 4. Tag
 

@@ -55,12 +55,14 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new(data_dir: &Path) -> Result<Self, Box<dyn std::error::Error>> {
+    /// Never fails: an unusable data directory costs the user their settings and history, not
+    /// the application. A bundled app that refuses to start has no console to explain itself.
+    pub fn new(data_dir: &Path) -> Self {
         let settings = Settings::load(data_dir);
         let engine = PruneEngine::configured(&settings, data_dir);
         let monitor = SystemMonitor::new(&engine.known_paths().home);
-        let ops = OperationLog::open(data_dir)?;
-        Ok(Self {
+        let ops = OperationLog::open(data_dir);
+        Self {
             engine: RwLock::new(Arc::new(engine)),
             settings: Mutex::new(settings),
             data_dir: data_dir.to_path_buf(),
@@ -71,7 +73,7 @@ impl AppState {
             disks: Mutex::new(Recent::new(RECENT_DISKS)),
             apps: Mutex::new(AppsState::default()),
             startup: Mutex::new(Vec::new()),
-        })
+        }
     }
 
     /// The current engine. Held by `Arc` so a long scan keeps working on the engine it started

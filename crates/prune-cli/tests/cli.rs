@@ -38,7 +38,7 @@ fn harness() -> Harness {
 
     let engine =
         PruneEngine::with_parts(Box::new(sandbox.clone()), ProviderRegistry::with_defaults());
-    let log = OperationLog::open(&dir.path().join("logdir")).unwrap();
+    let log = OperationLog::open(&dir.path().join("logdir"));
     Harness {
         _dir: dir,
         sandbox,

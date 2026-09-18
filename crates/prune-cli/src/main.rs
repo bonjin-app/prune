@@ -37,7 +37,7 @@ fn main() -> ExitCode {
             issue.message
         );
     }
-    let log = dir.as_deref().and_then(|d| OperationLog::open(d).ok());
+    let log = dir.as_deref().map(OperationLog::open);
 
     let stdout = std::io::stdout();
     let mut out = std::io::BufWriter::new(stdout.lock());

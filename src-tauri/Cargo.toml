@@ -22,6 +22,12 @@ tempfile = "3"
 [dependencies]
 prune-core = { path = "../crates/prune-core" }
 tauri = { version = "2", features = [] }
+# Remembering the window and refusing a second copy are desktop-app manners, not access:
+# neither plugin can see anything the user's data.
+tauri-plugin-window-state = "2"
+
+[target.'cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))'.dependencies]
+tauri-plugin-single-instance = "2"
 serde.workspace = true
 serde_json.workspace = true
 tracing.workspace = true

@@ -364,6 +364,18 @@ Events: `prune://scan-progress`, `prune://scan-completed`, `prune://cleanup-prog
 `prune://disk-progress`, `prune://disk-completed`, `prune://apps-progress`,
 `prune://apps-completed`.
 
+Two plugins make Prune behave like an application rather than a process: window state, so it
+reopens where it was left, and single instance, so a second copy hands over to the first rather
+than scanning the same machine twice and disagreeing about what it found. Neither can see
+anything of the user's. Single instance is registered only in `run`, never in
+`register_plugins`, because it exits the process when another copy exists — which a test
+harness must never do.
+
+Nothing in start-up is allowed to refuse. A bundled application that fails to open has no
+console to explain itself, so a data directory that cannot be used costs the user their
+settings and history, not the application: the operation log creates its directory on first
+write, an unreadable history reads as empty, and `AppState::new` cannot fail.
+
 Long-lived results are bounded. `Recent<T>` keeps only the newest few scan sessions, plans and
 disk analyses: an analysis holds one node per directory, so keeping every one of them for the
 life of the process was a slow leak. Asking for an evicted scan returns `unknown_scan`, which

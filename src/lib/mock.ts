@@ -725,6 +725,9 @@ export const mockBackend: Backend = {
         "System Settings → Privacy & Security → Full Disk Access, then add Prune and restart it.",
     };
   },
+  async providersCustomIssues() {
+    return [{ id: "old_entry", message: "unknown location '{nowhere}' in \"{nowhere}/x\"" }];
+  },
   async appOpenPrivacySettings() {
     console.info("[mock] open privacy settings");
   },
