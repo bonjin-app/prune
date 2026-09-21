@@ -54,6 +54,20 @@ jobs:
         run: mkdir -p dist && echo "<!doctype html><title>ci</title>" > dist/index.html
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
+      # Tauri links WebView2Loader.dll. Cargo puts it beside the built binaries, but an
+      # integration test executable runs from `deps/`, where it is not — so `tests/ipc.rs`
+      # could not start at all (STATUS_ENTRYPOINT_NOT_FOUND) before any test ran. Building the
+      # test binaries first and copying the DLLs across puts it where the loader looks. The
+      # listing is kept because when this breaks again, what is actually on disk is the
+      # question worth answering.
+      - name: Put the runtime DLLs where test binaries can find them
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          cargo build --workspace --tests
+          echo "--- target/debug ---"; ls target/debug/*.dll 2>/dev/null || echo "(none)"
+          echo "--- target/debug/deps ---"; ls target/debug/deps/*.dll 2>/dev/null || echo "(none)"
+          cp -v target/debug/*.dll target/debug/deps/ 2>/dev/null || true
       - run: cargo test --workspace
       # Prune's central promise is that it never talks to a network. A dependency bump is the
       # easiest way for that to stop being true without anyone noticing.
