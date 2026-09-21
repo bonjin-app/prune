@@ -31,6 +31,25 @@ fn app_cache(home: &Path) -> PathBuf {
     }
 }
 
+/// The npm cache this platform's provider collects: `~/.npm/_cacache` on macOS,
+/// `%LOCALAPPDATA%\npm-cache` on Windows.
+fn npm_cache(home: &Path) -> PathBuf {
+    if cfg!(windows) {
+        home.join("Library/Application Support/npm-cache")
+    } else {
+        home.join(".npm/_cacache")
+    }
+}
+
+/// The name that npm cache's target path ends with.
+fn npm_cache_name() -> &'static str {
+    if cfg!(windows) {
+        "npm-cache"
+    } else {
+        "_cacache"
+    }
+}
+
 /// The name that cache's target path ends with.
 fn app_cache_name() -> &'static str {
     if cfg!(windows) {
@@ -53,7 +72,7 @@ fn build_sandbox() -> tempfile::TempDir {
     // logs
     write(&home.join("Library/Logs/app.log"), 512);
     // npm cache (specialised provider)
-    write(&home.join(".npm/_cacache/index/x"), 1024);
+    write(&npm_cache(&home).join("index/x"), 1024);
     // project with node_modules + rust target
     write(&home.join("Projects/web/package.json"), 2);
     write(
@@ -121,7 +140,7 @@ fn scan_discovers_expected_targets_and_dedupes_overlaps() {
         assert!(!has("user_cache", "Library/Caches/Homebrew"));
     }
     assert!(has("user_logs", "Library/Logs/app.log"));
-    assert!(has("npm_cache", ".npm/_cacache"));
+    assert!(has("npm_cache", npm_cache_name()));
     assert!(has("project_artifacts", "Projects/web/node_modules"));
     assert!(has("project_artifacts", "Projects/cli/target"));
     assert!(!has("project_artifacts", "Projects/notes/node_modules"));
