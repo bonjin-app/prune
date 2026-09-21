@@ -113,13 +113,19 @@ jobs:
           tag="${GITHUB_REF_NAME}"
           dir="target/${{ matrix.target }}/release"
           name="prune-${tag}-${{ matrix.target }}"
+          # Each platform produces one archive, and the upload below names exactly that one.
+          # Naming both shapes there instead meant every job asked for a file it had not made,
+          # and `gh release upload` treats a pattern that matches nothing as an error — so the
+          # command line never reached a release on any platform until this was found.
           if [ -f "$dir/prune.exe" ]; then
             7z a "$name.zip" "./$dir/prune.exe" ./LICENSE ./README.md
+            echo "ARCHIVE=$name.zip" >> "$GITHUB_ENV"
           else
             tar -czf "$name.tar.gz" -C "$dir" prune -C "$GITHUB_WORKSPACE" LICENSE README.md
+            echo "ARCHIVE=$name.tar.gz" >> "$GITHUB_ENV"
           fi
       - name: Attach to the release
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${GITHUB_REF_NAME}" prune-*.tar.gz prune-*.zip --clobber
+        run: gh release upload "${GITHUB_REF_NAME}" "$ARCHIVE" --clobber
