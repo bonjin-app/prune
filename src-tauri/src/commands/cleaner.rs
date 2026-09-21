@@ -107,8 +107,7 @@ pub fn cleaner_preview(
         .plan(&session, &target_ids, mode.unwrap_or_default());
     state
         .plans
-        .lock()
-        .unwrap()
+        .lock_recover()
         .insert(plan.id.clone(), plan.clone());
     Ok(plan)
 }
@@ -123,8 +122,7 @@ pub async fn cleaner_execute<R: Runtime>(
 ) -> CommandResult<CleanupResult> {
     let plan = state
         .plans
-        .lock()
-        .unwrap()
+        .lock_recover()
         .remove(&plan_id)
         .ok_or_else(|| CommandError::new("unknown_plan", plan_id.clone()))?;
     let scan_id = plan.scan_id.clone();

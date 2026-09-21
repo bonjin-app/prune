@@ -80,6 +80,32 @@ describe("selection", () => {
     expect([...useScan.getState().selected]).toEqual(["safe"]);
   });
 
+  it("does not tick an irreversible item for someone moving things to the Trash", () => {
+    // Items already in the Trash can only be deleted outright, whatever mode is chosen. A
+    // button called "Select safe items" must not put one of those among a list the user was
+    // told is recoverable. `prune clean` applies the same rule.
+    const inTrash = factory.target({
+      id: "trashed",
+      risk: "safe",
+      providerId: "trash",
+      permanentOnly: true,
+    });
+    const cache = factory.target({ id: "cache", risk: "safe" });
+    const session = factory.session([
+      factory.result("user_cache", "application_cache", [cache]),
+      factory.result("trash", "trash", [inTrash]),
+    ]);
+
+    useScan.setState({ session, scanId: session.id, deleteMode: "trash" });
+    useScan.getState().selectRecommended();
+    expect([...useScan.getState().selected]).toEqual(["cache"]);
+
+    // Asking for permanent removal is asking for exactly this, so then it is included.
+    useScan.setState({ selected: new Set(), deleteMode: "permanent" });
+    useScan.getState().selectRecommended();
+    expect([...useScan.getState().selected].sort()).toEqual(["cache", "trashed"]);
+  });
+
   it("limits recommendations to the requested categories", () => {
     const safeDev = factory.target({ id: "devsafe", risk: "safe", providerId: "npm_cache" });
     const safeCache = factory.target({ id: "cachesafe", risk: "safe" });

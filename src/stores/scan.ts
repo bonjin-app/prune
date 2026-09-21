@@ -169,10 +169,17 @@ export const useScan = create<ScanState>((set, get) => ({
   selectRecommended: (categories) =>
     set((s) => {
       const selected = new Set(s.selected);
+      // Some targets can only be deleted outright — items already in the Trash, for instance —
+      // and are removed permanently whatever mode is chosen. Ticking those for someone who
+      // asked to move things to the Trash puts one irreversible item among a list that reads as
+      // recoverable. They are still offered; they are just not chosen on the user's behalf
+      // unless permanent removal is what was asked for. `prune clean` applies the same rule.
+      const permanent = s.deleteMode === "permanent";
       s.session?.results
         .filter((r) => !categories || categories.includes(r.category))
         .flatMap((r) => r.targets)
         .filter((t) => t.risk === "safe")
+        .filter((t) => permanent || !t.permanentOnly)
         .forEach((t) => selected.add(t.id));
       return { selected };
     }),

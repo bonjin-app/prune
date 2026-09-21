@@ -25,8 +25,7 @@ pub async fn startup_set_enabled(
 ) -> CommandResult<StartupItem> {
     let item = state
         .startup
-        .lock()
-        .unwrap()
+        .lock_recover()
         .iter()
         .find(|i| i.id == item_id)
         .cloned()
@@ -40,8 +39,7 @@ pub async fn startup_set_enabled(
     let updated = StartupItem { enabled, ..item };
     if let Some(slot) = state
         .startup
-        .lock()
-        .unwrap()
+        .lock_recover()
         .iter_mut()
         .find(|i| i.id == item_id)
     {

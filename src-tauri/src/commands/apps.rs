@@ -72,8 +72,7 @@ pub async fn apps_get_detail(
 ) -> CommandResult<AppDetail> {
     let info = state
         .apps
-        .lock()
-        .unwrap()
+        .lock_recover()
         .list
         .iter()
         .find(|a| a.id == app_id)
@@ -113,8 +112,7 @@ pub async fn apps_get_detail(
 pub fn apps_run_uninstaller(state: State<'_, AppState>, app_id: String) -> CommandResult<()> {
     let info = state
         .apps
-        .lock()
-        .unwrap()
+        .lock_recover()
         .list
         .iter()
         .find(|a| a.id == app_id)
