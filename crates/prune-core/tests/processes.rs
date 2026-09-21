@@ -61,15 +61,26 @@ fn wait_for_exit(sleeper: &mut Sleeper, within: Duration) -> bool {
 fn asking_a_process_to_stop_actually_stops_it() {
     let monitor = monitor();
     let mut sleeper = Sleeper::spawn();
+    let asked = monitor.stop_process(sleeper.pid(), StopMode::Ask);
 
-    monitor
-        .stop_process(sleeper.pid(), StopMode::Ask)
-        .expect("a process we started should be stoppable");
-
-    assert!(
-        wait_for_exit(&mut sleeper, Duration::from_secs(5)),
-        "the process was still running after being asked to stop"
-    );
+    if cfg!(unix) {
+        asked.expect("a process we started should be stoppable");
+        assert!(
+            wait_for_exit(&mut sleeper, Duration::from_secs(5)),
+            "the process was still running after being asked to stop"
+        );
+    } else {
+        // No POSIX signals here, so there is no polite request to send. What matters is that
+        // the process is left alone and the reason is stated, rather than forcing it under a
+        // label that promised to ask.
+        let err = asked.expect_err("asking should not be possible without signals");
+        assert!(
+            err.to_string().contains("cannot be asked to quit"),
+            "unexpected error: {err}"
+        );
+        assert!(!sleeper.has_exited(), "it should still be running");
+        let _ = monitor.stop_process(sleeper.pid(), StopMode::Force);
+    }
 }
 
 #[test]
@@ -87,14 +98,19 @@ fn forcing_a_process_to_stop_actually_stops_it() {
 #[test]
 fn the_init_process_is_refused() {
     let monitor = monitor();
-    // pid 1 is launchd on macOS, systemd on Linux, and the System process on Windows.
     let err = monitor
         .stop_process(1, StopMode::Force)
         .expect_err("pid 1 must never be stoppable");
-    assert!(
-        err.to_string().contains("cannot be stopped"),
-        "unexpected error: {err}"
-    );
+
+    // pid 1 is launchd on macOS and systemd on Linux, and the protection rules name it.
+    // Windows has no pid 1 at all, so it is refused earlier and for a different reason — which
+    // is still a refusal, and still the right answer.
+    let refused = if cfg!(unix) {
+        "cannot be stopped"
+    } else {
+        "no process with id 1"
+    };
+    assert!(err.to_string().contains(refused), "unexpected error: {err}");
 }
 
 #[test]

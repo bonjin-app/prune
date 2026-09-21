@@ -348,7 +348,18 @@ impl SystemMonitor {
         }
 
         let signalled = match mode {
-            StopMode::Ask => process.kill_with(Signal::Term).unwrap_or(false),
+            StopMode::Ask => match process.kill_with(Signal::Term) {
+                Some(sent) => sent,
+                // Windows has no POSIX signals, so there is no polite request to send. Saying
+                // so is better than the alternatives: reporting a refusal the system never
+                // made, or quietly forcing instead — which would take unsaved work with it
+                // under a label that promised to ask first.
+                None => {
+                    return Err(PruneError::Other(format!(
+                        "{name} cannot be asked to quit on this system; only forcing it to stop                          is available, which loses anything unsaved"
+                    )))
+                }
+            },
             StopMode::Force => process.kill(),
         };
         if signalled {
