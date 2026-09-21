@@ -17,6 +17,13 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/bonjin-app/prune/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/bonjin-app/prune?style=flat-square&color=15803d" /></a>
+  <a href="https://github.com/bonjin-app/prune/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/bonjin-app/prune/ci.yml?branch=main&style=flat-square&label=CI" /></a>
+  <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/github/license/bonjin-app/prune?style=flat-square" /></a>
+  <img alt="Platforms" src="https://img.shields.io/badge/macOS%20%7C%20Windows-supported-informational?style=flat-square" />
+</p>
+
+<p align="center">
   🧹 Clean &nbsp; 🗑 Uninstall &nbsp; 📊 Analyze &nbsp; 💻 Developer &nbsp; 📈 Monitor &nbsp; ⚡ Startup
 </p>
 
@@ -128,13 +135,37 @@ real interface.</sub>
 | macOS    | Apple Silicon, Intel | macOS 12              |
 | Windows  | x64                  | Windows 10 (WebView2) |
 
-## Installation
+## Download
 
-Pre-built installers (`.dmg`, `.msi`, `.exe`) will be published on
-[GitHub Releases](https://github.com/bonjin-app/prune/releases). Homebrew, WinGet and Scoop
-are planned.
+Pick the one for your machine. Every file is built by GitHub Actions from the tagged commit —
+nothing is uploaded from anyone's laptop.
 
-Until then, build from source (below).
+| Platform                   | File                                                                                                            |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| **macOS** (Apple Silicon)  | [`Prune_0.1.0_aarch64.dmg`](https://github.com/bonjin-app/prune/releases/latest/download/Prune_0.1.0_aarch64.dmg) |
+| **macOS** (Intel)          | [`Prune_0.1.0_x64.dmg`](https://github.com/bonjin-app/prune/releases/latest/download/Prune_0.1.0_x64.dmg)         |
+| **Windows** (x64)          | [`Prune_0.1.0_x64-setup.exe`](https://github.com/bonjin-app/prune/releases/latest/download/Prune_0.1.0_x64-setup.exe) · [`.msi`](https://github.com/bonjin-app/prune/releases/latest/download/Prune_0.1.0_x64_en-US.msi) |
+
+The `prune` command line ships from the same release, as
+[`prune-v0.1.0-<target>.tar.gz`](https://github.com/bonjin-app/prune/releases/latest) (`.zip` on
+Windows). Unpack it and put `prune` on your `PATH`.
+
+All releases: [GitHub Releases](https://github.com/bonjin-app/prune/releases). Homebrew, WinGet
+and Scoop are planned.
+
+### These builds are not signed yet
+
+macOS will say the app "cannot be opened because the developer cannot be verified", and Windows
+SmartScreen will warn about an unrecognised app. Neither is a claim about what the app does —
+both mean nobody has paid for a certificate that vouches for it.
+
+- **macOS** — right-click `Prune.app` and choose **Open**, then **Open** again.
+- **Windows** — click **More info**, then **Run anyway**.
+
+If you would rather not, [build it from source](#development). That is the same code.
+
+Signing is prepared and off only because there is no certificate; see
+[RELEASING.md](RELEASING.md).
 
 ## First run
 
