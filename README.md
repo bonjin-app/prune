@@ -64,11 +64,11 @@ safety as the primary feature.
 | Developer       | ✅         | Global tool caches + project artifact finder with per-item risk levels                 |
 | Monitor         | ✅         | Live CPU per core, memory, swap, disks, top processes                                  |
 | Command palette | ✅         | `⌘K` / `Ctrl+K` to jump anywhere or start a scan                                       |
-| Disk analyzer   | 🔜 Phase 5 | Directory tree, large file finder, visual usage                                        |
-| Uninstaller     | 🔜 Phase 6 | Apps with their caches, preferences, containers                                        |
-| Startup manager | 🔜 Phase 7 | Login items and launch agents, enable / disable                                        |
+| Disk analyzer   | ✅         | Directory tree with drill-down, largest files, file type statistics, cancellable       |
+| Uninstaller     | ✅         | Apps with their caches, preferences and containers, matched by bundle identifier       |
+| Startup manager | ✅         | Login items and launch agents, enable / disable without deleting anything              |
 | Docker          | ✅         | What Docker is holding, and two conservative prune commands. Volumes are never touched |
-| CLI             | 🔜         | `prune scan`, `prune clean --developer`, … (read-only prototype available)             |
+| CLI             | ✅         | `prune scan`, `clean`, `disk`, `apps`, `startup`, `docker`, `processes`, `log`, `--json` |
 
 Every removable item carries a risk level:
 
@@ -76,9 +76,17 @@ Every removable item carries a risk level:
 Safe        regenerated automatically, no user state      browser cache, npm cache, logs
 Low Risk    cheap to rebuild                              node_modules, build directories
 Medium Risk may hold state you care about                 Xcode archives, virtualenvs
-High Risk   shown, never pre-selected
+High Risk   removal is likely to break something
 Protected   never removable through Prune
 ```
+
+Only `Safe` items are ever ticked for you, and only when you ask — by pressing **Select safe
+items**, or `prune clean` without `--include-low`. Everything else you choose yourself.
+
+There is one exception in the other direction. A few things cannot be moved to the Trash at
+all — what is already *in* the Trash, for one — so they are deleted outright whatever mode is
+chosen. Those are left unticked while the mode is "Move to Trash", because a recommendation
+that reads as reversible should not contain the one item that is not.
 
 ## Screenshots
 

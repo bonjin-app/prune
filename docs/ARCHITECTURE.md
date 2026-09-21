@@ -10,7 +10,7 @@ the first line of code (spec §39) and the reasoning behind them.
 | Local-first / Privacy-first | The engine has no network crate at all; the app carries only what Tauri needs, and no HTTP client or TLS stack on any shipped target. Enforced by `scripts/check-no-network.sh` and `src/lib/no-network.test.ts` in CI. Operation log is JSON lines on disk. |
 | Safe-by-default             | All deletion goes through `SafetyPolicy::validate` → `fs::remove`. Only `ValidatedPath` can be removed. |
 | Developer-first             | Developer providers are the largest provider group and have their own view.                             |
-| CLI-ready                   | `prune-core` has no Tauri dependency. `examples/scan.rs` is the CLI prototype.                          |
+| CLI-ready                   | `prune-core` has no Tauri dependency. `crates/prune-cli` is a second front end over the same engine.    |
 | Native                      | Rust owns all OS access. React never touches the filesystem.                                            |
 
 ## 2. Workspace layout
@@ -47,7 +47,7 @@ prune/
 └── src/                       React UI
     ├── lib/tauri.ts           the ONLY IPC entry point (+ browser mock in lib/mock.ts)
     ├── types/models.ts        TS mirror of Rust models
-    ├── stores/                zustand: ui, system, scan
+    ├── stores/                zustand: ui, system, scan, disk, apps, startup, settings
     ├── app/                   Shell, Sidebar, routes
     ├── components/ui/         primitives
     └── features/              dashboard, cleaner, developer, monitor, settings, palette, …
@@ -480,10 +480,14 @@ Never use real system paths in tests.
 | 1 Foundation        | Tauri 2, React, TS, Vite, Tailwind, navigation, theme, icon, versioning | done                                                       |
 | 2 Dashboard         | CPU, memory, disk, OS info, process list                                | done                                                       |
 | 3 Cleaner           | caches, logs, temp, trash, scan, preview, safe cleanup, log             | done (system-wide `/Library/Caches` deferred: needs admin) |
-| 4 Developer         | tool caches + project artifacts                                         | done, Docker pending                                       |
-| 5 Disk Analyzer     | tree, large files, visual usage                                         | next                                                       |
-| 6 Uninstaller       | apps + related data                                                     | planned                                                    |
-| 7 Monitor / Startup | monitor done; startup items planned                                     | partial                                                    |
+| 4 Developer         | tool caches + project artifacts                                         | done, including Docker (§10)                               |
+| 5 Disk Analyzer     | tree, large files, visual usage                                         | done                                                       |
+| 6 Uninstaller       | apps + related data                                                     | done                                                       |
+| 7 Monitor / Startup | monitor + startup items                                                 | done                                                       |
+
+Beyond the phases: a command line over the same engine (§5g), cache locations added from
+`providers.json` without rebuilding, and the operation log. What is *not* here is listed under
+§11.
 
 ## 10. Docker, the one cleanup outside the pipeline
 
