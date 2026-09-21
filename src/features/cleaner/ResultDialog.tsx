@@ -1,6 +1,7 @@
 import { CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
+import { cn } from "@/lib/cn";
 import { abbreviatePath, formatBytes, formatCount } from "@/lib/format";
 import { useScan } from "@/stores/scan";
 import { useSystem } from "@/stores/system";
@@ -11,11 +12,23 @@ export function ResultDialog() {
   const home = useSystem((s) => s.info?.homeDir);
   if (!result) return null;
   const ok = result.status === "success";
+  // The largest thing on screen should not say "success" when nothing was removed. It is the
+  // first thing read and often the only thing read.
+  const tone = ok
+    ? "bg-accent-soft text-accent"
+    : result.status === "partial"
+      ? "bg-warn-soft text-warn"
+      : "bg-danger-soft text-danger";
   return (
     <Dialog open onClose={dismiss} className="max-w-[460px]" label="Cleanup result">
       <div className="px-5 pt-6 pb-4 text-center">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft text-accent">
-          {ok ? <CheckCircle2 size={26} /> : <XCircle size={26} className="text-warn" />}
+        <div
+          className={cn(
+            "mx-auto flex h-12 w-12 items-center justify-center rounded-full",
+            tone,
+          )}
+        >
+          {ok ? <CheckCircle2 size={26} /> : <XCircle size={26} />}
         </div>
         <h2 className="mt-3 text-[16px] font-semibold tracking-tight">
           {ok ? "Pruned" : result.status === "partial" ? "Partially pruned" : "Nothing removed"}
