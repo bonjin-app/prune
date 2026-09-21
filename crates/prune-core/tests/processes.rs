@@ -159,3 +159,47 @@ fn the_process_list_marks_what_can_and_cannot_be_stopped() {
         assert!(!init.can_terminate, "pid 1 was offered as stoppable");
     }
 }
+
+#[test]
+fn a_recycled_id_does_not_stop_whatever_now_holds_it() {
+    // The gap the protection rules leave open: an id that has been reused by an *ordinary*
+    // process passes every one of them, so without checking the name the user confirms one
+    // program and a different one dies. Asking to stop a real process under the wrong name
+    // stands in for that: the answer must be no, and it must still be running afterwards.
+    let monitor = monitor();
+    let mut sleeper = Sleeper::spawn();
+
+    let err = monitor
+        .stop_process_named(sleeper.pid(), StopMode::Force, Some("something-else"))
+        .expect_err("a mismatched name must not stop anything");
+    assert!(
+        err.to_string().contains("not something-else"),
+        "the message should say what it found instead: {err}"
+    );
+    assert!(!sleeper.has_exited(), "it must still be running");
+
+    // Cleaned up through the same call, with the name it really has.
+    let name = monitor
+        .processes(500)
+        .into_iter()
+        .find(|p| p.pid == sleeper.pid())
+        .map(|p| p.name);
+    if let Some(name) = name {
+        monitor
+            .stop_process_named(sleeper.pid(), StopMode::Force, Some(&name))
+            .expect("the right name should be accepted");
+        assert!(wait_for_exit(&mut sleeper, Duration::from_secs(5)));
+    }
+}
+
+#[test]
+fn a_caller_with_no_name_to_check_is_still_served() {
+    // `prune processes --stop 1234` was never shown a name, so it has none to pass.
+    let monitor = monitor();
+    let mut sleeper = Sleeper::spawn();
+
+    monitor
+        .stop_process_named(sleeper.pid(), StopMode::Force, None)
+        .expect("a process we started should be stoppable");
+    assert!(wait_for_exit(&mut sleeper, Duration::from_secs(5)));
+}

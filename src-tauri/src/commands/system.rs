@@ -40,15 +40,22 @@ pub async fn system_list_processes(
 ///
 /// The engine re-checks its own protection rules before signalling anything, so a stale process
 /// id from the UI cannot reach a process Prune refuses to touch.
+///
+/// `name` is what the user was shown when they confirmed. The engine checks the id still belongs
+/// to it, because a recycled id on an ordinary process passes every protection rule — and then
+/// the program that dies is not the one anybody agreed to.
 #[tauri::command]
 pub async fn system_stop_process(
     state: State<'_, AppState>,
     pid: u32,
     mode: StopMode,
+    name: Option<String>,
 ) -> CommandResult<()> {
     let monitor = state.monitor.clone();
-    tauri::async_runtime::spawn_blocking(move || monitor.stop_process(pid, mode))
-        .await
-        .map_err(join_err)??;
+    tauri::async_runtime::spawn_blocking(move || {
+        monitor.stop_process_named(pid, mode, name.as_deref())
+    })
+    .await
+    .map_err(join_err)??;
     Ok(())
 }

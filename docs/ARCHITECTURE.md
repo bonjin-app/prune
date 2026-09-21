@@ -436,6 +436,11 @@ silently changes what a scan covers. `Settings::save` and the log's compaction b
 `.writing` sibling and rename it over the original, which is atomic on both platforms, and
 remove the sibling if the rename fails so the next run has nothing half-written to trip over.
 
+`system_stop_process` carries the name the user was shown alongside the id, and
+`stop_process_named` refuses if the id now belongs to something else. The protection rules are
+re-applied at the same moment, but they only cover processes Prune will never stop — a recycled
+id on an ordinary process satisfies them, and the name is what makes that case fail too.
+
 Errors cross IPC as `{ code, message }` (`CommandError`), with stable codes from
 `PruneError::code()`.
 

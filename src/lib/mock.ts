@@ -803,6 +803,28 @@ const plans = new Map<string, CleanupPlan>();
 const ops: OperationRecord[] = [];
 let cpu = 18;
 
+/// The process list the mock serves, and the pid → name mapping derived from it.
+///
+/// Stopping checks the name, so both sides have to agree on which pid is which — the same
+/// question the engine asks the real system.
+const MOCK_PROCESS_NAMES = [
+  "WindowServer",
+  "Google Chrome Helper",
+  "Xcode",
+  "node",
+  "cargo",
+  "Docker",
+  "Spotify",
+  "Finder",
+  "kernel_task",
+  "Code Helper (Plugin)",
+];
+
+function mockProcessName(pid: number): string | undefined {
+  if (pid < 100 || (pid - 100) % 7 !== 0) return undefined;
+  return MOCK_PROCESS_NAMES[((pid - 100) / 7) % MOCK_PROCESS_NAMES.length];
+}
+
 export const mockBackend: Backend = {
   async appGetMeta() {
     return {
@@ -890,25 +912,22 @@ export const mockBackend: Backend = {
       processCount: 612,
     };
   },
-  async systemStopProcess(pid, mode) {
+  async systemStopProcess(pid, mode, name) {
     const target = MOCK_PROTECTED.get(pid);
     if (target) throw { code: "other", message: `${target} cannot be stopped: ${MOCK_REASON}` };
+    // Mirrors the engine: an id that now belongs to something else is refused.
+    const current = mockProcessName(pid);
+    if (name && current && current !== name) {
+      throw {
+        code: "other",
+        message: `process ${pid} is now ${current}, not ${name}; nothing was stopped`,
+      };
+    }
     mockStopped.add(pid);
     console.info("[mock] stop", pid, mode);
   },
   async systemListProcesses(limit = 50) {
-    const names = [
-      "WindowServer",
-      "Google Chrome Helper",
-      "Xcode",
-      "node",
-      "cargo",
-      "Docker",
-      "Spotify",
-      "Finder",
-      "kernel_task",
-      "Code Helper (Plugin)",
-    ];
+    const names = MOCK_PROCESS_NAMES;
     const critical = new Set(["WindowServer", "Finder", "kernel_task"]);
     return Array.from({ length: limit }, (_, i) => {
       const pid = 100 + i * 7;

@@ -27,7 +27,8 @@ export function StopProcessDialog({
 
   const stop = async (mode: "ask" | "force") => {
     setBusy(mode);
-    const ok = await stopProcess(process.pid, mode);
+    // The name goes with it: the engine refuses if the id now belongs to something else.
+    const ok = await stopProcess(process.pid, mode, process.name);
     setBusy(null);
     if (ok) onClose();
   };

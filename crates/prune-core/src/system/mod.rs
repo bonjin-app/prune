@@ -316,7 +316,17 @@ impl SystemMonitor {
     ///
     /// The protection rules are applied here, not trusted from the caller: the UI sends a
     /// process id, and by the time it arrives that id may belong to something else entirely.
-    pub fn stop_process(&self, pid: u32, mode: StopMode) -> Result<()> {
+    ///
+    /// `expected` is the name the caller was shown. Re-checking it closes the other half of the
+    /// same problem: an id that has been recycled onto an *ordinary* process passes every
+    /// protection rule, so without this the user confirms one program and a different one dies.
+    /// Callers that have no name to check — a person typing `--stop 1234` — pass `None`.
+    pub fn stop_process_named(
+        &self,
+        pid: u32,
+        mode: StopMode,
+        expected: Option<&str>,
+    ) -> Result<()> {
         let mut sys = self.inner.lock_recover();
         let target = Pid::from_u32(pid);
         sys.refresh_processes_specifics(ProcessesToUpdate::Some(&[target]), true, process_fields());
@@ -333,6 +343,14 @@ impl SystemMonitor {
             .user_id()
             .and_then(|uid| users.get_user_by_id(uid))
             .map(|u| u.name().to_string());
+
+        if let Some(expected) = expected {
+            if name != expected {
+                return Err(PruneError::Other(format!(
+                    "process {pid} is now {name}, not {expected}; nothing was stopped"
+                )));
+            }
+        }
 
         if let Some(reason) = protection::classify(Candidate {
             pid,
@@ -370,6 +388,14 @@ impl SystemMonitor {
                 "the system refused to stop {name}"
             )))
         }
+    }
+}
+
+impl SystemMonitor {
+    /// Stops a process without checking which one it is now. For callers that were never shown
+    /// a name to check against.
+    pub fn stop_process(&self, pid: u32, mode: StopMode) -> Result<()> {
+        self.stop_process_named(pid, mode, None)
     }
 }
 

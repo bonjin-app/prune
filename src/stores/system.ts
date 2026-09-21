@@ -20,7 +20,7 @@ interface SystemState {
   refreshSnapshot: () => Promise<void>;
   refreshProcesses: (limit?: number) => Promise<void>;
   /** Asks a process to stop, or forces it. Returns true when the system accepted. */
-  stopProcess: (pid: number, mode: StopMode) => Promise<boolean>;
+  stopProcess: (pid: number, mode: StopMode, name?: string) => Promise<boolean>;
   clearError: () => void;
 }
 
@@ -51,9 +51,9 @@ export const useSystem = create<SystemState>((set) => ({
       set({ error: errorMessage(e) });
     }
   },
-  stopProcess: async (pid, mode) => {
+  stopProcess: async (pid, mode, name) => {
     try {
-      await backend.systemStopProcess(pid, mode);
+      await backend.systemStopProcess(pid, mode, name);
       // A process asked to quit takes a moment to go; the next poll picks that up.
       set((s) => ({ processes: s.processes.filter((p) => p.pid !== pid) }));
       return true;
