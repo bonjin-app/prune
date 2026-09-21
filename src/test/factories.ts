@@ -139,7 +139,11 @@ export function appItem(kind: AppDataItem["kind"], risk: RiskLevel, size = 1_000
   };
 }
 
-export function appDetail(app: ApplicationInfo, items: AppDataItem[]): AppDetail {
+export function appDetail(
+  app: ApplicationInfo,
+  items: AppDataItem[],
+  overrides: Partial<AppDetail> = {},
+): AppDetail {
   const totalBytes = items.reduce((a, i) => a + i.target.sizeBytes, 0);
   return {
     app,
@@ -148,6 +152,7 @@ export function appDetail(app: ApplicationInfo, items: AppDataItem[]): AppDetail
     leftoverBytes: items
       .filter((i) => i.kind !== "application")
       .reduce((a, i) => a + i.target.sizeBytes, 0),
+    ...overrides,
   };
 }
 
