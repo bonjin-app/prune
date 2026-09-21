@@ -90,8 +90,8 @@ pub fn detail(
 
 /// Installed applications other than `app` that answer to the same bundle identifier.
 ///
-/// Matched on the identifier, not the name: `PeterFan.app` and `PeterFan-v1.27.74-backup.app`
-/// have different names and the same identifier, which is precisely the pair that shares data.
+/// Matched on the identifier, not the name: `Thing.app` and `Thing-1.2-backup.app` have
+/// different names and the same identifier, which is precisely the pair that shares data.
 /// An application without an identifier matches nothing, since "no identifier" is not something
 /// two applications can have in common.
 fn other_copies(
