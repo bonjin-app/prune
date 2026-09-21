@@ -93,23 +93,33 @@ fn profiles(root: &Path) -> Vec<PathBuf> {
 
 pub struct ChromiumCache;
 
+/// Where a browser's profiles live, on the platform asked about.
+///
+/// Taking the platform as an argument rather than reading `cfg!` makes both answers reachable
+/// from a test on either machine. The directories this decides are the ones the scan then looks
+/// inside, so getting them wrong is how a cleanup ends up somewhere it was never meant to be.
+fn profile_roots(b: &ChromiumBrowser, known: &KnownPaths, windows: bool) -> Vec<PathBuf> {
+    let mut roots: Vec<PathBuf> = Vec::new();
+    if windows {
+        if let Some(local) = &known.local_app_data {
+            roots.push(local.join(b.win_data));
+        }
+    } else {
+        if let Some(c) = &known.user_cache {
+            roots.push(c.join(b.mac_cache));
+        }
+        if let Some(d) = &known.app_support {
+            roots.push(d.join(b.mac_data));
+        }
+    }
+    roots
+}
+
 impl ChromiumCache {
     fn roots(known: &KnownPaths) -> Vec<(String, PathBuf)> {
         let mut roots = Vec::new();
         for b in CHROMIUM {
-            let mut profile_roots: Vec<PathBuf> = Vec::new();
-            if cfg!(target_os = "windows") {
-                if let Some(local) = &known.local_app_data {
-                    profile_roots.push(local.join(b.win_data));
-                }
-            } else {
-                if let Some(c) = &known.user_cache {
-                    profile_roots.push(c.join(b.mac_cache));
-                }
-                if let Some(d) = &known.app_support {
-                    profile_roots.push(d.join(b.mac_data));
-                }
-            }
+            let profile_roots = profile_roots(b, known, cfg!(target_os = "windows"));
             for root in profile_roots.into_iter().filter(|p| p.is_dir()) {
                 for profile in profiles(&root) {
                     let profile_name = profile.file_name().unwrap().to_string_lossy().into_owned();
@@ -231,5 +241,167 @@ impl CleanupProvider for FirefoxCache {
             out.push_measured(ctx, self.id(), &path, label, RiskLevel::Safe, None, false);
         }
         out
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// What a real Chrome profile holds besides its caches. Nothing on this list may ever be
+    /// reported: these are logins, sessions, site data and the user's own bookmarks and
+    /// history. `CACHE_DIRS` is the only thing standing between them and a cleanup, so the
+    /// point of these tests is to keep that list honest rather than to exercise the walk.
+    const MUST_SURVIVE: &[&str] = &[
+        "Cookies",
+        "Login Data",
+        "Web Data",
+        "History",
+        "Bookmarks",
+        "Local Storage",
+        "Session Storage",
+        "IndexedDB",
+        "Service Worker",
+        "Extensions",
+        "Local Extension Settings",
+        "Preferences",
+        "Affiliation Database",
+        "ClientCertificates",
+        "Accounts",
+    ];
+
+    fn known_for(dir: &std::path::Path) -> KnownPaths {
+        KnownPaths {
+            user_cache: Some(dir.join("Library/Caches")),
+            app_support: Some(dir.join("Library/Application Support")),
+            local_app_data: Some(dir.join("AppData/Local")),
+            temp: dir.join("tmp"),
+            home: dir.to_path_buf(),
+            ..Default::default()
+        }
+    }
+
+    /// A Chrome profile as it really looks: caches beside everything that must not be touched.
+    fn lay_out_profile(profile: &std::path::Path) {
+        for dir in CACHE_DIRS {
+            std::fs::create_dir_all(profile.join(dir)).unwrap();
+            std::fs::write(profile.join(dir).join("data"), b"x").unwrap();
+        }
+        for name in MUST_SURVIVE {
+            std::fs::create_dir_all(profile.join(name)).unwrap();
+            std::fs::write(profile.join(name).join("data"), b"secret").unwrap();
+        }
+    }
+
+    #[test]
+    fn only_caches_are_reported_out_of_a_profile() {
+        let dir = tempfile::tempdir().unwrap();
+        let known = known_for(dir.path());
+        let profile = known
+            .user_cache
+            .as_ref()
+            .unwrap()
+            .join("Google/Chrome/Default");
+        lay_out_profile(&profile);
+
+        let reported: Vec<String> = ChromiumCache::roots(&known)
+            .into_iter()
+            .map(|(_, p)| p.file_name().unwrap().to_string_lossy().into_owned())
+            .collect();
+
+        assert!(!reported.is_empty(), "the caches should be found");
+        for name in MUST_SURVIVE {
+            assert!(
+                !reported.iter().any(|r| r == name),
+                "{name} is not a cache and must never be reported: {reported:?}"
+            );
+        }
+        for name in reported {
+            assert!(
+                CACHE_DIRS.contains(&name.as_str()),
+                "{name} is outside the cache list"
+            );
+        }
+    }
+
+    #[test]
+    fn a_profile_is_recognised_by_name_and_nothing_else_is() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        for name in ["Default", "Profile 1", "Profile 27", "Guest Profile"] {
+            std::fs::create_dir_all(root.join(name)).unwrap();
+        }
+        // Chrome keeps plenty beside the profiles; none of it is one.
+        for name in ["Crashpad", "ShaderCache", "Safe Browsing", "System Profile"] {
+            std::fs::create_dir_all(root.join(name)).unwrap();
+        }
+        std::fs::write(root.join("Default.txt"), b"not a directory").unwrap();
+
+        let found: Vec<String> = profiles(root)
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(
+            found,
+            vec!["Default", "Guest Profile", "Profile 1", "Profile 27"]
+        );
+    }
+
+    #[test]
+    fn each_platform_looks_where_that_platform_keeps_profiles() {
+        let dir = tempfile::tempdir().unwrap();
+        let known = known_for(dir.path());
+        let chrome = &CHROMIUM[0];
+
+        // Windows keeps both the caches and the profile data under one `User Data` directory.
+        let windows = profile_roots(chrome, &known, true);
+        assert_eq!(windows.len(), 1);
+        assert!(
+            windows[0].ends_with("Google\\Chrome\\User Data"),
+            "{windows:?}"
+        );
+        assert!(windows[0].starts_with(known.local_app_data.as_ref().unwrap()));
+
+        // macOS splits them: the HTTP cache under Caches, the rest under Application Support.
+        let mac = profile_roots(chrome, &known, false);
+        assert_eq!(mac.len(), 2);
+        assert!(mac[0].starts_with(known.user_cache.as_ref().unwrap()));
+        assert!(mac[1].starts_with(known.app_support.as_ref().unwrap()));
+    }
+
+    #[test]
+    fn firefox_takes_the_cache_and_leaves_the_profile() {
+        let dir = tempfile::tempdir().unwrap();
+        let known = known_for(dir.path());
+        let profile = known
+            .user_cache
+            .as_ref()
+            .unwrap()
+            .join("Firefox/Profiles/abc.default-release");
+        std::fs::create_dir_all(profile.join("cache2/entries")).unwrap();
+        // The things a Firefox profile keeps that are not cache.
+        for name in ["storage", "sessionstore-backups", "bookmarkbackups"] {
+            std::fs::create_dir_all(profile.join(name)).unwrap();
+        }
+
+        let roots = FirefoxCache::roots(&known);
+        assert_eq!(roots.len(), 1, "{roots:?}");
+        assert!(roots[0].1.ends_with("cache2"), "{:?}", roots[0].1);
+    }
+
+    #[test]
+    fn a_profile_without_a_cache_yields_nothing_to_remove() {
+        let dir = tempfile::tempdir().unwrap();
+        let known = known_for(dir.path());
+        let profile = known
+            .user_cache
+            .as_ref()
+            .unwrap()
+            .join("Google/Chrome/Default");
+        for name in MUST_SURVIVE {
+            std::fs::create_dir_all(profile.join(name)).unwrap();
+        }
+
+        assert!(ChromiumCache::roots(&known).is_empty());
     }
 }
