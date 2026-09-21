@@ -6,6 +6,12 @@ All notable changes to Prune are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-21
+
+The first release. Everything below is what Prune does on day one — there is no earlier version
+to have changed from, so the Fixed entries record defects found and corrected during development
+rather than regressions anyone shipped.
+
 ### Fixed
 
 - The desktop app and the command line were both called `prune`, so they overwrote each other in `target/`. Running `pnpm tauri build` and then `./target/release/prune scan` opened the GUI and ignored the arguments, and a release cut from one directory could have shipped the desktop app under the command line's name. The desktop binary is now `prune-desktop` and a check in CI refuses any future collision. The bundle is still `Prune.app` and the command is still `prune`.
@@ -78,3 +84,6 @@ All notable changes to Prune are documented here. The format follows
 - Frontend tests for the selection, preview, execute and cleanup-bookkeeping logic in every store, plus component tests asserting that a protected target can never be selected and that dialogs trap and restore focus.
 - IPC integration tests on Tauri's mock runtime covering the real command surface, including a full disk scan → preview → execute → operation log cycle.
 - A `prune` command line built on the same engine: `status`, `providers`, `scan`, `clean`, `disk`, `apps`, `startup` and `log`, each with `--json` for scripting and meaningful exit codes. `clean` is a dry run unless `--yes` is passed and never selects anything riskier than low on its own. The read-only example prototypes it replaces have been removed.
+
+[unreleased]: https://github.com/bonjin-app/prune/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/bonjin-app/prune/releases/tag/v0.1.0
