@@ -29,6 +29,13 @@ jobs:
             args: --target x86_64-pc-windows-msvc
             target: x86_64-pc-windows-msvc
     runs-on: ${{ matrix.os }}
+    env:
+      # A secret that was never set arrives as an empty string, not as nothing at all. Passing
+      # `APPLE_CERTIFICATE=""` straight to the build makes it try to import an empty certificate
+      # and fail the whole thing — which is what happened the first time this workflow ran, on
+      # both macOS jobs, while Windows sailed through. So whether to sign is decided here and
+      # the variables are only set when there is something to set.
+      HAS_APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE != '' }}
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -44,16 +51,21 @@ jobs:
           workspaces: ". -> target"
           key: ${{ matrix.target }}
       - run: pnpm install --frozen-lockfile
+      - name: Sign, if there is a certificate to sign with
+        if: env.HAS_APPLE_CERTIFICATE == 'true'
+        shell: bash
+        run: |
+          {
+            echo "APPLE_CERTIFICATE=${{ secrets.APPLE_CERTIFICATE }}"
+            echo "APPLE_CERTIFICATE_PASSWORD=${{ secrets.APPLE_CERTIFICATE_PASSWORD }}"
+            echo "APPLE_SIGNING_IDENTITY=${{ secrets.APPLE_SIGNING_IDENTITY }}"
+            echo "APPLE_ID=${{ secrets.APPLE_ID }}"
+            echo "APPLE_PASSWORD=${{ secrets.APPLE_PASSWORD }}"
+            echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}"
+          } >> "$GITHUB_ENV"
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Optional code signing. Builds are unsigned when these secrets are absent.
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Prune ${{ github.ref_name }}"

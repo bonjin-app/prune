@@ -87,7 +87,12 @@ publish.
 ## 5. Signing
 
 Unsigned builds still run, but macOS shows a Gatekeeper warning and Windows SmartScreen
-complains. To sign, set these repository secrets; the workflow picks them up automatically and
+complains. Signing is off unless `APPLE_CERTIFICATE` is set — a secret that was never configured
+reaches the workflow as an empty string rather than as nothing, so the workflow checks for one
+before putting any of these into the environment. Without that check the macOS builds fail
+outright trying to import an empty certificate, which is how it behaved the first time it ran.
+
+To sign, set these repository secrets; the workflow picks them up automatically and
 skips signing when they are absent.
 
 | Secret                                        | What it is                                                 |
