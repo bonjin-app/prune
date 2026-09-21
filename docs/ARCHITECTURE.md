@@ -277,6 +277,16 @@ no content read) and reports which are blocked plus how to grant access.
 dashboard and above every scan, and Settings lists the state. Windows has no equivalent gate, so
 it reports `NotApplicable`.
 
+Both platforms match leftovers by folder name as well, and both refuse to treat a name as proof
+of ownership: a `SHARED_FOLDERS` list keeps one application from claiming a vendor umbrella
+(`Application Support/Google`, `%APPDATA%\Microsoft`) or a folder the system shares. The
+Windows list has to cover one case macOS does not — `%LOCALAPPDATA%\Programs` holds every
+per-user installation and cannot be protected, because those applications are what the
+uninstaller exists to remove, so the name rule is the only thing standing between it and a
+DisplayName that happens to match. Those rules live in `platform/windows/rules.rs`, which is
+compiled on every platform (`platform::windows_rules` off Windows) so the half of the product
+that never runs during development is not also the untested half.
+
 Leftovers are matched by bundle identifier, which is also why two installed copies of one
 application cannot each claim them. `AppDetail::shared_with` names any other installed copy with
 the same identifier, and while it is non-empty every leftover is reported `Protected`: the data

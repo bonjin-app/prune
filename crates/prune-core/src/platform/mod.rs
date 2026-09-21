@@ -20,6 +20,16 @@ pub mod macos;
 #[cfg(target_os = "windows")]
 pub mod windows;
 
+/// The Windows rules for which folders belong to an application, compiled everywhere.
+///
+/// They decide what an uninstall offers to delete and they are plain path logic, so they are
+/// tested on every machine rather than only on the platform they run on. Windows is built in CI
+/// but is never exercised by hand during development here, which is exactly why this half of it
+/// should not be the untested half.
+#[cfg(not(target_os = "windows"))]
+#[path = "windows/rules.rs"]
+pub mod windows_rules;
+
 /// Well-known user directories for the current OS. Missing directories are simply `None`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

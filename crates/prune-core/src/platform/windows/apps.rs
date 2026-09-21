@@ -1,12 +1,10 @@
 //! Application discovery on Windows via the `Uninstall` registry keys, plus AppData folders
 //! named after the application.
 
-use std::path::PathBuf;
-
 use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_READ};
 use winreg::RegKey;
 
-use super::{AppDataKind, ApplicationInfo, KnownPaths, RelatedPath};
+use super::{ApplicationInfo, KnownPaths};
 use crate::models::CleanupTarget;
 use crate::Result;
 
@@ -77,40 +75,4 @@ pub fn list(_known: &KnownPaths) -> Result<Vec<ApplicationInfo>> {
     out.sort_by_key(|a| a.name.to_lowercase());
     out.dedup_by(|a, b| a.name == b.name && a.version == b.version);
     Ok(out)
-}
-
-pub fn related_paths(app: &ApplicationInfo, known: &KnownPaths) -> Vec<RelatedPath> {
-    let mut out: Vec<RelatedPath> = Vec::new();
-    let mut push = |kind: AppDataKind, path: PathBuf| {
-        if path.exists() && !out.iter().any(|r| r.path == path) {
-            out.push(RelatedPath { kind, path });
-        }
-    };
-    if !app.path.is_empty() {
-        let p = PathBuf::from(&app.path);
-        // Install locations under the user profile can be removed; Program Files cannot
-        // (the vendor uninstaller handles those) and would be marked Protected anyway.
-        push(AppDataKind::Application, p);
-    }
-    let name = app.name.trim();
-    if name.len() >= 3 {
-        if let Some(local) = &known.local_app_data {
-            push(AppDataKind::LocalAppData, local.join(name));
-        }
-        if let Some(roaming) = &known.app_support {
-            push(AppDataKind::RoamingAppData, roaming.join(name));
-        }
-        if let Some(publisher) = app.publisher.as_deref() {
-            if let Some(local) = &known.local_app_data {
-                push(AppDataKind::LocalAppData, local.join(publisher).join(name));
-            }
-            if let Some(roaming) = &known.app_support {
-                push(
-                    AppDataKind::RoamingAppData,
-                    roaming.join(publisher).join(name),
-                );
-            }
-        }
-    }
-    out
 }
