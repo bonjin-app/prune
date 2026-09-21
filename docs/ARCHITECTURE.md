@@ -481,6 +481,10 @@ Long-running work uses `tauri::async_runtime::spawn_blocking`; the UI thread is 
   behaviours a user's data depends on: a protected target cannot be selected by any route, and a
   dialog traps Tab and restores focus to whatever opened it.
 
+The confirmation dialog is covered too, because it is the last thing between a user and a
+removal: every target listed with its path, blocked items showing why rather than being dropped,
+items that can only go permanently named even in Trash mode, and no way to dismiss it mid-run.
+
 Never use real system paths in tests.
 
 One test in `pipeline.rs` holds a property rather than a case: scanning each provider on its
