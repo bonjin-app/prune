@@ -31,6 +31,16 @@ fn app_cache(home: &Path) -> PathBuf {
     }
 }
 
+/// Does this path end with `suffix`, whichever separators either happens to use?
+///
+/// Paths are compared as text here, and on Windows `join("Projects/web")` keeps the forward
+/// slash inside the component while adding backslashes around it — so a literal match misses on
+/// both spellings.
+fn ends_with_path(path: &str, suffix: &str) -> bool {
+    path.replace('\\', "/")
+        .ends_with(&suffix.replace('\\', "/"))
+}
+
 /// The npm cache this platform's provider collects: `~/.npm/_cacache` on macOS,
 /// `%LOCALAPPDATA%\npm-cache` on Windows.
 fn npm_cache(home: &Path) -> PathBuf {
@@ -124,12 +134,9 @@ fn scan_discovers_expected_targets_and_dedupes_overlaps() {
     // inside the component and adds backslashes around it, so a plain string match on either
     // form misses.
     let has = |provider: &str, suffix: &str| {
-        paths.iter().any(|(p, path)| {
-            p == provider
-                && path
-                    .replace('\\', "/")
-                    .ends_with(&suffix.replace('\\', "/"))
-        })
+        paths
+            .iter()
+            .any(|(p, path)| p == provider && ends_with_path(path, suffix))
     };
 
     assert!(has("user_cache", app_cache_name()));
@@ -154,7 +161,7 @@ fn scan_discovers_expected_targets_and_dedupes_overlaps() {
         .results
         .iter()
         .flat_map(|r| r.targets.iter())
-        .find(|t| t.path.ends_with("Projects/web/node_modules"))
+        .find(|t| ends_with_path(&t.path, "Projects/web/node_modules"))
         .unwrap();
     assert_eq!(node_modules.size_bytes, 300);
     assert_eq!(node_modules.file_count, 1);
@@ -183,7 +190,7 @@ fn plan_blocks_unknown_ids_and_execute_removes_only_planned_targets() {
         .results
         .iter()
         .flat_map(|r| r.targets.iter())
-        .find(|t| t.path.ends_with(app_cache_name()))
+        .find(|t| ends_with_path(&t.path, app_cache_name()))
         .unwrap()
         .id
         .clone();
@@ -296,7 +303,7 @@ fn a_cleanup_still_counts_when_the_log_cannot_be_written() {
         .results
         .iter()
         .flat_map(|r| r.targets.iter())
-        .find(|t| t.path.ends_with(app_cache_name()))
+        .find(|t| ends_with_path(&t.path, app_cache_name()))
         .unwrap()
         .clone();
     let plan = engine.plan(
@@ -339,7 +346,7 @@ fn a_successful_cleanup_reports_no_log_problem() {
         .results
         .iter()
         .flat_map(|r| r.targets.iter())
-        .find(|t| t.path.ends_with(app_cache_name()))
+        .find(|t| ends_with_path(&t.path, app_cache_name()))
         .unwrap()
         .id
         .clone();
