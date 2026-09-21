@@ -493,26 +493,34 @@ mod tests {
 
     #[test]
     fn expands_the_locations_it_understands() {
+        // Built from a root this platform calls absolute rather than written out as a Unix
+        // path: `/home/u` has a root on Windows but is not absolute there — it is relative to
+        // the current drive — so `expand` would rightly refuse it and the test would be
+        // measuring the fixture instead of the behaviour.
+        let root = if cfg!(windows) {
+            PathBuf::from("C:\\")
+        } else {
+            PathBuf::from("/")
+        };
+        let home = root.join("home").join("u");
+        let cache = home.join("Library").join("Caches");
+        let temp = root.join("tmp");
         let known = KnownPaths {
-            home: PathBuf::from("/home/u"),
-            user_cache: Some(PathBuf::from("/home/u/Library/Caches")),
-            temp: PathBuf::from("/tmp"),
+            home: home.clone(),
+            user_cache: Some(cache.clone()),
+            temp: temp.clone(),
             ..Default::default()
         };
 
+        assert_eq!(expand("~/thing", &known).unwrap(), home.join("thing"));
+        assert_eq!(expand("~", &known).unwrap(), home);
+        assert_eq!(expand("{cache}/zig", &known).unwrap(), cache.join("zig"));
+        assert_eq!(expand("{temp}", &known).unwrap(), temp);
+
+        let absolute = root.join("absolute").join("path");
         assert_eq!(
-            expand("~/thing", &known).unwrap(),
-            PathBuf::from("/home/u/thing")
-        );
-        assert_eq!(expand("~", &known).unwrap(), PathBuf::from("/home/u"));
-        assert_eq!(
-            expand("{cache}/zig", &known).unwrap(),
-            PathBuf::from("/home/u/Library/Caches/zig")
-        );
-        assert_eq!(expand("{temp}", &known).unwrap(), PathBuf::from("/tmp"));
-        assert_eq!(
-            expand("/absolute/path", &known).unwrap(),
-            PathBuf::from("/absolute/path")
+            expand(&absolute.to_string_lossy(), &known).unwrap(),
+            absolute
         );
         // A relative path is not a location.
         assert_eq!(expand("relative/path", &known), None);
