@@ -483,6 +483,15 @@ Long-running work uses `tauri::async_runtime::spawn_blocking`; the UI thread is 
 
 Never use real system paths in tests.
 
+One test in `pipeline.rs` holds a property rather than a case: scanning each provider on its
+own, every target it reports must lie strictly inside a directory `KnownPaths` named, and must
+never *be* one of those directories. A provider claiming `~/Library/Caches` or `%LOCALAPPDATA%`
+whole would offer every application's data at once. It runs per provider because a whole-
+workspace scan resolves overlaps, and a target that swallows a higher-priority one is exactly
+what that resolution removes — the offence would be tidied away before the test could see it.
+Paths are compared canonically, because `/var/…` and `/private/var/…` are the same directory and
+a plain comparison quietly matches nothing.
+
 ## 9. Roadmap mapping
 
 | Phase               | Spec                                                                    | Status                                                     |

@@ -170,6 +170,84 @@ fn scan_discovers_expected_targets_and_dedupes_overlaps() {
 }
 
 #[test]
+fn no_provider_reaches_outside_the_directories_it_was_given() {
+    // The property every provider has to hold, whatever platform it resolves its paths for:
+    // a target lives strictly inside one of the directories `KnownPaths` named, and is never
+    // one of those directories itself. A provider that claimed `~/Library/Caches` or
+    // `%LOCALAPPDATA%` whole would offer to delete every application's data at once.
+    //
+    // This runs on macOS and on Windows in CI, so both halves of every `cfg!` branch are
+    // covered without either being written out by hand.
+    let dir = build_sandbox();
+    let home = dir.path().join("home");
+    let engine = engine_for(&dir);
+
+    // One provider at a time. A whole-directory scan resolves overlaps between providers, and
+    // a target that swallows a higher-priority one is exactly what that resolution removes —
+    // so the offence would be tidied away before this could see it.
+    let mut sessions = Vec::new();
+    for info in engine.providers() {
+        let id = info.id.clone();
+        sessions.push(engine.scan(
+            &format!("invariants-{id}"),
+            &ScanRequest {
+                provider_ids: Some(vec![id]),
+            },
+            Arc::new(AtomicBool::new(false)),
+            &|_| {},
+        ));
+    }
+
+    // Compared in canonical form. The scan normalises what it reports, so on macOS a plain
+    // comparison pits `/var/folders/…` against `/private/var/folders/…` and quietly matches
+    // nothing — which is how the first version of this test passed while a provider really was
+    // claiming a whole cache directory.
+    let canon = |p: &Path| std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
+    let known = engine.known_paths();
+    let roots: Vec<PathBuf> = [
+        known.user_cache.clone(),
+        known.user_logs.clone(),
+        known.app_support.clone(),
+        known.local_app_data.clone(),
+        known.trash.clone(),
+        known.downloads.clone(),
+        Some(known.temp.clone()),
+        Some(known.home.clone()),
+    ]
+    .into_iter()
+    .flatten()
+    .map(|p| canon(&p))
+    .collect();
+    let home_c = canon(&home);
+    let temp_c = canon(&known.temp);
+
+    let mut reported = 0usize;
+    for result in sessions.iter().flat_map(|s| s.results.iter()) {
+        for target in &result.targets {
+            reported += 1;
+            let path = canon(&PathBuf::from(&target.path));
+
+            assert!(
+                path.starts_with(&home_c) || path.starts_with(&temp_c),
+                "{} reported {} , which is outside the sandbox",
+                result.provider_id,
+                target.path
+            );
+            assert!(
+                !roots.iter().any(|r| &path == r),
+                "{} reported {} , which is a whole user directory rather than something inside one",
+                result.provider_id,
+                target.path
+            );
+        }
+    }
+    assert!(
+        reported > 0,
+        "the fixture should produce something to check"
+    );
+}
+
+#[test]
 fn plan_blocks_unknown_ids_and_execute_removes_only_planned_targets() {
     let dir = build_sandbox();
     let engine = engine_for(&dir);
