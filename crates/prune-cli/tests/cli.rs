@@ -24,8 +24,15 @@ fn harness() -> Harness {
     sandbox.prepare().unwrap();
 
     // A safe cache, a low-risk project artifact, and data that must survive everything.
+    // The cache provider looks in different places per platform: a unified `Caches` directory
+    // on macOS, and specific well-known locations under `%LOCALAPPDATA%` on Windows, because
+    // Windows has no single cache directory. Laying out both keeps one test honest on both —
+    // the Windows CI job found this by reporting no application caches at all.
     sandbox
         .write("Library/Caches/com.example.app/blob.bin", 4_000)
+        .unwrap();
+    sandbox
+        .write("Library/Application Support/D3DSCache/shader.bin", 4_000)
         .unwrap();
     sandbox.write("Library/Logs/app.log", 500).unwrap();
     sandbox.write("Projects/web/package.json", 2).unwrap();
@@ -111,7 +118,13 @@ fn clean_is_a_dry_run_unless_asked() {
 #[test]
 fn clean_takes_safe_items_and_leaves_low_risk_ones_alone() {
     let h = harness();
-    let cache = h.sandbox.home().join("Library/Caches/com.example.app");
+    let cache = if cfg!(windows) {
+        h.sandbox
+            .home()
+            .join("Library/Application Support/D3DSCache")
+    } else {
+        h.sandbox.home().join("Library/Caches/com.example.app")
+    };
     let node_modules = h.sandbox.home().join("Projects/web/node_modules");
 
     let (code, out) = run(&h, &["clean", "--permanent", "--yes"]);
@@ -237,8 +250,17 @@ fn processes_refuses_to_stop_the_init_process() {
     let h = harness();
     let (code, out) = run(&h, &["processes", "--stop", "1"]);
 
-    assert_eq!(code, prune_cli::EXIT_ERROR);
-    assert!(out.contains("cannot be stopped"), "{out}");
+    // What matters on every platform is that it refuses and stops nothing.
+    assert_eq!(code, prune_cli::EXIT_ERROR, "{out}");
+
+    // How it refuses differs. On Unix pid 1 is init and the protection rules name it. Windows
+    // has no pid 1 at all, so it never gets that far — which is still a refusal, and still the
+    // right answer.
+    if cfg!(unix) {
+        assert!(out.contains("cannot be stopped"), "{out}");
+    } else {
+        assert!(out.contains("no process with id 1"), "{out}");
+    }
 }
 
 #[test]
