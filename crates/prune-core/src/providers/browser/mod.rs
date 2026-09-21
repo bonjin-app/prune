@@ -281,6 +281,32 @@ mod tests {
         }
     }
 
+    /// Where `ChromiumCache::roots` will actually look on the machine running the test.
+    ///
+    /// `roots` reads `cfg!` to choose, so a fixture written to the macOS location finds nothing
+    /// on Windows — which is the mistake these very tests exist to catch elsewhere.
+    fn chrome_profile(known: &KnownPaths) -> std::path::PathBuf {
+        profile_roots(&CHROMIUM[0], known, cfg!(target_os = "windows"))
+            .into_iter()
+            .next()
+            .expect("a profile root for this platform")
+            .join("Default")
+    }
+
+    /// The same question for Firefox.
+    fn firefox_profile(known: &KnownPaths) -> std::path::PathBuf {
+        let root = if cfg!(target_os = "windows") {
+            known
+                .local_app_data
+                .as_ref()
+                .unwrap()
+                .join("Mozilla\\Firefox\\Profiles")
+        } else {
+            known.user_cache.as_ref().unwrap().join("Firefox/Profiles")
+        };
+        root.join("abc.default-release")
+    }
+
     /// A Chrome profile as it really looks: caches beside everything that must not be touched.
     fn lay_out_profile(profile: &std::path::Path) {
         for dir in CACHE_DIRS {
@@ -297,11 +323,7 @@ mod tests {
     fn only_caches_are_reported_out_of_a_profile() {
         let dir = tempfile::tempdir().unwrap();
         let known = known_for(dir.path());
-        let profile = known
-            .user_cache
-            .as_ref()
-            .unwrap()
-            .join("Google/Chrome/Default");
+        let profile = chrome_profile(&known);
         lay_out_profile(&profile);
 
         let reported: Vec<String> = ChromiumCache::roots(&known)
@@ -373,11 +395,7 @@ mod tests {
     fn firefox_takes_the_cache_and_leaves_the_profile() {
         let dir = tempfile::tempdir().unwrap();
         let known = known_for(dir.path());
-        let profile = known
-            .user_cache
-            .as_ref()
-            .unwrap()
-            .join("Firefox/Profiles/abc.default-release");
+        let profile = firefox_profile(&known);
         std::fs::create_dir_all(profile.join("cache2/entries")).unwrap();
         // The things a Firefox profile keeps that are not cache.
         for name in ["storage", "sessionstore-backups", "bookmarkbackups"] {
@@ -393,11 +411,7 @@ mod tests {
     fn a_profile_without_a_cache_yields_nothing_to_remove() {
         let dir = tempfile::tempdir().unwrap();
         let known = known_for(dir.path());
-        let profile = known
-            .user_cache
-            .as_ref()
-            .unwrap()
-            .join("Google/Chrome/Default");
+        let profile = chrome_profile(&known);
         for name in MUST_SURVIVE {
             std::fs::create_dir_all(profile.join(name)).unwrap();
         }
