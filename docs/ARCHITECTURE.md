@@ -564,6 +564,12 @@ forty processes — which includes the WebView redrawing live meters, not only t
 
 ## 11. Known limitations
 
+- `src-tauri/tests/ipc.rs` runs on macOS but is excluded from `cargo test` on Windows: the test
+  executable does not start there at all (`STATUS_ENTRYPOINT_NOT_FOUND`), which is a Tauri
+  linking problem rather than a failing test. Clippy still builds it on Windows so it cannot
+  rot, the Build job proves the application itself links, and what the tests check — argument
+  deserialization, managed state, JSON shapes on Tauri's mock runtime — is not platform-specific.
+
 - macOS: `~/.Trash`, Safari, Mail and Messages are TCC-protected. Prune detects this and says so
   (see §5e), but cannot read them until the user grants Full Disk Access and restarts the app.
 - Windows: Recycle Bin size is not path-based and is not reported yet.
