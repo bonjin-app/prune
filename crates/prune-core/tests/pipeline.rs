@@ -1,7 +1,7 @@
 //! End-to-end test of the safety pipeline against a sandboxed fake home directory.
 //! Never touches the real filesystem outside a temp dir.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
@@ -17,11 +17,38 @@ fn write(path: &Path, size: usize) {
     std::fs::write(path, vec![b'x'; size]).unwrap();
 }
 
+/// The cache the generic provider collects here, and the name its target path ends with.
+///
+/// macOS has one `Caches` directory and every child of it is a target. Windows has no such
+/// directory, so the provider names specific well-known locations and each location is itself
+/// the target. The pipeline under test is the same either way; only where the fixture has to
+/// put a cache differs.
+fn app_cache(home: &Path) -> PathBuf {
+    if cfg!(windows) {
+        home.join("Library/Application Support/D3DSCache")
+    } else {
+        home.join("Library/Caches/com.example.app")
+    }
+}
+
+/// The name that cache's target path ends with.
+fn app_cache_name() -> &'static str {
+    if cfg!(windows) {
+        "D3DSCache"
+    } else {
+        "com.example.app"
+    }
+}
+
 fn build_sandbox() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     let home = dir.path().join("home");
     // caches (safe)
     write(&home.join("Library/Caches/com.example.app/blob.bin"), 4096);
+    // Same size, so the totals asserted below hold on either platform.
+    if cfg!(windows) {
+        write(&app_cache(&home).join("shader.bin"), 4096);
+    }
     write(&home.join("Library/Caches/Homebrew/pkg.tar.gz"), 2048);
     // logs
     write(&home.join("Library/Logs/app.log"), 512);
@@ -74,16 +101,25 @@ fn scan_discovers_expected_targets_and_dedupes_overlaps() {
                 .map(|t| (r.provider_id.clone(), t.path.clone()))
         })
         .collect();
+    // Separators are normalised: on Windows `join("Library/Caches")` keeps the forward slash
+    // inside the component and adds backslashes around it, so a plain string match on either
+    // form misses.
     let has = |provider: &str, suffix: &str| {
-        paths
-            .iter()
-            .any(|(p, path)| p == provider && path.ends_with(suffix))
+        paths.iter().any(|(p, path)| {
+            p == provider
+                && path
+                    .replace('\\', "/")
+                    .ends_with(&suffix.replace('\\', "/"))
+        })
     };
 
-    assert!(has("user_cache", "Library/Caches/com.example.app"));
-    assert!(has("homebrew_cache", "Library/Caches/Homebrew"));
-    // The generic cache provider must not also report Homebrew.
-    assert!(!has("user_cache", "Library/Caches/Homebrew"));
+    assert!(has("user_cache", app_cache_name()));
+    // Homebrew does not exist on Windows, so neither does the overlap it is here to prove: the
+    // specialised provider must win over the generic one for the same directory.
+    if cfg!(unix) {
+        assert!(has("homebrew_cache", "Library/Caches/Homebrew"));
+        assert!(!has("user_cache", "Library/Caches/Homebrew"));
+    }
     assert!(has("user_logs", "Library/Logs/app.log"));
     assert!(has("npm_cache", ".npm/_cacache"));
     assert!(has("project_artifacts", "Projects/web/node_modules"));
@@ -128,7 +164,7 @@ fn plan_blocks_unknown_ids_and_execute_removes_only_planned_targets() {
         .results
         .iter()
         .flat_map(|r| r.targets.iter())
-        .find(|t| t.path.ends_with("com.example.app"))
+        .find(|t| t.path.ends_with(app_cache_name()))
         .unwrap()
         .id
         .clone();
@@ -152,9 +188,7 @@ fn plan_blocks_unknown_ids_and_execute_removes_only_planned_targets() {
     assert_eq!(plan.total_bytes, 4096 + 128);
     assert_eq!(plan.directory_count, 1);
     // Dry run touched nothing.
-    assert!(home
-        .join("Library/Caches/com.example.app/blob.bin")
-        .exists());
+    assert!(app_cache(&home).exists());
 
     let log_dir = dir.path().join("log");
     let log = OperationLog::open(&log_dir);
@@ -172,7 +206,7 @@ fn plan_blocks_unknown_ids_and_execute_removes_only_planned_targets() {
     assert_eq!(result.removed_targets, 2);
     assert_eq!(result.removed_bytes, 4096 + 128);
     assert!(result.failed.is_empty());
-    assert!(!home.join("Library/Caches/com.example.app").exists());
+    assert!(!app_cache(&home).exists());
     assert!(!home.join(".Trash/old.txt").exists());
     // Everything not in the plan is intact.
     assert!(home.join("Library/Caches/Homebrew/pkg.tar.gz").exists());
@@ -243,7 +277,7 @@ fn a_cleanup_still_counts_when_the_log_cannot_be_written() {
         .results
         .iter()
         .flat_map(|r| r.targets.iter())
-        .find(|t| t.path.ends_with("com.example.app"))
+        .find(|t| t.path.ends_with(app_cache_name()))
         .unwrap()
         .clone();
     let plan = engine.plan(
@@ -269,7 +303,7 @@ fn a_cleanup_still_counts_when_the_log_cannot_be_written() {
     // What matters: the files really are gone and the caller was told so.
     assert_eq!(result.removed_targets, 1);
     assert_eq!(result.removed_bytes, 4096);
-    assert!(!home.join("Library/Caches/com.example.app").exists());
+    assert!(!app_cache(&home).exists());
 }
 
 #[test]
@@ -286,7 +320,7 @@ fn a_successful_cleanup_reports_no_log_problem() {
         .results
         .iter()
         .flat_map(|r| r.targets.iter())
-        .find(|t| t.path.ends_with("com.example.app"))
+        .find(|t| t.path.ends_with(app_cache_name()))
         .unwrap()
         .id
         .clone();
