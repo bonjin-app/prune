@@ -19,9 +19,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # GitHub's Windows images do not ship a usable winget: it is an app package that needs a
-      # desktop context the runner does not have by default.
+      # The runner image may or may not carry winget. Installing it unconditionally fails on
+      # the images that do: the installer action ships an older Microsoft.UI.Xaml than the one
+      # already present, and Windows refuses to install a package over a newer version.
+      - name: Look for winget
+        id: find
+        shell: pwsh
+        run: |
+          if (Get-Command winget -ErrorAction SilentlyContinue) {
+            "present=true" >> $env:GITHUB_OUTPUT
+            winget --version
+          } else {
+            "present=false" >> $env:GITHUB_OUTPUT
+            "winget is not on this image; installing it" | Write-Host
+          }
+
       - name: Install winget
+        if: steps.find.outputs.present != 'true'
         uses: Cyberboss/install-winget@v1
 
       - name: winget --version
