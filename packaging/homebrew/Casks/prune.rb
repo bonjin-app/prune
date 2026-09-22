@@ -18,7 +18,7 @@ cask "prune" do
   end
 
   # The bundle asks for 12.0, so an older system would install a copy it cannot open.
-  depends_on macos: ">= :monterey"
+  depends_on macos: :monterey
 
   app "Prune.app"
 
@@ -36,9 +36,15 @@ cask "prune" do
 
   caveats do
     <<~EOS
-      Prune is not signed with a Developer ID yet, so macOS quarantines it and Gatekeeper
-      refuses the first launch. To allow it, open the app once, then go to
-      System Settings -> Privacy & Security and choose "Open Anyway".
+      Prune is not signed with a Developer ID yet, so `spctl` rejects this bundle and macOS
+      quarantines it on download. The first launch is refused. Try to open it, then allow it
+      in System Settings -> Privacy & Security. If macOS calls the app damaged instead of
+      unverified, that dialog offers no way through, and the quarantine flag has to go:
+
+        xattr -d com.apple.quarantine /Applications/Prune.app
+
+      Neither message is a statement about what the app does. Both mean nobody has paid for a
+      certificate that vouches for it.
 
       The `prune` command line ships separately, from the same release:
         https://github.com/bonjin-app/prune/releases/latest

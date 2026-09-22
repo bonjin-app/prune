@@ -154,11 +154,16 @@ On macOS, Homebrew can install the same disk image for you:
 
 ```bash
 brew tap bonjin-app/tap
+brew trust bonjin-app/tap
 brew install --cask prune
 ```
 
-`brew uninstall --cask prune` removes the app and keeps your settings and the operation log;
-`brew zap --cask prune` removes those too.
+Homebrew 7 refuses to load a cask from a tap it has not been told to trust, and says so rather
+than failing quietly; `brew trust` is what tells it. On Homebrew 6 that command does not exist,
+and the tap and install lines are all you need.
+
+`brew uninstall --cask prune` removes the app and keeps your settings and the operation log —
+the record of what Prune removed. `brew uninstall --zap --cask prune` removes those too.
 
 All releases: [GitHub Releases](https://github.com/bonjin-app/prune/releases). WinGet and Scoop
 are planned.
