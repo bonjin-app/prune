@@ -170,6 +170,9 @@ repository, so there is no `winget install Prune` to run. From a clone you can i
 them directly:
 
 ```powershell
+# once, in an administrator prompt: installing from a file on disk is off by default
+winget settings --enable LocalManifestFiles
+
 winget install --manifest packaging\winget
 ```
 

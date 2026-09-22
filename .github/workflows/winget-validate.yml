@@ -44,6 +44,11 @@ jobs:
       - name: Validate the manifests
         run: winget validate --manifest packaging/winget
 
+      # Installing from a file on disk is off by default, for the obvious reason: a manifest can
+      # point anywhere. The runner is an administrator, so it can turn it on.
+      - name: Allow installing from a local manifest
+        run: winget settings --enable LocalManifestFiles
+
       # Installing proves the manifest points at something that actually installs, which is the
       # half of the pull request checklist that validation alone does not cover.
       - name: Install from the manifest
