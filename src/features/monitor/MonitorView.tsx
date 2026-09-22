@@ -129,26 +129,26 @@ export function MonitorView() {
         <Card>
           <CardHeader title="Top Processes" subtitle={`${snapshot?.processCount ?? 0} running`} />
           <div className="max-h-[420px] overflow-y-auto px-2 pb-2">
-            <table className="w-full text-[12px]">
+            <table className="w-full text-[12.5px]">
               <thead className="sticky top-0 bg-surface text-[11px] text-fg-faint">
                 <tr>
-                  <th className="px-2 py-1 text-left font-medium">Process</th>
-                  <th className="px-2 py-1 text-right font-medium">CPU</th>
-                  <th className="px-2 py-1 text-right font-medium">Memory</th>
-                  <th className="px-2 py-1 text-right font-medium">PID</th>
-                  <th className="px-2 py-1 text-left font-medium">User</th>
-                  <th className="px-2 py-1 text-right font-medium" />
+                  <th className="px-2.5 py-2 text-left font-medium">Process</th>
+                  <th className="px-2.5 py-2 text-right font-medium">CPU</th>
+                  <th className="px-2.5 py-2 text-right font-medium">Memory</th>
+                  <th className="px-2.5 py-2 text-right font-medium">PID</th>
+                  <th className="px-2.5 py-2 text-left font-medium">User</th>
+                  <th className="px-2.5 py-2 text-right font-medium" />
                 </tr>
               </thead>
               <tbody>
                 {processes.map((p) => (
                   <tr key={p.pid} className="border-t border-line/50 hover:bg-surface-2/60">
-                    <td className="max-w-[220px] truncate px-2 py-1">{p.name}</td>
-                    <td className="px-2 py-1 text-right tnum">{formatPercent(p.cpuPercent, 1)}</td>
-                    <td className="px-2 py-1 text-right tnum">{formatBytes(p.memoryBytes)}</td>
-                    <td className="px-2 py-1 text-right text-fg-faint tnum">{p.pid}</td>
-                    <td className="px-2 py-1 text-fg-faint">{p.user ?? ""}</td>
-                    <td className="px-2 py-1 text-right">
+                    <td className="max-w-[220px] truncate px-2.5 py-1.5">{p.name}</td>
+                    <td className="px-2.5 py-1.5 text-right tnum">{formatPercent(p.cpuPercent, 1)}</td>
+                    <td className="px-2.5 py-1.5 text-right tnum">{formatBytes(p.memoryBytes)}</td>
+                    <td className="px-2.5 py-1.5 text-right text-fg-faint tnum">{p.pid}</td>
+                    <td className="px-2.5 py-1.5 text-fg-faint">{p.user ?? ""}</td>
+                    <td className="px-2.5 py-1.5 text-right">
                       {p.canTerminate ? (
                         <button
                           type="button"

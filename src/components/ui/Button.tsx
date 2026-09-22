@@ -3,7 +3,7 @@ import { cn } from "@/lib/cn";
 import { Spinner } from "./Spinner";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
-type Size = "sm" | "md";
+type Size = "sm" | "md" | "lg";
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
@@ -23,6 +23,8 @@ const variants: Record<Variant, string> = {
 const sizes: Record<Size, string> = {
   sm: "h-7 px-2.5 text-[12px] gap-1.5",
   md: "h-8 px-3 text-[13px] gap-2",
+  // For the one action a screen is built around. Nothing else should reach for it.
+  lg: "h-10 px-5 text-[13.5px] gap-2 rounded-lg",
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(

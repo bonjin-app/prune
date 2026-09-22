@@ -8,7 +8,6 @@ import { backend } from "@/lib/tauri";
 import { useScan } from "@/stores/scan";
 import { useSystem } from "@/stores/system";
 import type { CleanupTarget, ScanResult } from "@/types/models";
-import { CATEGORY_LABEL } from "@/types/models";
 import { ProjectSection } from "./ProjectSection";
 import { groupByProject } from "./projects";
 
@@ -53,7 +52,7 @@ export const ProviderGroup = memo(function ProviderGroup({ result }: { result: S
         tabIndex={0}
         aria-expanded={open}
         aria-label={`${open ? "Collapse" : "Expand"} ${result.providerName}`}
-        className="flex cursor-default items-center gap-2.5 px-3 py-2.5 hover:bg-surface-2/60"
+        className="flex cursor-default items-center gap-3 px-3.5 py-3 hover:bg-surface-2/60"
         onClick={() => setOpen((o) => !o)}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -79,10 +78,7 @@ export const ProviderGroup = memo(function ProviderGroup({ result }: { result: S
           className={cn("text-fg-faint transition-transform", open && "rotate-90")}
         />
         <div className="min-w-0 flex-1">
-          <div className="flex items-baseline gap-2">
-            <h3 className="text-[13px] font-semibold">{result.providerName}</h3>
-            <span className="text-[11px] text-fg-faint">{CATEGORY_LABEL[result.category]}</span>
-          </div>
+          <h3 className="text-[13.5px] font-semibold">{result.providerName}</h3>
           {description && <p className="truncate text-[11.5px] text-fg-muted">{description}</p>}
         </div>
         {result.issues.length > 0 && (
@@ -152,7 +148,7 @@ export const TargetRow = memo(function TargetRow({ target, indent = false }: { t
   return (
     <div
       className={cn(
-        "group flex items-center gap-2.5 border-t border-line/60 px-3 py-[7px] first:border-t-0",
+        "group flex items-center gap-3 border-t border-line/50 px-3.5 py-2.5 first:border-t-0",
         indent && "pl-10",
         protectedItem ? "opacity-60" : "hover:bg-surface-2/60",
         checked && "bg-accent-soft/40",

@@ -88,13 +88,14 @@ export function CleanerWorkspace({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2 px-7 pb-3">
+      <div className="flex items-center gap-2 px-7 pb-4">
         {scanning ? (
           <Button variant="secondary" onClick={() => void cancelScan()}>
             <Ban size={14} /> Cancel
           </Button>
         ) : (
           <Button
+            size={hasResults ? "md" : "lg"}
             variant={hasResults ? "secondary" : "primary"}
             onClick={() => void startScan(scopedIds)}
           >
@@ -144,28 +145,20 @@ export function CleanerWorkspace({
           </>
         )}
         <div className="flex-1" />
-        {hasResults && (
-          <div className="text-[12px] text-fg-muted tnum">
-            {scopedSelected.length > 0 ? (
-              <>
-                <span className="text-fg">{scopedSelected.length}</span> selected ·{" "}
-                <span className="text-fg">{formatBytes(selectedBytes)}</span>
-              </>
-            ) : (
-              <>
-                Found <span className="text-fg">{formatBytes(scopedTotal)}</span>
-              </>
-            )}
-          </div>
+        {hasResults && scopedSelected.length === 0 && (
+          <span className="text-[12.5px] text-fg-muted tnum">{formatBytes(scopedTotal)} found</span>
         )}
         {hasResults && (
           <Button
+            size="lg"
             variant={deleteMode === "permanent" ? "danger" : "primary"}
             disabled={scopedSelected.length === 0 || scanning}
             loading={previewing}
             onClick={() => void preview(scopedSelected.map((t) => t.id))}
           >
-            Review {selectedBytes > 0 ? formatBytes(selectedBytes) : ""}
+            {scopedSelected.length === 0
+              ? "Review"
+              : `Review ${scopedSelected.length} · ${formatBytes(selectedBytes)}`}
           </Button>
         )}
       </div>

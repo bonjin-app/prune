@@ -44,7 +44,7 @@ export const ProjectSection = memo(function ProjectSection({ project }: { projec
           }
         }}
         className={cn(
-          "flex cursor-default items-center gap-2.5 px-3 py-[7px]",
+          "flex cursor-default items-center gap-3 px-3.5 py-2.5",
           chosenCount > 0 ? "bg-accent-soft/40" : "hover:bg-surface-2/60",
         )}
       >
