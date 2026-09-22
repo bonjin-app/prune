@@ -1,0 +1,44 @@
+# Checks the WinGet manifests the way the winget-pkgs pull request template asks for, on the
+# only kind of machine that can: `winget validate` and `winget install` are Windows programs,
+# so neither can be run where the manifests are written.
+#
+# Run it by hand before submitting a release to microsoft/winget-pkgs.
+name: WinGet manifests
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "packaging/winget/**"
+      - ".github/workflows/winget-validate.yml"
+
+jobs:
+  validate:
+    name: Validate and install
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # GitHub's Windows images do not ship a usable winget: it is an app package that needs a
+      # desktop context the runner does not have by default.
+      - name: Install winget
+        uses: Cyberboss/install-winget@v1
+
+      - name: winget --version
+        run: winget --version
+
+      - name: Validate the manifests
+        run: winget validate --manifest packaging/winget
+
+      # Installing proves the manifest points at something that actually installs, which is the
+      # half of the pull request checklist that validation alone does not cover.
+      - name: Install from the manifest
+        run: >
+          winget install --manifest packaging/winget
+          --accept-package-agreements --accept-source-agreements --disable-interactivity
+
+      - name: Show what was installed
+        run: winget list --name Prune
+
+      - name: Uninstall
+        run: winget uninstall --name Prune --disable-interactivity
