@@ -1,3 +1,5 @@
+# Edited here, in the Prune repository. The copy in bonjin-app/homebrew-tap is written by
+# scripts/update-cask.sh --publish; a change made there is overwritten by the next release.
 cask "prune" do
   arch arm: "aarch64", intel: "x64"
 

@@ -153,12 +153,12 @@ Windows). Unpack it and put `prune` on your `PATH`.
 On macOS, Homebrew can install the same disk image for you:
 
 ```bash
-brew install --cask https://raw.githubusercontent.com/bonjin-app/prune/main/packaging/homebrew/Casks/prune.rb
+brew tap bonjin-app/tap
+brew install --cask prune
 ```
 
-That installs and uninstalls cleanly, but `brew upgrade` will not see new versions, because a
-cask installed from a URL belongs to no tap. A `bonjin-app/tap` to install from is the next
-step.
+`brew uninstall --cask prune` removes the app and keeps your settings and the operation log;
+`brew zap --cask prune` removes those too.
 
 All releases: [GitHub Releases](https://github.com/bonjin-app/prune/releases). WinGet and Scoop
 are planned.

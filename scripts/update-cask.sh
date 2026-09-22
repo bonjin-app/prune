@@ -2,15 +2,25 @@
 # Points the Homebrew cask at a published release.
 #
 #   scripts/update-cask.sh 0.2.0
+#   scripts/update-cask.sh 0.2.0 --publish
 #
 # A cask carries the checksum of the file it installs, so it can only be written after the
 # release exists — `set-version.sh` cannot do it at the same time as the rest. Run this once
-# the release is published, then copy the cask to the tap (see RELEASING.md).
+# the release is published.
+#
+# `--publish` then pushes the cask to bonjin-app/homebrew-tap, which is what `brew` actually
+# reads. Without it the tap keeps serving the previous version, and the README's install
+# command installs something older than the release that was just cut.
 set -euo pipefail
 
 version="${1:-}"
+publish="${2:-}"
 if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
-  echo "usage: $0 <semver>   e.g. $0 0.2.0" >&2
+  echo "usage: $0 <semver> [--publish]   e.g. $0 0.2.0 --publish" >&2
+  exit 1
+fi
+if [[ -n "$publish" && "$publish" != "--publish" ]]; then
+  echo "unknown argument: $publish (expected --publish)" >&2
   exit 1
 fi
 
@@ -41,4 +51,23 @@ echo
 echo "Cask updated:"
 grep -E '^ +(version |sha256 arm:|intel:)' "$cask" | sed 's/^/  /'
 echo
-echo "Next: copy packaging/homebrew/Casks/prune.rb into the bonjin-app/homebrew-tap repository."
+
+if [[ "$publish" != "--publish" ]]; then
+  echo "Not published. Re-run with --publish to push this to bonjin-app/homebrew-tap,"
+  echo "or the tap will keep serving the previous version."
+  exit 0
+fi
+
+tap="$tmp/homebrew-tap"
+git clone -q --depth 1 https://github.com/bonjin-app/homebrew-tap.git "$tap"
+cp "$cask" "$tap/Casks/prune.rb"
+
+if git -C "$tap" diff --quiet; then
+  echo "Tap already serves $version; nothing to push."
+  exit 0
+fi
+
+git -C "$tap" add Casks/prune.rb
+git -C "$tap" commit -q -m "chore: prune $version"
+git -C "$tap" push -q origin HEAD:main
+echo "Pushed to bonjin-app/homebrew-tap: prune $version"

@@ -125,7 +125,7 @@ build, but both are a reason to sign before a release anyone else is expected to
 - Point the Homebrew cask at the release you just published:
 
   ```bash
-  scripts/update-cask.sh 0.2.0
+  scripts/update-cask.sh 0.2.0 --publish
   git commit -am "chore: point the cask at 0.2.0"
   ```
 
@@ -134,7 +134,8 @@ build, but both are a reason to sign before a release anyone else is expected to
   images from the release and writes their real checksums, rather than trusting a local build
   that happens to share the version number.
 
-  `packaging/homebrew/Casks/prune.rb` is the source of truth. Publishing it to a tap means
-  copying it into a `bonjin-app/homebrew-tap` repository, which does not exist yet; until it
-  does, the README tells people to install from the raw file, which works but does not upgrade.
+  `packaging/homebrew/Casks/prune.rb` is the source of truth; `--publish` copies it to
+  [bonjin-app/homebrew-tap](https://github.com/bonjin-app/homebrew-tap), which is what `brew`
+  reads. Leave `--publish` off and the tap keeps serving the previous version, so
+  `brew install --cask prune` installs something older than the release you just cut.
 - WinGet and Scoop manifests are not written yet.
