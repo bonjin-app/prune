@@ -152,9 +152,18 @@ build, but both are a reason to sign before a release anyone else is expected to
   and get upgrade and uninstall wrong. Without `olefile` the script stops rather than leaving
   the old code in place.
 
-  The manifests validate against the published 1.12.0 schemas. `winget validate --manifest
-  packaging/winget` is the check on a Windows machine, and it is the one that has not been run
-  here, because winget is a Windows program.
+  The manifests target schema 1.10.0, not the newest. Nothing here needs a field added since,
+  and the winget shipped on GitHub's Windows images is older than 1.12, so a 1.12 header makes
+  `winget validate` warn — and it exits non-zero on warnings. An older schema also means more
+  installed clients can read the manifest.
+
+  The `WinGet manifests` workflow runs `winget validate` and a real `winget install` on a
+  Windows runner, which is the half of the winget-pkgs checklist that cannot be done here.
+  Run it before submitting:
+
+  ```bash
+  gh workflow run winget-validate.yml --ref main
+  ```
 
   They are not in [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs) yet, so
   `winget install Prune` finds nothing; the README says so rather than printing a command that
