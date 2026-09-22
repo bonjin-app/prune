@@ -109,14 +109,23 @@ export function DiskView() {
               count={summary.largeFileCount}
             />
             <Tab id="types" current={tab} onSelect={setTab} label="File Types" />
-            <div className="ml-auto text-[12px] text-fg-muted tnum">
-              {formatBytes(summary.totalBytes)} · {formatCount(summary.fileCount)} files ·{" "}
-              {formatCount(summary.dirCount)} folders · {(summary.durationMs / 1000).toFixed(1)}s
+            {/*
+              The total is the answer; the counts are how it was arrived at; how long the walk
+              took is neither. Strung together with middle dots they all read as equally
+              important, so the figure leads and the rest follows it quietly.
+            */}
+            <div className="ml-auto flex items-baseline gap-2 text-[12px] tnum">
+              <span className="text-[13px] font-medium text-fg">
+                {formatBytes(summary.totalBytes)}
+              </span>
+              <span className="text-fg-faint">
+                in {formatCount(summary.fileCount)} files
+              </span>
               {summary.status === "cancelled" && (
-                <span className="ml-2 text-warn">stopped early, partial</span>
+                <span className="text-warn">stopped early, partial</span>
               )}
               {summary.issueCount > 0 && (
-                <span className="ml-2 text-warn">{summary.issueCount} skipped</span>
+                <span className="text-warn">{summary.issueCount} skipped</span>
               )}
             </div>
           </div>

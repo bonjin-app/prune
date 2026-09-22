@@ -109,7 +109,7 @@ function Row({ item }: { item: StartupItem }) {
   return (
     <div
       className={cn(
-        "flex items-center gap-3 border-t border-line/60 px-3 py-2 first:border-t-0",
+        "flex items-center gap-3 border-t border-line/50 px-3.5 py-2.5 first:border-t-0",
         !item.enabled && "opacity-60",
       )}
     >
@@ -126,6 +126,9 @@ function Row({ item }: { item: StartupItem }) {
           <span className="shrink-0 rounded-sm bg-surface-2 px-1 text-[10.5px] text-fg-muted">
             {STARTUP_TRIGGER_LABEL[item.trigger]}
           </span>
+          <span className="shrink-0 text-[11px] text-fg-faint">
+            {STARTUP_SOURCE_LABEL[item.source] ?? item.source}
+          </span>
           {!item.canToggle && (
             <span title={item.reason} className="shrink-0 text-fg-faint">
               <ShieldAlert size={11} />
@@ -135,9 +138,6 @@ function Row({ item }: { item: StartupItem }) {
         <div className="truncate font-mono text-[11px] text-fg-faint">
           {abbreviatePath(target, home)}
         </div>
-      </div>
-      <div className="w-[96px] shrink-0 text-right text-[11px] text-fg-faint">
-        {STARTUP_SOURCE_LABEL[item.source] ?? item.source}
       </div>
       {isTauri && (
         <button
