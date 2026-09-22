@@ -1,0 +1,29 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.12.0.schema.json
+
+PackageIdentifier: PruneContributors.Prune
+PackageVersion: 0.1.3
+Platform:
+- Windows.Desktop
+# The compatibility table in the README says Windows 10, and nothing narrower has been tested,
+# so this claims no more than that.
+MinimumOSVersion: 10.0.0.0
+UpgradeBehavior: install
+ReleaseDate: 2026-09-22
+Installers:
+# The NSIS installer is built with installMode currentUser, so it needs no elevation.
+- Architecture: x64
+  InstallerType: nullsoft
+  Scope: user
+  InstallerUrl: https://github.com/bonjin-app/prune/releases/download/v0.1.3/Prune_0.1.3_x64-setup.exe
+  InstallerSha256: 6A33DCC05262EEF3B58881C623BF7828BE5ACD01DC5AD265ECCBDC064BB55E66
+# The MSI sets ALLUSERS=1, so it installs for the machine and elevates. ProductCode is read out
+# of the package itself by scripts/update-winget.sh: WiX generates a new one for every build.
+- Architecture: x64
+  InstallerType: wix
+  Scope: machine
+  InstallerLocale: en-US
+  InstallerUrl: https://github.com/bonjin-app/prune/releases/download/v0.1.3/Prune_0.1.3_x64_en-US.msi
+  InstallerSha256: D18FD1BA0D9B5AAAE1F78A7F12699AB01B58ACF01366B26D3F56F80BB09713F9
+  ProductCode: '{3AF5551B-9F08-4F3E-BBD5-CAAA24505399}'
+ManifestType: installer
+ManifestVersion: 1.12.0

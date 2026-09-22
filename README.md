@@ -165,8 +165,16 @@ and the tap and install lines are all you need.
 `brew uninstall --cask prune` removes the app and keeps your settings and the operation log —
 the record of what Prune removed. `brew uninstall --zap --cask prune` removes those too.
 
-All releases: [GitHub Releases](https://github.com/bonjin-app/prune/releases). WinGet and Scoop
-are planned.
+On Windows the WinGet manifests are in the repository but not yet in the community package
+repository, so there is no `winget install Prune` to run. From a clone you can install from
+them directly:
+
+```powershell
+winget install --manifest packaging\winget
+```
+
+All releases: [GitHub Releases](https://github.com/bonjin-app/prune/releases). Scoop is
+planned.
 
 ### These builds are not signed yet
 

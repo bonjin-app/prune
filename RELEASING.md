@@ -138,4 +138,30 @@ build, but both are a reason to sign before a release anyone else is expected to
   [bonjin-app/homebrew-tap](https://github.com/bonjin-app/homebrew-tap), which is what `brew`
   reads. Leave `--publish` off and the tap keeps serving the previous version, so
   `brew install --cask prune` installs something older than the release you just cut.
-- WinGet and Scoop manifests are not written yet.
+- Point the WinGet manifests at the same release:
+
+  ```bash
+  pip3 install --user olefile     # once; needed to read the MSI
+  scripts/update-winget.sh 0.2.0
+  git commit -am "chore: point the WinGet manifests at 0.2.0"
+  ```
+
+  As well as the two checksums, this re-reads the MSI's `ProductCode`. WiX generates a new one
+  for every build, and a manifest carrying the previous release's code is worse than one
+  carrying none — WinGet would match an installed copy against a code that is no longer there
+  and get upgrade and uninstall wrong. Without `olefile` the script stops rather than leaving
+  the old code in place.
+
+  The manifests validate against the published 1.12.0 schemas. `winget validate --manifest
+  packaging/winget` is the check on a Windows machine, and it is the one that has not been run
+  here, because winget is a Windows program.
+
+  They are not in [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs) yet, so
+  `winget install Prune` finds nothing; the README says so rather than printing a command that
+  fails. Submitting means opening a pull request there, which the validation pipeline then
+  runs the installer for:
+
+  ```powershell
+  wingetcreate submit --token <github-token> packaging\winget
+  ```
+- Scoop manifests are not written yet.
