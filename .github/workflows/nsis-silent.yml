@@ -1,8 +1,8 @@
-# Can the Windows installer install without anyone at the keyboard?
+# Does the Windows installer install with nobody at the keyboard?
 #
-# That is how winget installs it, how a fleet deployment installs it, and how Microsoft's own
-# validation pipeline installs it. `winget install` hung here with no output, so this runs the
-# installer directly and, if it does not finish, says what it was doing.
+# That is how a fleet deployment installs it, and it is the baseline the winget hang in
+# issue #1 is measured against: this passes, and `winget install` of the same file does not.
+# If this ever starts failing, the two problems are not the same problem.
 name: Silent install (Windows)
 
 on:
@@ -25,33 +25,46 @@ jobs:
           $url = "https://github.com/bonjin-app/prune/releases/download/v$v/Prune_${v}_x64-setup.exe"
           Write-Host "downloading $url"
           Invoke-WebRequest $url -OutFile setup.exe
-          Get-Item setup.exe | Format-List Name, Length
 
-      # winget hangs waiting for this installer even on a clean machine, while the installer
-      # process itself returns in seconds. So something it starts outlives it: winget waits on
-      # the whole tree, Start-Process -Wait does not. This lists what is still there.
-      - name: What does /S leave behind?
+      - name: Install
         shell: pwsh
         run: |
-          $before = (Get-CimInstance Win32_Process | Select-Object -ExpandProperty ProcessId)
           $p = Start-Process -FilePath .\setup.exe -ArgumentList '/S' -PassThru
-          if (-not $p.WaitForExit(120000)) { Write-Host "the installer itself hung"; exit 1 }
-          Write-Host "installer exited with $($p.ExitCode)"
-          Start-Sleep -Seconds 10
-          Write-Host "--- processes that exist now and did not before ---"
-          Get-CimInstance Win32_Process |
-            Where-Object { $before -notcontains $_.ProcessId } |
-            Select-Object ProcessId, ParentProcessId, Name, CommandLine |
-            Format-List
-          Write-Host "--- anything still holding the installer or its folder ---"
-          Get-CimInstance Win32_Process |
-            Where-Object { $_.CommandLine -and ($_.CommandLine -match 'setup|Prune|nsis|webview' ) } |
-            Select-Object ProcessId, Name, CommandLine | Format-List
+          if (-not $p.WaitForExit(120000)) {
+            Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+            throw "the installer did not finish within two minutes"
+          }
+          if ($p.ExitCode -ne 0) { throw "the installer exited with $($p.ExitCode)" }
+          Write-Host "installed, exit 0"
 
-      - name: What landed on disk
-        if: always()
+      - name: It installed where it said it would
         shell: pwsh
         run: |
-          foreach ($d in @("$env:LOCALAPPDATA\Prune", "$env:PROGRAMFILES\Prune")) {
-            if (Test-Path $d) { Write-Host "--- $d ---"; Get-ChildItem $d | Select-Object Name }
+          # installMode is currentUser, so this belongs under the user's own directory and
+          # nowhere else.
+          $user = "$env:LOCALAPPDATA\Prune\prune-desktop.exe"
+          if (-not (Test-Path $user)) { throw "not installed at $user" }
+          if (Test-Path "$env:PROGRAMFILES\Prune") { throw "a currentUser install wrote to Program Files" }
+          Get-Item $user | Select-Object FullName, Length
+
+      - name: It leaves nothing running
+        shell: pwsh
+        run: |
+          Start-Sleep -Seconds 5
+          $app = Get-Process prune-desktop -ErrorAction SilentlyContinue
+          if ($app) {
+            Stop-Process -Name prune-desktop -Force
+            throw "the installer left the application running"
           }
+          Write-Host "nothing left running"
+
+      - name: Uninstall
+        shell: pwsh
+        run: |
+          $u = "$env:LOCALAPPDATA\Prune\uninstall.exe"
+          $p = Start-Process -FilePath $u -ArgumentList '/S' -PassThru
+          if (-not $p.WaitForExit(120000)) { throw "the uninstaller did not finish" }
+          if ($p.ExitCode -ne 0) { throw "the uninstaller exited with $($p.ExitCode)" }
+          Start-Sleep -Seconds 3
+          if (Test-Path "$env:LOCALAPPDATA\Prune\prune-desktop.exe") { throw "the application is still installed" }
+          Write-Host "uninstalled cleanly"
