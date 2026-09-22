@@ -6,6 +6,11 @@ All notable changes to Prune are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-22
+
+A packaging fix. Nothing about what Prune does has changed; if 0.1.0 is installed and running,
+there is no reason to hurry.
+
 ### Fixed
 
 - The macOS disk image demanded that the MIT licence be agreed to before it would mount. `licenseFile` applies to every bundle at once — there is no per-installer setting in Tauri 2 — and on macOS that becomes a modal agreement, so `hdiutil attach` on the published `.dmg` answered "attach canceled" and any scripted install, Homebrew casks included, stopped there. MIT grants rights rather than asking for assent, so presenting it as something to accept was wrong twice over. The licence still ships: in the repository, in the command-line archives, and named in the application's own copyright string.
@@ -89,5 +94,6 @@ rather than regressions anyone shipped.
 - IPC integration tests on Tauri's mock runtime covering the real command surface, including a full disk scan → preview → execute → operation log cycle.
 - A `prune` command line built on the same engine: `status`, `providers`, `scan`, `clean`, `disk`, `apps`, `startup` and `log`, each with `--json` for scripting and meaningful exit codes. `clean` is a dry run unless `--yes` is passed and never selects anything riskier than low on its own. The read-only example prototypes it replaces have been removed.
 
-[unreleased]: https://github.com/bonjin-app/prune/compare/v0.1.0...HEAD
+[unreleased]: https://github.com/bonjin-app/prune/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/bonjin-app/prune/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/bonjin-app/prune/releases/tag/v0.1.0

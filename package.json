@@ -1,7 +1,7 @@
 {
   "name": "prune",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Keep what matters. Remove what doesn't. Open-source system utility for macOS and Windows.",
   "type": "module",
   "license": "MIT",

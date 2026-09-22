@@ -23,11 +23,18 @@ perl -0pi -e 's/("version"\s*:\s*")[^"]+(")/${1}'"$version"'${2}/' package.json
 # Cargo workspace — the version under [workspace.package].
 perl -0pi -e 's/(\[workspace\.package\]\nversion\s*=\s*")[^"]+(")/${1}'"$version"'${2}/' Cargo.toml
 
+# The README links straight at the release files, and their names carry the version. Left
+# behind, those links 404 the moment the next release lands — `releases/latest/download/<name>`
+# needs the exact name, and there is no unversioned alias to point at instead.
+perl -0pi -e 's/Prune_\d+\.\d+\.\d+(?=_(?:aarch64|x64)(?:-setup|_en-US)?\.(?:dmg|exe|msi))/Prune_'"$version"'/g' README.md
+perl -0pi -e 's/prune-v\d+\.\d+\.\d+(?=-<target>)/prune-v'"$version"'/g' README.md
+
 # Keep Cargo.lock in step so the commit is complete.
 cargo metadata --format-version 1 >/dev/null
 
 echo "Version set to $version:"
 grep -m1 '"version"' package.json
 grep -A1 '^\[workspace.package\]' Cargo.toml | grep version
+grep -c "Prune_$version" README.md | sed 's/^/README download links: /'
 echo
 echo "Next: update CHANGELOG.md, commit, then tag v$version."
