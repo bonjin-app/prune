@@ -165,6 +165,10 @@ build, but both are a reason to sign before a release anyone else is expected to
   gh workflow run winget-validate.yml --ref main
   ```
 
+  Only the MSI is listed. `winget install` never sees the NSIS installer exit, on a clean
+  machine as well as a used one — [issue #1](https://github.com/bonjin-app/prune/issues/1).
+  Putting it back means re-adding it to the manifest and to the workflow at the same time.
+
   They are not in [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs) yet, so
   `winget install Prune` finds nothing; the README says so rather than printing a command that
   fails. Submitting means opening a pull request there, which the validation pipeline then

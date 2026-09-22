@@ -54,22 +54,11 @@ jobs:
 
       # Installing proves the manifest points at something that actually installs, which is the
       # half of the pull request checklist that validation alone does not cover.
-      # Both installers are listed in the manifest, and winget picks one; installing at each
-      # scope exercises both entries and both checksums rather than whichever it prefers.
       # --silent, not the default SilentWithProgress: the runner has no interactive desktop for
       # an installer's progress window to appear on, and one that waits for it never returns.
-      - name: Install the NSIS package (user scope)
-        timeout-minutes: 8
-        run: >
-          winget install --manifest packaging/winget --scope user --silent --verbose-logs
-          --accept-package-agreements --accept-source-agreements --disable-interactivity
-
-      - name: Show what was installed
-        run: winget list --name Prune --accept-source-agreements --disable-interactivity
-
-      - name: Uninstall the NSIS package
-        run: winget uninstall --name Prune --silent --disable-interactivity
-
+      #
+      # Only the MSI is exercised, because only the MSI is in the manifest. Putting the NSIS
+      # installer back means re-adding it here as well; see issue #1.
       - name: Install the MSI (machine scope)
         timeout-minutes: 8
         run: >

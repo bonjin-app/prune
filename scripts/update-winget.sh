@@ -25,16 +25,14 @@ repo="bonjin-app/prune"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
-exe="Prune_${version}_x64-setup.exe"
+# Only the MSI is listed in the manifest; see the comment there for why the NSIS installer is
+# not.
 msi="Prune_${version}_x64_en-US.msi"
-for f in "$exe" "$msi"; do
-  url="https://github.com/$repo/releases/download/v$version/$f"
-  echo "fetching $url"
-  curl -fsSL --retry 3 -o "$tmp/$f" "$url"
-done
+url="https://github.com/$repo/releases/download/v$version/$msi"
+echo "fetching $url"
+curl -fsSL --retry 3 -o "$tmp/$msi" "$url"
 
 # WinGet writes checksums in upper case.
-exe_sha="$(shasum -a 256 "$tmp/$exe" | cut -d' ' -f1 | tr 'a-f' 'A-F')"
 msi_sha="$(shasum -a 256 "$tmp/$msi" | cut -d' ' -f1 | tr 'a-f' 'A-F')"
 product_code="$(python3 "$root/scripts/msi-property.py" "$tmp/$msi" ProductCode)"
 released="$(date -u +%Y-%m-%d)"
@@ -48,9 +46,6 @@ for f in "$dir"/*.yaml; do
   perl -0pi -e 's/(InstallerSha256: )[0-9A-F]{64}(?=\s*$)/${1}PLACEHOLDER/gm'          "$f"
 done
 
-# Two installers, two checksums: the first InstallerSha256 belongs to the .exe, the second to
-# the .msi, in the order they appear under Installers.
-perl -0pi -e 's/PLACEHOLDER/'"$exe_sha"'/'                                             "$dir/PruneContributors.Prune.installer.yaml"
 perl -0pi -e 's/PLACEHOLDER/'"$msi_sha"'/'                                             "$dir/PruneContributors.Prune.installer.yaml"
 perl -0pi -e "s/(ProductCode: ')[^']*(')/\${1}$product_code\${2}/"                     "$dir/PruneContributors.Prune.installer.yaml"
 
