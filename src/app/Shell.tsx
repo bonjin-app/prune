@@ -1,4 +1,4 @@
-import { TopBar } from "./TopBar";
+import { Sidebar } from "./Sidebar";
 import { useUi } from "@/stores/ui";
 import { DashboardView } from "@/features/dashboard/DashboardView";
 import { CleanerView } from "@/features/cleaner/CleanerView";
@@ -37,9 +37,11 @@ function CurrentView() {
 export function Shell() {
   const view = useUi((s) => s.view);
   return (
-    <div className="flex h-full w-full flex-col bg-bg">
-      <TopBar />
-      <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div className="flex h-full w-full">
+      <Sidebar />
+      <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-bg">
+        {/* Drag region under the traffic lights on macOS. */}
+        <div className="h-3 shrink-0" data-tauri-drag-region />
         <div key={view} className="fade-in min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-[1080px]">
             <CurrentView />
