@@ -6,6 +6,10 @@ All notable changes to Prune are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- The macOS disk image demanded that the MIT licence be agreed to before it would mount. `licenseFile` applies to every bundle at once — there is no per-installer setting in Tauri 2 — and on macOS that becomes a modal agreement, so `hdiutil attach` on the published `.dmg` answered "attach canceled" and any scripted install, Homebrew casks included, stopped there. MIT grants rights rather than asking for assent, so presenting it as something to accept was wrong twice over. The licence still ships: in the repository, in the command-line archives, and named in the application's own copyright string.
+
 ## [0.1.0] - 2026-09-21
 
 The first release. Everything below is what Prune does on day one — there is no earlier version

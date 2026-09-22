@@ -56,8 +56,7 @@
     },
     "copyright": "MIT licensed. Copyright 2026 Prune contributors.",
     "publisher": "Prune contributors",
-    "homepage": "https://github.com/bonjin-app/prune",
-    "licenseFile": "../LICENSE"
+    "homepage": "https://github.com/bonjin-app/prune"
   },
   "mainBinaryName": "prune-desktop"
 }
