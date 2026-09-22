@@ -27,49 +27,26 @@ jobs:
           Invoke-WebRequest $url -OutFile setup.exe
           Get-Item setup.exe | Format-List Name, Length
 
-      # The installer itself returns in seconds, so what winget waited on has to be something
-      # the installer left running. Tauri's NSIS starts the application when it finishes.
-      - name: /S — does it leave the app running?
+      # winget hangs waiting for this installer even on a clean machine, while the installer
+      # process itself returns in seconds. So something it starts outlives it: winget waits on
+      # the whole tree, Start-Process -Wait does not. This lists what is still there.
+      - name: What does /S leave behind?
         shell: pwsh
         run: |
+          $before = (Get-CimInstance Win32_Process | Select-Object -ExpandProperty ProcessId)
           $p = Start-Process -FilePath .\setup.exe -ArgumentList '/S' -PassThru
-          if (-not $p.WaitForExit(120000)) { Write-Host "installer itself hung"; exit 1 }
+          if (-not $p.WaitForExit(120000)) { Write-Host "the installer itself hung"; exit 1 }
           Write-Host "installer exited with $($p.ExitCode)"
-          Start-Sleep -Seconds 5
-          $app = Get-Process prune-desktop -ErrorAction SilentlyContinue
-          if ($app) {
-            Write-Host "LEFT RUNNING: prune-desktop pid $($app.Id -join ', ')"
-            Stop-Process -Name prune-desktop -Force
-          } else {
-            Write-Host "nothing left running"
-          }
-
-      - name: Uninstall before the second attempt
-        shell: pwsh
-        run: |
-          $u = "$env:LOCALAPPDATA\Prune\uninstall.exe"
-          if (Test-Path $u) {
-            $p = Start-Process -FilePath $u -ArgumentList '/S' -PassThru
-            $null = $p.WaitForExit(120000)
-            Write-Host "uninstaller exited with $($p.ExitCode)"
-          }
-          Start-Sleep -Seconds 3
-
-      # Tauri's NSIS documents /NS as "do not start the application afterwards".
-      - name: /S /NS — does that stop it?
-        shell: pwsh
-        run: |
-          $p = Start-Process -FilePath .\setup.exe -ArgumentList '/S','/NS' -PassThru
-          if (-not $p.WaitForExit(120000)) { Write-Host "installer itself hung"; exit 1 }
-          Write-Host "installer exited with $($p.ExitCode)"
-          Start-Sleep -Seconds 5
-          $app = Get-Process prune-desktop -ErrorAction SilentlyContinue
-          if ($app) {
-            Write-Host "STILL LEFT RUNNING: prune-desktop pid $($app.Id -join ', ')"
-            Stop-Process -Name prune-desktop -Force
-            exit 1
-          }
-          Write-Host "nothing left running"
+          Start-Sleep -Seconds 10
+          Write-Host "--- processes that exist now and did not before ---"
+          Get-CimInstance Win32_Process |
+            Where-Object { $before -notcontains $_.ProcessId } |
+            Select-Object ProcessId, ParentProcessId, Name, CommandLine |
+            Format-List
+          Write-Host "--- anything still holding the installer or its folder ---"
+          Get-CimInstance Win32_Process |
+            Where-Object { $_.CommandLine -and ($_.CommandLine -match 'setup|Prune|nsis|webview' ) } |
+            Select-Object ProcessId, Name, CommandLine | Format-List
 
       - name: What landed on disk
         if: always()
