@@ -150,8 +150,18 @@ The `prune` command line ships from the same release, as
 [`prune-v0.1.3-<target>.tar.gz`](https://github.com/bonjin-app/prune/releases/latest) (`.zip` on
 Windows). Unpack it and put `prune` on your `PATH`.
 
-All releases: [GitHub Releases](https://github.com/bonjin-app/prune/releases). Homebrew, WinGet
-and Scoop are planned.
+On macOS, Homebrew can install the same disk image for you:
+
+```bash
+brew install --cask https://raw.githubusercontent.com/bonjin-app/prune/main/packaging/homebrew/Casks/prune.rb
+```
+
+That installs and uninstalls cleanly, but `brew upgrade` will not see new versions, because a
+cask installed from a URL belongs to no tap. A `bonjin-app/tap` to install from is the next
+step.
+
+All releases: [GitHub Releases](https://github.com/bonjin-app/prune/releases). WinGet and Scoop
+are planned.
 
 ### These builds are not signed yet
 

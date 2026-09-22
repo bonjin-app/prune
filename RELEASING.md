@@ -122,5 +122,19 @@ build, but both are a reason to sign before a release anyone else is expected to
 ## 6. Afterwards
 
 - Open a new `## [Unreleased]` section in `CHANGELOG.md`.
-- Package manager manifests (Homebrew, WinGet, Scoop) are not published yet. They need a
-  released artifact to point at, so they come after the first public release.
+- Point the Homebrew cask at the release you just published:
+
+  ```bash
+  scripts/update-cask.sh 0.2.0
+  git commit -am "chore: point the cask at 0.2.0"
+  ```
+
+  A cask carries the checksum of the file it installs, so this cannot happen in step 2 with the
+  rest of the version bump — the artifact does not exist yet. The script downloads both disk
+  images from the release and writes their real checksums, rather than trusting a local build
+  that happens to share the version number.
+
+  `packaging/homebrew/Casks/prune.rb` is the source of truth. Publishing it to a tap means
+  copying it into a `bonjin-app/homebrew-tap` repository, which does not exist yet; until it
+  does, the README tells people to install from the raw file, which works but does not upgrade.
+- WinGet and Scoop manifests are not written yet.
