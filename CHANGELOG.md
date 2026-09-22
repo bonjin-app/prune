@@ -6,6 +6,32 @@ All notable changes to Prune are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-09-22
+
+The interface, laid out as a utility rather than as an administration console. Nothing about
+what Prune finds or removes has changed.
+
+### Changed
+
+- The column of eight labelled destinations down the left is now a thin strip along the top. A
+  sidebar makes every screen feel like a page in a site; a utility is something you point at a
+  machine, so there is one place to stand and the rest stays out of the way.
+- The home screen is one figure and one action — how much can be reclaimed, at a size you can
+  read across a desk, with the button under it. It was previously three equal panels of live
+  readings, a list and a history box, each bordered and shadowed alike, so nothing was more
+  important than anything else and the only action was a small button in the corner of a card.
+  The live readings are now a quiet line at the foot, where context belongs.
+- Cards lost their shadow and softened their border, which was most of why every box on every
+  screen carried the same weight.
+- The cleaner's three separate clusters of controls became one bar, and the button that starts
+  the work carries the number that makes it mean something: "Review 6 · 7.37 GB" rather than a
+  bare "Review" beside a "Found 10.6 GB" label. Its rows, and the process table's, have room to
+  be read rather than being packed like a spreadsheet.
+- Startup no longer spends its right-hand column — where a row puts what you act on — on
+  whether an item is a launch agent or a launch daemon.
+- A disk scan reports its total first instead of chaining the total, the file count, the folder
+  count and the scan duration together as though they mattered equally.
+
 ## [0.1.1] - 2026-09-22
 
 A packaging fix. Nothing about what Prune does has changed; if 0.1.0 is installed and running,
@@ -94,6 +120,7 @@ rather than regressions anyone shipped.
 - IPC integration tests on Tauri's mock runtime covering the real command surface, including a full disk scan → preview → execute → operation log cycle.
 - A `prune` command line built on the same engine: `status`, `providers`, `scan`, `clean`, `disk`, `apps`, `startup` and `log`, each with `--json` for scripting and meaningful exit codes. `clean` is a dry run unless `--yes` is passed and never selects anything riskier than low on its own. The read-only example prototypes it replaces have been removed.
 
-[unreleased]: https://github.com/bonjin-app/prune/compare/v0.1.1...HEAD
+[unreleased]: https://github.com/bonjin-app/prune/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/bonjin-app/prune/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/bonjin-app/prune/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/bonjin-app/prune/releases/tag/v0.1.0
