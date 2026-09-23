@@ -177,4 +177,20 @@ build, but both are a reason to sign before a release anyone else is expected to
   ```powershell
   wingetcreate submit --token <github-token> packaging\winget
   ```
+
+  0.1.3 went as far as that pipeline:
+  [microsoft/winget-pkgs#438805](https://github.com/microsoft/winget-pkgs/pull/438805) was
+  labelled `Azure-Pipeline-Passed` and `Validation-Completed`, so these manifests install on
+  Microsoft's own machines as well as ours. It was then withdrawn, because the account had not
+  signed Microsoft's Contributor License Agreement, and a pull request cannot be merged until it
+  has. Three things to know before submitting again:
+
+  - The CLA is signed by the account owner replying `@microsoft-github-policy-service agree` on
+    the pull request, once per account. It is an agreement made in that person's name, so it
+    cannot be done on their behalf.
+  - Submit the manifests without the explanatory comments they carry here, keeping only the
+    schema header on the first line. winget-pkgs expects its manifests to look generated, and a
+    file containing any non-ASCII character must also carry a UTF-8 byte order mark.
+  - The pull request template asks for 1.12; these are 1.10. Say why in the pull request rather
+    than ticking the box — see the schema note above.
 - Scoop manifests are not written yet.
