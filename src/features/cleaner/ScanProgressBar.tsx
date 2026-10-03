@@ -1,5 +1,5 @@
 import { useScan } from "@/stores/scan";
-import { formatBytes, formatCount } from "@/lib/format";
+import { formatBytes, plural } from "@/lib/format";
 import { Spinner } from "@/components/ui/Spinner";
 
 export function ScanProgressBar({ providerIds }: { providerIds: string[] }) {
@@ -20,7 +20,7 @@ export function ScanProgressBar({ providerIds }: { providerIds: string[] }) {
         <Spinner size={13} className="text-accent" />
         <span className="font-medium">Scanning{name ? ` ${name}` : ""}…</span>
         <span className="ml-auto text-fg-muted tnum">
-          {formatCount(files)} files · {formatBytes(bytes)}
+          {plural(files, "file")} · {formatBytes(bytes)}
         </span>
       </div>
       <div

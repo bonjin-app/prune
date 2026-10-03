@@ -2,7 +2,7 @@ import { memo, useMemo, useState } from "react";
 import { ChevronRight, GitBranch } from "lucide-react";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { cn } from "@/lib/cn";
-import { formatBytes, formatCount } from "@/lib/format";
+import { formatBytes, plural } from "@/lib/format";
 import { useScan } from "@/stores/scan";
 import { TargetRow } from "./ProviderGroup";
 import { daysSince, describeActivity, STALE_DAYS, type Project } from "./projects";
@@ -87,7 +87,7 @@ export const ProjectSection = memo(function ProjectSection({ project }: { projec
           </div>
         </div>
         <div className="w-[60px] text-right text-[11px] text-fg-faint tnum">
-          {formatCount(project.targets.length)} items
+          {plural(project.targets.length, "item")}
         </div>
         <div className="w-[76px] text-right text-[12.5px] font-medium tnum">
           {formatBytes(project.sizeBytes)}

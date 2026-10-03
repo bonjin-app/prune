@@ -2,7 +2,7 @@ import { CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { cn } from "@/lib/cn";
-import { abbreviatePath, formatBytes, formatCount } from "@/lib/format";
+import { abbreviatePath, formatBytes, plural } from "@/lib/format";
 import { useScan } from "@/stores/scan";
 import { useSystem } from "@/stores/system";
 
@@ -37,8 +37,7 @@ export function ResultDialog() {
           {formatBytes(result.removedBytes)}
         </div>
         <p className="text-[12.5px] text-fg-muted">
-          {formatCount(result.removedFiles)} files in {result.removedTargets} item
-          {result.removedTargets === 1 ? "" : "s"}{" "}
+          {plural(result.removedFiles, "file")} in {plural(result.removedTargets, "item")}{" "}
           {result.mode === "trash" ? "moved to the Trash" : "deleted permanently"}.
         </p>
         {result.logError && (

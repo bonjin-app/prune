@@ -96,6 +96,8 @@ describe("describeActivity", () => {
     expect(describeActivity(1)).toBe("worked on yesterday");
     expect(describeActivity(12)).toBe("12 days since work");
     expect(describeActivity(90)).toBe("3 months since work");
+    // A month and a bit is one month, not "1 months".
+    expect(describeActivity(35)).toBe("1 month since work");
     expect(describeActivity(400)).toBe("over a year since work");
   });
 });

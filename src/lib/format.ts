@@ -18,7 +18,15 @@ export function formatBytes(bytes: number, digits?: number): string {
 export function splitBytes(bytes: number): [string, string] {
   const s = formatBytes(bytes);
   const i = s.lastIndexOf(" ");
-  return [s.slice(0, i), s.slice(i + 1)];
+  return i === -1 ? [s, ""] : [s.slice(0, i), s.slice(i + 1)];
+}
+
+/**
+ * "1 file", "2 files". A count with the wrong noun reads as a bug even when the number is
+ * right, and every count in the interface goes through here so none of them can.
+ */
+export function plural(n: number, one: string, many = `${one}s`): string {
+  return `${formatCount(n)} ${n === 1 ? one : many}`;
 }
 
 export function formatPercent(value: number, digits = 0): string {
@@ -39,37 +47,60 @@ export function formatDuration(seconds: number): string {
   return `${m}m`;
 }
 
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/**
+ * `2026-09-04 03:36`, in local time.
+ *
+ * Deliberately not the system locale's format: the interface is English, and on a Korean system
+ * the locale format is "2026. 09. 04. 오전 03:36" — another language in the middle of an English
+ * sentence, and long enough to wrap a table cell onto three lines.
+ */
 export function formatDateTime(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return new Intl.DateTimeFormat(undefined, {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(d);
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
+    `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  );
 }
 
-export function formatRelative(iso: string): string {
+/**
+ * "3d ago", "2mo ago", "1y ago" — the same short shape at every age.
+ *
+ * It used to give up after thirty days and print the full date and time, so a list of caches
+ * read "26d ago" on one row and a three-line timestamp on the next. A cache two months old is
+ * described well enough by "2mo ago"; the exact minute it was last written is noise.
+ */
+export function formatRelative(iso: string, now: number = Date.now()): string {
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return iso;
-  const diff = Date.now() - then;
-  const mins = Math.round(diff / 60000);
+  // A timestamp slightly in the future is clock skew, not time travel.
+  const mins = Math.round(Math.max(0, now - then) / 60000);
   if (mins < 1) return "just now";
   if (mins < 60) return `${mins}m ago`;
   const hours = Math.round(mins / 60);
   if (hours < 24) return `${hours}h ago`;
   const days = Math.round(hours / 24);
   if (days < 30) return `${days}d ago`;
-  return formatDateTime(iso);
+  if (days < 365) return `${Math.max(1, Math.round(days / 30.44))}mo ago`;
+  return `${Math.floor(days / 365.25)}y ago`;
 }
 
-/** Replaces the home directory prefix with `~` for compact display. */
+/**
+ * Replaces the home directory prefix with `~` for compact display.
+ *
+ * Only at a path boundary: with a home of `/Users/dev`, `/Users/developer/x` is someone else's
+ * folder, not `~eloper/x`.
+ */
 export function abbreviatePath(path: string, home: string | null | undefined): string {
-  if (home && path.startsWith(home)) {
-    const rest = path.slice(home.length);
-    return `~${rest}`;
+  if (!home) return path;
+  const base = home.replace(/[/\\]+$/, "");
+  if (!base) return path;
+  if (path === base) return "~";
+  const next = path.charAt(base.length);
+  if (path.startsWith(base) && (next === "/" || next === "\\")) {
+    return `~${path.slice(base.length)}`;
   }
   return path;
 }

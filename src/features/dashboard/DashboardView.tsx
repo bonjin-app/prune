@@ -5,7 +5,7 @@ import { PermissionBanner } from "@/components/ui/PermissionBanner";
 import { Spinner } from "@/components/ui/Spinner";
 import { cn } from "@/lib/cn";
 import { InsightsCard } from "./InsightsCard";
-import { formatBytes, formatPercent, formatRelative } from "@/lib/format";
+import { formatBytes, formatPercent, formatRelative, splitBytes } from "@/lib/format";
 import { useScan } from "@/stores/scan";
 import { startSnapshotPolling, useSystem } from "@/stores/system";
 import { useUi } from "@/stores/ui";
@@ -175,11 +175,4 @@ function Reading({ label, value, pct }: { label: string; value: string; pct: num
       </dd>
     </div>
   );
-}
-
-/** "44.0 GB" → ["44.0", "GB"], so the unit can sit at its own size beside the figure. */
-function splitBytes(bytes: number): [string, string] {
-  const text = formatBytes(bytes);
-  const at = text.lastIndexOf(" ");
-  return at === -1 ? [text, ""] : [text.slice(0, at), text.slice(at + 1)];
 }

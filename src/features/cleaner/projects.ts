@@ -1,3 +1,4 @@
+import { plural } from "@/lib/format";
 import type { CleanupTarget, TargetGroup } from "@/types/models";
 
 /** One project, with everything it is holding. */
@@ -67,6 +68,6 @@ export function describeActivity(days: number | null): string {
   if (days === 0) return "worked on today";
   if (days === 1) return "worked on yesterday";
   if (days < 30) return `${days} days since work`;
-  if (days < 365) return `${Math.round(days / 30)} months since work`;
+  if (days < 365) return `${plural(Math.max(1, Math.round(days / 30)), "month")} since work`;
   return `over a year since work`;
 }

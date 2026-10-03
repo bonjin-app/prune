@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { RiskBadge } from "@/components/ui/RiskBadge";
 import { Spinner } from "@/components/ui/Spinner";
 import { cn } from "@/lib/cn";
-import { abbreviatePath, formatBytes, formatCount, formatRelative } from "@/lib/format";
+import { abbreviatePath, formatBytes, formatRelative, plural } from "@/lib/format";
 import { backend } from "@/lib/tauri";
 import { SIZE_FILTERS, useDisk, type DiskTab } from "@/stores/disk";
 import { useScan } from "@/stores/scan";
@@ -24,6 +24,9 @@ export function DiskView() {
   const cancelScan = useDisk((s) => s.cancelScan);
   const tab = useDisk((s) => s.tab);
   const setTab = useDisk((s) => s.setTab);
+  // The tab counts what the tab shows. The analyzer's own count is taken at a different
+  // threshold from the size filter, so it said 11 above a list of 9.
+  const largeFileCount = useDisk((s) => s.largeFiles.length);
   const info = useSystem((s) => s.info);
   const home = info?.homeDir;
 
@@ -76,7 +79,7 @@ export function DiskView() {
               Analyzing {abbreviatePath(root || home || "", home)}…
             </span>
             <span className="ml-auto text-fg-muted tnum">
-              {formatCount(progress?.files ?? 0)} files · {formatCount(progress?.dirs ?? 0)} folders
+              {plural(progress?.files ?? 0, "file")} · {plural(progress?.dirs ?? 0, "folder")}
               · {formatBytes(progress?.bytes ?? 0)}
             </span>
           </div>
@@ -105,8 +108,8 @@ export function DiskView() {
               id="large"
               current={tab}
               onSelect={setTab}
-              label={`Large Files`}
-              count={summary.largeFileCount}
+              label="Large Files"
+              count={largeFileCount}
             />
             <Tab id="types" current={tab} onSelect={setTab} label="File Types" />
             {/*
@@ -119,7 +122,7 @@ export function DiskView() {
                 {formatBytes(summary.totalBytes)}
               </span>
               <span className="text-fg-faint">
-                in {formatCount(summary.fileCount)} files
+                in {plural(summary.fileCount, "file")}
               </span>
               {summary.status === "cancelled" && (
                 <span className="text-warn">stopped early, partial</span>
@@ -218,7 +221,7 @@ function FolderTree() {
           <div className="w-[38%] min-w-0">
             <div className="truncate text-[12.5px] font-medium">{c.name}</div>
             <div className="truncate text-[11px] text-fg-faint tnum">
-              {formatCount(c.fileCount)} files · {formatCount(c.dirCount)} folders
+              {plural(c.fileCount, "file")} · {plural(c.dirCount, "folder")}
             </div>
           </div>
           <div className="flex-1">
@@ -364,7 +367,7 @@ function LargeFiles() {
               </button>
             </>
           ) : (
-            `${files.length} files`
+            plural(files.length, "file")
           )}
         </div>
         <Button
@@ -474,7 +477,7 @@ function FileTypes() {
             </div>
           </div>
           <div className="w-[80px] text-right text-[11px] text-fg-faint tnum">
-            {formatCount(e.count)} files
+            {plural(e.count, "file")}
           </div>
           <div className="w-[52px] text-right text-[11px] text-fg-faint tnum">
             {summary.totalBytes > 0 ? `${((e.bytes / summary.totalBytes) * 100).toFixed(1)}%` : ""}

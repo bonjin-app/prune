@@ -28,7 +28,7 @@ export function MonitorView() {
     <div className="pb-8">
       <PageHeader
         title="Monitor"
-        description="Live CPU, memory, disk and process activity. Read-only."
+        description="Live CPU, memory, disk and process activity. Stopping a process always asks first."
       />
       <div className="grid grid-cols-2 gap-3 px-7">
         <Card>

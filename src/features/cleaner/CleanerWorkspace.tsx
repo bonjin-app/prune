@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { cn } from "@/lib/cn";
 import { PermissionBanner } from "@/components/ui/PermissionBanner";
-import { formatBytes } from "@/lib/format";
+import { formatBytes, plural } from "@/lib/format";
 import { filterResults, selectedTargets, sumBytes, useScan } from "@/stores/scan";
 import type { Category, ProviderInfo } from "@/types/models";
 import { ProviderGroup } from "./ProviderGroup";
@@ -230,7 +230,7 @@ export function CleanerWorkspace({
           ? ""
           : session
             ? hasResults
-              ? `Scan finished. ${formatBytes(scopedTotal)} in ${totalTargets} items.`
+              ? `Scan finished. ${formatBytes(scopedTotal)} in ${plural(totalTargets, "item")}.`
               : "Scan finished. Nothing to remove here."
             : ""}
       </span>

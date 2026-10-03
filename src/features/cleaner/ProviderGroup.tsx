@@ -3,7 +3,7 @@ import { AlertCircle, ChevronRight, FolderOpen } from "lucide-react";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { RiskBadge } from "@/components/ui/RiskBadge";
 import { cn } from "@/lib/cn";
-import { abbreviatePath, formatBytes, formatCount, formatRelative } from "@/lib/format";
+import { abbreviatePath, formatBytes, formatRelative, plural } from "@/lib/format";
 import { backend } from "@/lib/tauri";
 import { useScan } from "@/stores/scan";
 import { useSystem } from "@/stores/system";
@@ -100,7 +100,7 @@ export const ProviderGroup = memo(function ProviderGroup({ result }: { result: S
           <div className="text-[11px] text-fg-faint">
             {selectedCount > 0
               ? `${formatBytes(selectedBytes)} selected`
-              : `${formatCount(result.targets.length)} items · ${formatCount(result.totalFiles)} files`}
+              : `${plural(result.targets.length, "item")} · ${plural(result.totalFiles, "file")}`}
           </div>
         </div>
       </header>
@@ -195,7 +195,7 @@ export const TargetRow = memo(function TargetRow({ target, indent = false }: { t
         {target.modifiedAt ? formatRelative(target.modifiedAt) : ""}
       </div>
       <div className="w-[60px] text-right text-[11px] text-fg-faint tnum">
-        {target.kind === "directory" ? `${formatCount(target.fileCount)} files` : "file"}
+        {target.kind === "directory" ? plural(target.fileCount, "file") : "file"}
       </div>
       <div className="w-[76px] text-right text-[12.5px] font-medium tnum">
         {formatBytes(target.sizeBytes)}
