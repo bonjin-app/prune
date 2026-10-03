@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { act } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -131,5 +131,64 @@ describe("UninstallerView", () => {
     showDetail([factory.appItem("application", "medium", 500)]);
     expect(screen.getByRole("button", { name: /Uninstall|Remove leftovers/ })).toBeDisabled();
     expect(backend.cleanerPreview).not.toHaveBeenCalled();
+  });
+});
+
+describe("UninstallerView list", () => {
+  const zed = factory.application({ id: "zed", name: "Zed" });
+  const alpha = factory.application({ id: "alpha", name: "Alpha" });
+  const mid = factory.application({ id: "mid", name: "Mid" });
+
+  function showList(apps: ReturnType<typeof factory.application>[], measuring: boolean) {
+    act(() =>
+      useApps.setState({
+        apps,
+        selectedId: null,
+        detail: null,
+        loading: false,
+        measuring,
+        progress: null,
+        query: "",
+        error: null,
+      }),
+    );
+    return render(<UninstallerView />);
+  }
+
+  const order = () =>
+    screen
+      .getAllByRole("button")
+      .map((b) => within(b).queryByText(/^(Zed|Alpha|Mid)$/)?.textContent)
+      .filter(Boolean);
+
+  it("holds rows still while sizes are still arriving", () => {
+    // Zed has been measured and is the biggest; sorting by size now would move it to the top
+    // and every row below it down, under the pointer.
+    showList([zed, alpha, mid], true);
+    act(() => useApps.setState({ apps: [{ ...zed, sizeBytes: 9_000_000 }, alpha, mid] }));
+    expect(order()).toEqual(["Alpha", "Mid", "Zed"]);
+  });
+
+  it("puts the biggest first once measuring is over", () => {
+    showList(
+      [
+        { ...zed, sizeBytes: 9_000_000 },
+        { ...alpha, sizeBytes: 1_000 },
+        { ...mid, sizeBytes: 500_000 },
+      ],
+      false,
+    );
+    expect(order()).toEqual(["Zed", "Mid", "Alpha"]);
+  });
+
+  it("says a size is unknown instead of looking busy forever", () => {
+    showList([{ ...alpha, sizeBytes: undefined }], false);
+    expect(screen.getByTitle("Its size could not be measured")).toHaveTextContent("—");
+    expect(screen.queryByLabelText("Measuring")).toBeNull();
+  });
+
+  it("shows that a size is still coming while measuring", () => {
+    showList([{ ...alpha, sizeBytes: undefined }], true);
+    expect(screen.getByLabelText("Measuring")).toBeInTheDocument();
   });
 });

@@ -15,7 +15,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { RiskBadge } from "@/components/ui/RiskBadge";
 import { Spinner } from "@/components/ui/Spinner";
 import { cn } from "@/lib/cn";
-import { abbreviatePath, formatBytes, formatCount } from "@/lib/format";
+import { abbreviatePath, formatBytes, plural } from "@/lib/format";
 import { backend, errorMessage } from "@/lib/tauri";
 import { useApps } from "@/stores/apps";
 import { useScan } from "@/stores/scan";
@@ -45,10 +45,17 @@ export function UninstallerView() {
           (a) => a.name.toLowerCase().includes(q) || a.bundleId?.toLowerCase().includes(q),
         )
       : apps;
+    // Sizes arrive one application at a time. Sorting by them as they come in moved every row
+    // under the pointer, so a click could land on a different application from the one aimed
+    // at — or on none, when the row moved between press and release. Name order holds still
+    // while measuring; biggest first takes over once there is nothing left to arrive.
+    const byName = (a: ApplicationInfo, b: ApplicationInfo) => a.name.localeCompare(b.name);
     return [...list].sort(
-      (a, b) => (b.sizeBytes ?? -1) - (a.sizeBytes ?? -1) || a.name.localeCompare(b.name),
+      measuring
+        ? byName
+        : (a, b) => (b.sizeBytes ?? -1) - (a.sizeBytes ?? -1) || byName(a, b),
     );
-  }, [apps, query]);
+  }, [apps, query, measuring]);
 
   const totalBytes = apps.reduce((a, x) => a + (x.sizeBytes ?? 0), 0);
 
@@ -80,7 +87,7 @@ export function UninstallerView() {
             </button>
           </div>
           <div className="flex items-center justify-between px-3 py-1.5 text-[11px] text-fg-faint tnum">
-            <span>{formatCount(apps.length)} applications</span>
+            <span>{plural(apps.length, "application")}</span>
             <span>
               {measuring && progress
                 ? `measuring ${progress.done}/${progress.total}`
@@ -93,6 +100,7 @@ export function UninstallerView() {
                 key={a.id}
                 app={a}
                 active={a.id === selectedId}
+                measuring={measuring}
                 onSelect={() => void select(a.id)}
               />
             ))}
@@ -114,10 +122,12 @@ export function UninstallerView() {
 function AppRow({
   app,
   active,
+  measuring,
   onSelect,
 }: {
   app: ApplicationInfo;
   active: boolean;
+  measuring: boolean;
   onSelect: () => void;
 }) {
   return (
@@ -141,9 +151,19 @@ function AppRow({
           {app.version ?? app.bundleId ?? app.source}
         </div>
       </div>
-      <div className="text-[12px] text-fg-muted tnum">
-        {app.sizeBytes !== undefined ? formatBytes(app.sizeBytes) : "…"}
-      </div>
+      {app.sizeBytes !== undefined ? (
+        <div className="text-[12px] text-fg-muted tnum">{formatBytes(app.sizeBytes)}</div>
+      ) : measuring ? (
+        <div className="text-[12px] text-fg-faint" aria-label="Measuring">
+          …
+        </div>
+      ) : (
+        // Measuring is over and this one has no size: say so, rather than leaving the ellipsis
+        // that means "still working" there forever.
+        <div className="text-[12px] text-fg-faint" title="Its size could not be measured">
+          —
+        </div>
+      )}
     </button>
   );
 }
@@ -272,7 +292,7 @@ function AppDetailPane() {
           label="Select all"
         />
         <span className="text-fg-muted">
-          {chosen.length} of {detail.items.length} items · {formatBytes(chosenBytes)}
+          {chosen.length} of {plural(detail.items.length, "item")} · {formatBytes(chosenBytes)}
         </span>
         <div className="flex-1" />
         {platform === "windows" && detail.app.uninstallCommand && (
@@ -325,7 +345,7 @@ function AppDetailPane() {
                 <div className="flex items-baseline gap-1.5">
                   <span className="truncate text-[12.5px] font-medium">{item.kindLabel}</span>
                   <span className="shrink-0 text-[11px] text-fg-faint tnum">
-                    {t.kind === "directory" ? `${formatCount(t.fileCount)} files` : "file"}
+                    {t.kind === "directory" ? plural(t.fileCount, "file") : "file"}
                   </span>
                 </div>
                 <div className="truncate font-mono text-[11px] text-fg-faint">
