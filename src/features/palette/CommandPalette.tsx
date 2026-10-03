@@ -4,6 +4,7 @@ import { useCallback } from "react";
 import { Dialog } from "@/components/ui/Dialog";
 import { Kbd } from "@/components/ui/Kbd";
 import { ROUTES, SETTINGS_ROUTE } from "@/app/routes";
+import { useShortcutLabel } from "@/lib/keys";
 import { useDisk } from "@/stores/disk";
 import { useScan } from "@/stores/scan";
 import { useUi } from "@/stores/ui";
@@ -14,6 +15,7 @@ export function CommandPalette() {
   const setOpen = useUi((s) => s.setPaletteOpen);
   const setView = useUi((s) => s.setView);
   const setTheme = useUi((s) => s.setTheme);
+  const shortcut = useShortcutLabel();
   const providers = useScan((s) => s.providers);
   const startScan = useScan((s) => s.startScan);
   const scanning = useScan((s) => s.scanning);
@@ -103,7 +105,7 @@ export function CommandPalette() {
             {[...ROUTES, SETTINGS_ROUTE].map((r) => (
               <Item key={r.id} onSelect={run(() => setView(r.id))}>
                 <r.icon size={14} /> {r.label}
-                <span className="ml-auto text-[11px] text-fg-faint">⌘{r.shortcut}</span>
+                <span className="ml-auto text-[11px] text-fg-faint">{shortcut(r.shortcut)}</span>
               </Item>
             ))}
           </Command.Group>

@@ -1,4 +1,5 @@
 import { cn } from "@/lib/cn";
+import { shortcutAria, shortcutLabel } from "@/lib/keys";
 import { isTauri } from "@/lib/tauri";
 import { useSystem } from "@/stores/system";
 import { useUi } from "@/stores/ui";
@@ -9,6 +10,7 @@ import { Search } from "lucide-react";
 function NavItem({ route }: { route: Route }) {
   const view = useUi((s) => s.view);
   const setView = useUi((s) => s.setView);
+  const platform = useSystem((s) => s.meta?.platform);
   const active = view === route.id;
   const Icon = route.icon;
   return (
@@ -16,6 +18,7 @@ function NavItem({ route }: { route: Route }) {
       type="button"
       onClick={() => setView(route.id)}
       aria-current={active ? "page" : undefined}
+      aria-keyshortcuts={route.ready ? shortcutAria(platform, route.shortcut) : undefined}
       className={cn(
         "group flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[13px] transition-colors",
         active
@@ -34,8 +37,13 @@ function NavItem({ route }: { route: Route }) {
           soon
         </span>
       ) : (
-        <span className="text-[10px] text-fg-faint opacity-0 transition-opacity group-hover:opacity-100">
-          ⌘{route.shortcut}
+        // The hint is for the eye; aria-keyshortcuts says the same thing to a screen reader
+        // without making it part of the item's name ("Dashboard, command 1").
+        <span
+          aria-hidden="true"
+          className="text-[10px] text-fg-faint opacity-0 transition-opacity group-hover:opacity-100"
+        >
+          {shortcutLabel(platform, route.shortcut)}
         </span>
       )}
     </button>
@@ -62,11 +70,14 @@ export function Sidebar() {
         <button
           type="button"
           onClick={() => setPaletteOpen(true)}
+          aria-keyshortcuts={shortcutAria(platform, "k")}
           className="flex w-full items-center gap-2 rounded-md border border-line bg-surface/60 px-2.5 py-1.5 text-left text-[12px] text-fg-faint hover:border-line-strong hover:text-fg-muted"
         >
-          <Search size={13} />
+          <Search size={13} aria-hidden="true" />
           <span className="flex-1">Search or run…</span>
-          <Kbd>⌘K</Kbd>
+          <span aria-hidden="true">
+            <Kbd>{shortcutLabel(platform, "k")}</Kbd>
+          </span>
         </button>
       </div>
 
