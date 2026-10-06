@@ -194,7 +194,9 @@ export const TargetRow = memo(function TargetRow({ target, indent = false }: { t
       <div className="w-[64px] text-right text-[11px] text-fg-faint tnum">
         {target.modifiedAt ? formatRelative(target.modifiedAt) : ""}
       </div>
-      <div className="w-[60px] text-right text-[11px] text-fg-faint tnum">
+      {/* One line, however many digits: "43,750 files" split over two was the loudest thing in
+          the row. The path beside it gives way instead, since it already truncates. */}
+      <div className="w-[92px] whitespace-nowrap text-right text-[11px] text-fg-faint tnum">
         {target.kind === "directory" ? plural(target.fileCount, "file") : "file"}
       </div>
       <div className="w-[76px] text-right text-[12.5px] font-medium tnum">

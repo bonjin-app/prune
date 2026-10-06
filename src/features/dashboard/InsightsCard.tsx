@@ -31,8 +31,10 @@ export function InsightsCard() {
     setView(insight.view);
   };
 
+  // The card owns its own gap above it. It returns nothing when there is nothing to say, and a
+  // margin on the caller would then leave an empty stripe above whatever comes next.
   return (
-    <Card>
+    <Card className="mt-8">
       <CardHeader
         title={
           <span className="flex items-center gap-1.5">
