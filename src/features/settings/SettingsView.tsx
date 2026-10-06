@@ -58,9 +58,10 @@ export function SettingsView() {
           <CardHeader
             title="Removal"
             subtitle={
-              platform === "windows"
-                ? "How selected items are removed."
-                : `How selected items are removed. Items already in the ${trash} are always deleted permanently.`
+              (platform === "windows"
+                ? "How selected items are removed. "
+                : `How selected items are removed. Items already in the ${trash} are always deleted permanently. `) +
+              "Prune starts every run with the recoverable option; permanent deletion lasts until you quit."
             }
           />
           <div className="px-4 pb-4">

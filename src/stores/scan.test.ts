@@ -320,10 +320,11 @@ describe("execute", () => {
 });
 
 describe("delete mode", () => {
-  it("remembers the choice", () => {
+  it("holds the choice for the run, and writes nothing down", () => {
+    // Surviving a restart is covered, with a fresh store each time, in deleteMode.test.ts.
     useScan.getState().setDeleteMode("permanent");
     expect(useScan.getState().deleteMode).toBe("permanent");
-    expect(localStorage.getItem("prune.deleteMode")).toBe("permanent");
+    expect(localStorage.getItem("prune.deleteMode")).toBeNull();
   });
 });
 

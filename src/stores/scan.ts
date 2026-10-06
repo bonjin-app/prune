@@ -15,17 +15,26 @@ import type {
   ScanSession,
 } from "@/types/models";
 
-const MODE_KEY = "prune.deleteMode";
+/**
+ * Removal always starts out recoverable.
+ *
+ * "Delete permanently" used to be remembered between runs, so choosing it once turned every later
+ * cleanup into one that cannot be undone, whenever Prune was next opened and whatever the person
+ * had since forgotten they chose. It now holds for the run it was chosen in and no longer.
+ *
+ * This key was where the old choice was kept. It is still read once — to be deleted, so that
+ * someone who had already switched is not carried into this run in the mode they left.
+ */
+const LEGACY_MODE_KEY = "prune.deleteMode";
 
-function loadMode(): DeleteMode {
+function forgetLegacyMode() {
   try {
-    const v = localStorage.getItem(MODE_KEY);
-    if (v === "trash" || v === "permanent") return v;
+    localStorage.removeItem(LEGACY_MODE_KEY);
   } catch {
-    /* ignore */
+    /* storage unavailable */
   }
-  return "trash";
 }
+forgetLegacyMode();
 
 /** Which risks the result list shows. */
 export type RiskFilter = "all" | "safe";
@@ -93,7 +102,7 @@ export const useScan = create<ScanState>((set, get) => ({
   progress: {},
   session: null,
   selected: new Set(),
-  deleteMode: loadMode(),
+  deleteMode: "trash",
   filter: "",
   riskFilter: "all",
   filterScope: null,
@@ -186,14 +195,7 @@ export const useScan = create<ScanState>((set, get) => ({
 
   clearSelection: () => set({ selected: new Set() }),
 
-  setDeleteMode: (deleteMode) => {
-    try {
-      localStorage.setItem(MODE_KEY, deleteMode);
-    } catch {
-      /* ignore */
-    }
-    set({ deleteMode });
-  },
+  setDeleteMode: (deleteMode) => set({ deleteMode }),
 
   setFilter: (filter, scope) => set((s) => ({ filter, filterScope: scope ?? s.filterScope })),
   setRiskFilter: (riskFilter) => set({ riskFilter }),
