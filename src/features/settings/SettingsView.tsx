@@ -5,6 +5,7 @@ import { ProjectRoots } from "./ProjectRoots";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { cn } from "@/lib/cn";
 import { formatBytes, formatCount, formatDateTime } from "@/lib/format";
+import { trashName } from "@/lib/wording";
 import { backend, isTauri } from "@/lib/tauri";
 import { useScan } from "@/stores/scan";
 import { useSystem } from "@/stores/system";
@@ -19,6 +20,8 @@ export function SettingsView() {
   const meta = useSystem((s) => s.meta);
   const info = useSystem((s) => s.info);
   const permissions = useSystem((s) => s.permissions);
+  const platform = meta?.platform;
+  const trash = trashName(platform);
   const [ops, setOps] = useState<OperationRecord[]>([]);
 
   useEffect(() => {
@@ -54,14 +57,18 @@ export function SettingsView() {
         <Card>
           <CardHeader
             title="Removal"
-            subtitle="How selected items are removed. Items already in the Trash are always deleted permanently."
+            subtitle={
+              platform === "windows"
+                ? "How selected items are removed."
+                : `How selected items are removed. Items already in the ${trash} are always deleted permanently.`
+            }
           />
           <div className="px-4 pb-4">
             <Segmented<DeleteMode>
               value={mode}
               onChange={setMode}
               options={[
-                ["trash", "Move to Trash (recoverable)"],
+                ["trash", `Move to ${trash} (recoverable)`],
                 ["permanent", "Delete permanently"],
               ]}
               danger="permanent"
@@ -92,7 +99,7 @@ export function SettingsView() {
                       <td className="py-1.5 text-fg-muted tnum">{formatDateTime(op.at)}</td>
                       <td className="py-1.5">{op.title}</td>
                       <td className="py-1.5 text-fg-muted">
-                        {op.mode === "trash" ? "Trash" : "Permanent"}
+                        {op.mode === "trash" ? trash : "Permanent"}
                       </td>
                       <td className="py-1.5 text-right tnum">{formatCount(op.removedFiles)}</td>
                       <td className="py-1.5 text-right font-medium tnum">

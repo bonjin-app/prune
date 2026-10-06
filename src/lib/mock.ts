@@ -826,13 +826,21 @@ function mockProcessName(pid: number): string | undefined {
   return MOCK_PROCESS_NAMES[((pid - 100) / 7) % MOCK_PROCESS_NAMES.length];
 }
 
+/**
+ * `?platform=windows` makes the browser mock report itself as Windows, so the wording and
+ * layout that differ there can be looked at without a Windows machine. Anything else is macOS.
+ */
+function mockPlatform(): "macos" | "windows" {
+  return new URLSearchParams(location.search).get("platform") === "windows" ? "windows" : "macos";
+}
+
 export const mockBackend: Backend = {
   async appGetMeta() {
     return {
       name: "Prune",
       version: "0.1.0-mock",
       coreVersion: "0.1.0",
-      platform: "macos",
+      platform: mockPlatform(),
       arch: "aarch64",
       debug: true,
       operationLogPath: `${HOME}/Library/Application Support/app.bonjin.prune/operations.jsonl`,
@@ -853,10 +861,11 @@ export const mockBackend: Backend = {
     console.info("[mock] open privacy settings");
   },
   async systemGetInfo() {
+    const windows = mockPlatform() === "windows";
     return {
-      platform: "macos",
-      osName: "macOS",
-      osVersion: "26.0",
+      platform: mockPlatform(),
+      osName: windows ? "Windows" : "macOS",
+      osVersion: windows ? "11" : "26.0",
       kernelVersion: "25.0.0",
       hostname: "dev-mac",
       arch: "aarch64",

@@ -6,6 +6,19 @@ All notable changes to Prune are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- On Windows the interface said "Move to Trash" on the button that puts things in the Recycle
+  Bin, and again in the confirmation, the result and the settings. It now uses the word the
+  platform uses. The cleaner's introduction also listed "the Trash" among the places Prune looks
+  through, which it does not do on Windows, where the Recycle Bin is not scanned; it no longer
+  says so there.
+
+### Changed
+
+- The browser preview (`pnpm dev`) accepts `?platform=windows` to show the Windows wording and
+  layout without a Windows machine.
+
 ## [0.1.4] - 2026-10-06
 
 The interface, corrected where walking every screen of it found something wrong. Nothing about

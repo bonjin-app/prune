@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Meter } from "@/components/ui/Meter";
 import { RiskBadge } from "@/components/ui/RiskBadge";
-import { abbreviatePath, formatBytes, formatCount } from "@/lib/format";
+import { abbreviatePath, formatBytes, formatCount, plural } from "@/lib/format";
+import { useTrashName } from "@/lib/wording";
 import { useScan } from "@/stores/scan";
 import { useSystem } from "@/stores/system";
 
@@ -14,6 +15,7 @@ export function PreviewDialog() {
   const executing = useScan((s) => s.executing);
   const progress = useScan((s) => s.cleanupProgress);
   const home = useSystem((s) => s.info?.homeDir);
+  const trash = useTrashName();
 
   if (!plan) return null;
   const permanent = plan.mode === "permanent";
@@ -37,7 +39,7 @@ export function PreviewDialog() {
             <h2 className="text-[15px] font-semibold tracking-tight">Preview Cleanup</h2>
             <p className="mt-0.5 text-[12.5px] text-fg-muted">
               Nothing has been removed yet. Review what Prune would{" "}
-              {permanent ? "delete permanently" : "move to the Trash"}.
+              {permanent ? "delete permanently" : `move to the ${trash}`}.
             </p>
           </div>
         </div>
@@ -57,8 +59,8 @@ export function PreviewDialog() {
             )}
             {!permanent && permanentOnly > 0 && (
               <li className="flex items-center gap-2 text-fg-muted">
-                <Trash2 size={13} /> {permanentOnly} item{permanentOnly > 1 ? "s" : ""} already in
-                the Trash will be deleted permanently.
+                <Trash2 size={13} /> {plural(permanentOnly, "item")} already in the {trash} will
+                be deleted permanently.
               </li>
             )}
             {riskiest && (
@@ -128,7 +130,7 @@ export function PreviewDialog() {
           loading={executing}
           disabled={plan.targets.length === 0}
         >
-          {permanent ? "Delete" : "Move to Trash"} {formatBytes(plan.totalBytes)}
+          {permanent ? "Delete" : `Move to ${trash}`} {formatBytes(plan.totalBytes)}
         </Button>
       </div>
     </Dialog>

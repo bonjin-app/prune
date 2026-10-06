@@ -1,8 +1,10 @@
 import { cn } from "@/lib/cn";
+import { useTrashName } from "@/lib/wording";
 import { useScan } from "@/stores/scan";
 import type { DeleteMode } from "@/types/models";
 
 export function DeleteModeToggle() {
+  const trash = useTrashName();
   const mode = useScan((s) => s.deleteMode);
   const setMode = useScan((s) => s.setDeleteMode);
   const opt = (value: DeleteMode, label: string) => (
@@ -27,7 +29,7 @@ export function DeleteModeToggle() {
       className="flex items-center gap-0.5 rounded-md border border-line bg-surface-2 p-0.5"
       title="How selected items are removed"
     >
-      {opt("trash", "Move to Trash")}
+      {opt("trash", `Move to ${trash}`)}
       {opt("permanent", "Delete permanently")}
     </div>
   );

@@ -2,6 +2,7 @@ import { CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { cn } from "@/lib/cn";
+import { useTrashName } from "@/lib/wording";
 import { abbreviatePath, formatBytes, plural } from "@/lib/format";
 import { useScan } from "@/stores/scan";
 import { useSystem } from "@/stores/system";
@@ -10,6 +11,7 @@ export function ResultDialog() {
   const result = useScan((s) => s.result);
   const dismiss = useScan((s) => s.dismissResult);
   const home = useSystem((s) => s.info?.homeDir);
+  const trash = useTrashName();
   if (!result) return null;
   const ok = result.status === "success";
   // The largest thing on screen should not say "success" when nothing was removed. It is the
@@ -38,7 +40,7 @@ export function ResultDialog() {
         </div>
         <p className="text-[12.5px] text-fg-muted">
           {plural(result.removedFiles, "file")} in {plural(result.removedTargets, "item")}{" "}
-          {result.mode === "trash" ? "moved to the Trash" : "deleted permanently"}.
+          {result.mode === "trash" ? `moved to the ${trash}` : "deleted permanently"}.
         </p>
         {result.logError && (
           <p className="mt-3 text-[12px] text-warn">

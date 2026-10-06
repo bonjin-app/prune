@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PreviewDialog } from "./PreviewDialog";
 import * as factory from "@/test/factories";
 import { useScan } from "@/stores/scan";
+import { useSystem } from "@/stores/system";
+import type { AppMeta, Platform } from "@/types/models";
 
 /**
  * The last thing a user reads before anything is removed.
@@ -116,5 +118,46 @@ describe("PreviewDialog", () => {
 
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(closePreview).toHaveBeenCalled();
+  });
+});
+
+describe("PreviewDialog wording", () => {
+  const meta = (platform: Platform): AppMeta => ({
+    name: "Prune",
+    version: "0",
+    coreVersion: "0",
+    platform,
+    arch: "x86_64",
+    debug: false,
+    operationLogPath: "",
+  });
+  const withPlatform = (platform: Platform | null) =>
+    act(() => useSystem.setState({ meta: platform ? meta(platform) : null }));
+
+  beforeEach(() => {
+    act(() => useScan.setState({ plan: null, executing: false, cleanupProgress: null }));
+  });
+
+  it("says Recycle Bin on Windows, where that is where things go", () => {
+    withPlatform("windows");
+    show(factory.plan([factory.target({ id: "a" })]));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText(/move to the Recycle Bin/)).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: /Move to Recycle Bin/ })).toBeInTheDocument();
+    expect(dialog.textContent).not.toMatch(/Trash/);
+  });
+
+  it("says Trash on a Mac", () => {
+    withPlatform("macos");
+    show(factory.plan([factory.target({ id: "a" })]));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText(/move to the Trash/)).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: /Move to Trash/ })).toBeInTheDocument();
+  });
+
+  it("falls back to Trash before the platform is known", () => {
+    withPlatform(null);
+    show(factory.plan([factory.target({ id: "a" })]));
+    expect(screen.getByRole("button", { name: /Move to Trash/ })).toBeInTheDocument();
   });
 });
