@@ -141,8 +141,9 @@ build, but both are a reason to sign before a release anyone else is expected to
 - Point the WinGet manifests at the same release:
 
   ```bash
-  pip3 install --user olefile     # once; needed to read the MSI
+  pip3 install --user olefile pyyaml jsonschema     # once; the MSI reader and the validator
   scripts/update-winget.sh 0.2.0
+  python3 scripts/validate-winget.py                  # the schema check, which runs anywhere
   git commit -am "chore: point the WinGet manifests at 0.2.0"
   ```
 
