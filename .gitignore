@@ -18,3 +18,6 @@ src-tauri/gen/schemas/
 *.log
 .env
 .env.*
+
+# Playwright MCP writes page snapshots and console logs here while capturing screenshots.
+.playwright-mcp/

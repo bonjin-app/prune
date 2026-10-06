@@ -620,6 +620,7 @@ const MOCK_APPS: ApplicationInfo[] = [
 ];
 const MOCK_APP_SIZES: Record<string, number> = {
   "app-vscode": 620e6,
+  "app-vscode-old": 590e6,
   "app-docker": 1.9e9,
   "app-xcode": 31e9,
   "app-slack": 410e6,

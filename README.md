@@ -98,27 +98,42 @@ that reads as reversible should not contain the one item that is not.
 ## Screenshots
 
 <p align="center">
-  <img src="docs/screenshots/dashboard.png" width="880" alt="Dashboard: storage, memory and CPU with reclaimable space by category" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dashboard-dark.png" />
+    <img src="docs/screenshots/dashboard-light.png" width="880" alt="Dashboard: how much can be reclaimed, by category, with what the scan found beyond the total" />
+  </picture>
 </p>
 
 <table>
   <tr>
     <td width="50%">
-      <img src="docs/screenshots/developer.png" alt="Developer: package manager caches and project artifacts with risk levels" /><br />
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/developer-dark.png" />
+        <img src="docs/screenshots/developer-light.png" alt="Developer: package manager caches and project artifacts with risk levels" />
+      </picture><br />
       <sub><b>Developer</b> — tool caches and project artifacts, each with a risk level</sub>
     </td>
     <td width="50%">
-      <img src="docs/screenshots/disk.png" alt="Disk: largest files with size filters" /><br />
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/disk-dark.png" />
+        <img src="docs/screenshots/disk-light.png" alt="Disk: largest files with size filters" />
+      </picture><br />
       <sub><b>Disk</b> — folder sizes, largest files, file types</sub>
     </td>
   </tr>
   <tr>
     <td width="50%">
-      <img src="docs/screenshots/uninstaller.png" alt="Uninstaller: an application with its caches, preferences and containers" /><br />
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/uninstaller-dark.png" />
+        <img src="docs/screenshots/uninstaller-light.png" alt="Uninstaller: an application with its caches, preferences and containers" />
+      </picture><br />
       <sub><b>Uninstaller</b> — the app plus everything it left behind</sub>
     </td>
     <td width="50%">
-      <img src="docs/screenshots/monitor.png" alt="Monitor: per-core CPU, memory, disks and top processes" /><br />
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/monitor-dark.png" />
+        <img src="docs/screenshots/monitor-light.png" alt="Monitor: per-core CPU, memory, disks and top processes" />
+      </picture><br />
       <sub><b>Monitor</b> — per-core CPU, memory, disks, processes</sub>
     </td>
   </tr>
