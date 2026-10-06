@@ -68,12 +68,13 @@ export function UninstallerView() {
       />
       <div className="flex min-h-0 flex-1 gap-3 px-7 pb-8">
         <div className="flex w-[300px] shrink-0 flex-col overflow-hidden rounded-lg border border-line bg-surface">
-          <div className="flex items-center gap-2 border-b border-line px-3 py-2">
+          <div className="field-inset flex items-center gap-2 border-b border-line px-3 py-2">
             <Search size={13} className="text-fg-faint" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search applications"
+              aria-label="Search applications"
               className="min-w-0 flex-1 bg-transparent text-[12.5px] outline-none placeholder:text-fg-faint"
             />
             <button

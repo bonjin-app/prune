@@ -39,13 +39,14 @@ export function DiskView() {
       />
 
       <div className="flex items-center gap-2 px-7 pb-3">
-        <div className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md border border-line bg-surface px-2.5">
+        <div className="field flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md border border-line bg-surface px-2.5">
           <HardDrive size={13} className="shrink-0 text-fg-faint" />
           <input
             value={root}
             onChange={(e) => setRoot(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && !scanning && void startScan()}
             placeholder={home ? `${home}  (default: home directory)` : "Directory to analyze"}
+            aria-label="Directory to analyze"
             spellCheck={false}
             className="min-w-0 flex-1 bg-transparent font-mono text-[12px] outline-none placeholder:text-fg-faint"
           />
@@ -334,7 +335,7 @@ function LargeFiles() {
         ))}
         <div
           className={cn(
-            "flex h-7 items-center gap-1 rounded-md border px-2 text-[12px]",
+            "field flex h-7 items-center gap-1 rounded-md border px-2 text-[12px]",
             !isPreset ? "border-accent bg-accent-soft" : "border-line bg-surface",
           )}
         >
@@ -349,6 +350,7 @@ function LargeFiles() {
               }
             }}
             placeholder="custom"
+            aria-label="Custom minimum size in megabytes"
             className="w-[56px] bg-transparent text-right outline-none tnum placeholder:text-fg-faint"
           />
           <span className="text-fg-faint">MB</span>

@@ -14,6 +14,13 @@ All notable changes to Prune are documented here. The format follows
   through, which it does not do on Windows, where the Recycle Bin is not scanned; it no longer
   says so there.
 
+- Text fields gave a keyboard user no sign of focus. The filter in the cleaner, the search in the
+  uninstaller and the two folder fields drew a box with a bare input inside it, and the input
+  had no outline, so focusing one changed nothing on screen. The box now takes the focus ring.
+  The search in the uninstaller, the directory field in Disk and its custom-size field were also
+  named only by their placeholder text, which assistive technology does not treat as a name; they
+  now have one.
+
 ### Changed
 
 - The browser preview (`pnpm dev`) accepts `?platform=windows` to show the Windows wording and

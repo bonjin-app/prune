@@ -187,6 +187,11 @@ describe("UninstallerView list", () => {
     expect(screen.queryByLabelText("Measuring")).toBeNull();
   });
 
+  it("names its search field for assistive technology, not only by a placeholder", () => {
+    showList([alpha], false);
+    expect(screen.getByRole("textbox", { name: "Search applications" })).toBeInTheDocument();
+  });
+
   it("shows that a size is still coming while measuring", () => {
     showList([{ ...alpha, sizeBytes: undefined }], true);
     expect(screen.getByLabelText("Measuring")).toBeInTheDocument();

@@ -105,6 +105,25 @@ body {
   border-radius: 4px;
 }
 
+/*
+ * A text field drawn as a bordered box with a bare <input> inside it. The input has no outline
+ * of its own, so on its own it showed nothing at all when focused — the one control on screen
+ * that gave a keyboard user no sign of where they were. The box takes the ring instead, as the
+ * whole of what looks like the field.
+ *
+ * :focus-within rather than :has(), which the WebKit on the oldest macOS Prune supports lacks.
+ * Unlike the rule above this keeps the box's own corners.
+ */
+.field:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+/* For a field that sits flush inside something that clips, where an outer ring would be cut. */
+.field-inset:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;

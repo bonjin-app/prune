@@ -167,7 +167,7 @@ export function CleanerWorkspace({
 
       {hasResults && !scanning && (
         <div className="flex items-center gap-2 px-7 pb-3">
-          <div className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md border border-line bg-surface px-2.5">
+          <div className="field flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md border border-line bg-surface px-2.5">
             <Search size={13} className="shrink-0 text-fg-faint" />
             <input
               value={filter}
