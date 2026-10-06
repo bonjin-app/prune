@@ -1,8 +1,8 @@
-import { useState } from "react";
 import { Lock, X } from "lucide-react";
 import { Button } from "./Button";
 import { backend } from "@/lib/tauri";
 import { useSystem } from "@/stores/system";
+import { useUi } from "@/stores/ui";
 
 /**
  * Shown when the OS is hiding locations from Prune. Without this the affected scans simply
@@ -11,7 +11,8 @@ import { useSystem } from "@/stores/system";
  */
 export function PermissionBanner() {
   const permissions = useSystem((s) => s.permissions);
-  const [dismissed, setDismissed] = useState(false);
+  const dismissed = useUi((s) => s.permissionNoticeDismissed);
+  const dismiss = useUi((s) => s.dismissPermissionNotice);
 
   if (dismissed || !permissions || permissions.fullDiskAccess !== "denied") return null;
 
@@ -30,7 +31,7 @@ export function PermissionBanner() {
       </Button>
       <button
         type="button"
-        onClick={() => setDismissed(true)}
+        onClick={dismiss}
         className="rounded p-1 text-fg-faint hover:text-fg"
         aria-label="Dismiss"
       >

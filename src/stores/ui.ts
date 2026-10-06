@@ -37,15 +37,26 @@ interface UiState {
   view: ViewId;
   theme: ThemePreference;
   paletteOpen: boolean;
+  /**
+   * Whether the "some locations are hidden" notice has been closed this run.
+   *
+   * Held here rather than in the banner, which every screen mounts afresh: closing it on the
+   * dashboard and finding it again on the cleaner one click later made closing it pointless.
+   * Deliberately not persisted — it says every scan total is smaller than the truth, and one
+   * that stayed silent forever would let a person trust a number they had been told not to.
+   */
+  permissionNoticeDismissed: boolean;
   setView: (view: ViewId) => void;
   setTheme: (theme: ThemePreference) => void;
   setPaletteOpen: (open: boolean) => void;
+  dismissPermissionNotice: () => void;
 }
 
 export const useUi = create<UiState>((set) => ({
   view: "dashboard",
   theme: loadTheme(),
   paletteOpen: false,
+  permissionNoticeDismissed: false,
   setView: (view) => set({ view }),
   setTheme: (theme) => {
     try {
@@ -57,4 +68,5 @@ export const useUi = create<UiState>((set) => ({
     set({ theme });
   },
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
+  dismissPermissionNotice: () => set({ permissionNoticeDismissed: true }),
 }));
