@@ -157,12 +157,12 @@ nothing is uploaded from anyone's laptop.
 
 | Platform                   | File                                                                                                            |
 | -------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| **macOS** (Apple Silicon)  | [`Prune_0.1.4_aarch64.dmg`](https://github.com/bonjin-app/prune/releases/latest/download/Prune_0.1.4_aarch64.dmg) |
-| **macOS** (Intel)          | [`Prune_0.1.4_x64.dmg`](https://github.com/bonjin-app/prune/releases/latest/download/Prune_0.1.4_x64.dmg)         |
-| **Windows** (x64)          | [`Prune_0.1.4_x64-setup.exe`](https://github.com/bonjin-app/prune/releases/latest/download/Prune_0.1.4_x64-setup.exe) · [`.msi`](https://github.com/bonjin-app/prune/releases/latest/download/Prune_0.1.4_x64_en-US.msi) |
+| **macOS** (Apple Silicon)  | [`Prune_0.1.5_aarch64.dmg`](https://github.com/bonjin-app/prune/releases/latest/download/Prune_0.1.5_aarch64.dmg) |
+| **macOS** (Intel)          | [`Prune_0.1.5_x64.dmg`](https://github.com/bonjin-app/prune/releases/latest/download/Prune_0.1.5_x64.dmg)         |
+| **Windows** (x64)          | [`Prune_0.1.5_x64-setup.exe`](https://github.com/bonjin-app/prune/releases/latest/download/Prune_0.1.5_x64-setup.exe) · [`.msi`](https://github.com/bonjin-app/prune/releases/latest/download/Prune_0.1.5_x64_en-US.msi) |
 
 The `prune` command line ships from the same release, as
-[`prune-v0.1.4-<target>.tar.gz`](https://github.com/bonjin-app/prune/releases/latest) (`.zip` on
+[`prune-v0.1.5-<target>.tar.gz`](https://github.com/bonjin-app/prune/releases/latest) (`.zip` on
 Windows). Unpack it and put `prune` on your `PATH`.
 
 On macOS, Homebrew can install the same disk image for you:

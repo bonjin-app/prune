@@ -6,6 +6,21 @@ All notable changes to Prune are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-10-06
+
+Three corrections to the interface and one to how removal starts out. The engine is untouched, so
+the settings file, the operation log and the safety rules are exactly as they were.
+
+### Changed
+
+- **"Delete permanently" no longer outlasts the run it was chosen in.** It used to be remembered
+  between runs, so choosing it once turned every later cleanup, whenever Prune was next opened,
+  into one that cannot be undone, whether or not you still remembered choosing it. Prune now
+  always starts with the recoverable option, and permanent deletion holds until you quit. If you
+  had already chosen it, that choice is discarded the first time 0.1.5 starts. Settings says so.
+- The browser preview (`pnpm dev`) accepts `?platform=windows` to show the Windows wording and
+  layout without a Windows machine.
+
 ### Fixed
 
 - On Windows the interface said "Move to Trash" on the button that puts things in the Recycle
@@ -13,18 +28,12 @@ All notable changes to Prune are documented here. The format follows
   platform uses. The cleaner's introduction also listed "the Trash" among the places Prune looks
   through, which it does not do on Windows, where the Recycle Bin is not scanned; it no longer
   says so there.
-
 - Text fields gave a keyboard user no sign of focus. The filter in the cleaner, the search in the
   uninstaller and the two folder fields drew a box with a bare input inside it, and the input
   had no outline, so focusing one changed nothing on screen. The box now takes the focus ring.
   The search in the uninstaller, the directory field in Disk and its custom-size field were also
   named only by their placeholder text, which assistive technology does not treat as a name; they
   now have one.
-
-### Changed
-
-- The browser preview (`pnpm dev`) accepts `?platform=windows` to show the Windows wording and
-  layout without a Windows machine.
 
 ## [0.1.4] - 2026-10-06
 
@@ -180,7 +189,8 @@ rather than regressions anyone shipped.
 - IPC integration tests on Tauri's mock runtime covering the real command surface, including a full disk scan → preview → execute → operation log cycle.
 - A `prune` command line built on the same engine: `status`, `providers`, `scan`, `clean`, `disk`, `apps`, `startup` and `log`, each with `--json` for scripting and meaningful exit codes. `clean` is a dry run unless `--yes` is passed and never selects anything riskier than low on its own. The read-only example prototypes it replaces have been removed.
 
-[unreleased]: https://github.com/bonjin-app/prune/compare/v0.1.4...HEAD
+[unreleased]: https://github.com/bonjin-app/prune/compare/v0.1.5...HEAD
+[0.1.5]: https://github.com/bonjin-app/prune/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/bonjin-app/prune/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/bonjin-app/prune/compare/v0.1.1...v0.1.3
 [0.1.1]: https://github.com/bonjin-app/prune/compare/v0.1.0...v0.1.1
