@@ -6,6 +6,43 @@ All notable changes to Prune are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-10-06
+
+The interface, corrected where walking every screen of it found something wrong. Nothing about
+what Prune finds or removes has changed: the engine is untouched, so the settings file, the
+operation log and the safety rules are exactly as they were.
+
+### Fixed
+
+- Clicking an application in the uninstaller could open a different one, or none. Sizes are
+  measured one application at a time and the list re-sorted by size after each, so every row
+  moved while measuring was under way. The list now keeps name order until measuring is over and
+  only then puts the biggest first. An application whose size could not be measured showed "…"
+  for good — the same mark that means "still working" — and now shows "—" once measuring has
+  finished, with a note saying why.
+- Anything last touched more than thirty days ago printed its full date and time in the system
+  locale: on a Korean machine, "2026. 09. 04. 오전 03:36" in the middle of an English row, three
+  lines tall beside rows reading "26d ago". Ages now keep one short shape — "2mo ago", "1y ago" —
+  and the operation log's absolute times are written 2026-09-04 03:36 whatever the locale.
+- "1 files", "1 items", "1 months since work". Every count in the interface now agrees with its
+  number.
+- A folder was shown as inside your home directory whenever its name merely started with yours:
+  with a home of `/Users/dev`, the folder `/Users/developer/x` read as `~eloper/x`. Paths are
+  abbreviated only at a folder boundary.
+- The Large Files tab counted at a different threshold from the list beneath it, so the badge
+  said 11 above a list of 9. It now counts what it shows.
+- Closing the notice that says some locations are hidden from Prune did nothing lasting: every
+  screen builds its own, so it was back one click later. It now stays closed for the rest of the
+  run. It is not remembered beyond that, deliberately — it says every total on screen is smaller
+  than the truth, and one click silencing it for good would let you trust a number you had been
+  told not to.
+- Shortcut hints read "⌘1" on Windows, whose keyboards have no ⌘ key. They now read "Ctrl+1".
+  Screen readers announced each menu item as "Dashboard, command 1"; the shortcut is now given
+  to assistive technology separately instead of being part of the name.
+- The "Worth a look" card sat flush against the list above it, and a result's file count such as
+  "43,750 files" broke across two lines in every row.
+- Monitor described itself as read-only above a table with a stop button on every row.
+
 ## [0.1.3] - 2026-09-22
 
 The interface, laid out as a utility rather than as an administration console. Nothing about
@@ -123,7 +160,8 @@ rather than regressions anyone shipped.
 - IPC integration tests on Tauri's mock runtime covering the real command surface, including a full disk scan → preview → execute → operation log cycle.
 - A `prune` command line built on the same engine: `status`, `providers`, `scan`, `clean`, `disk`, `apps`, `startup` and `log`, each with `--json` for scripting and meaningful exit codes. `clean` is a dry run unless `--yes` is passed and never selects anything riskier than low on its own. The read-only example prototypes it replaces have been removed.
 
-[unreleased]: https://github.com/bonjin-app/prune/compare/v0.1.3...HEAD
+[unreleased]: https://github.com/bonjin-app/prune/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/bonjin-app/prune/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/bonjin-app/prune/compare/v0.1.1...v0.1.3
 [0.1.1]: https://github.com/bonjin-app/prune/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/bonjin-app/prune/releases/tag/v0.1.0
