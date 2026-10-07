@@ -6,6 +6,13 @@ All notable changes to Prune are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-10-07
+
+Fixes to the Windows uninstaller button, to how Prune waits for Docker, and to reading a damaged
+operation log. The engine changed this time, but not what it writes: the operation log's format
+and the settings file are as they were, and nothing is removed that was not before — the safety
+rules are, if anything, stricter.
+
 ### Fixed
 
 - **"Run vendor uninstaller" on Windows did nothing for almost every application.** The
@@ -219,7 +226,8 @@ rather than regressions anyone shipped.
 - IPC integration tests on Tauri's mock runtime covering the real command surface, including a full disk scan → preview → execute → operation log cycle.
 - A `prune` command line built on the same engine: `status`, `providers`, `scan`, `clean`, `disk`, `apps`, `startup` and `log`, each with `--json` for scripting and meaningful exit codes. `clean` is a dry run unless `--yes` is passed and never selects anything riskier than low on its own. The read-only example prototypes it replaces have been removed.
 
-[unreleased]: https://github.com/bonjin-app/prune/compare/v0.1.5...HEAD
+[unreleased]: https://github.com/bonjin-app/prune/compare/v0.1.6...HEAD
+[0.1.6]: https://github.com/bonjin-app/prune/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/bonjin-app/prune/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/bonjin-app/prune/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/bonjin-app/prune/compare/v0.1.1...v0.1.3
