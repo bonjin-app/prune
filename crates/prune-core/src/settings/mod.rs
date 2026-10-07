@@ -1,7 +1,8 @@
 //! User settings, stored as one JSON file in the application data directory.
 //!
 //! Only choices the engine needs live here. Anything that is purely a matter of appearance
-//! (theme, delete mode) stays in the frontend, because the engine has no use for it.
+//! (the theme) stays in the frontend, because the engine has no use for it. The delete mode is
+//! kept nowhere: it is per run, so permanent deletion is never inherited from an earlier one.
 
 use std::path::{Path, PathBuf};
 

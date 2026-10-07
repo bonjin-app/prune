@@ -6,6 +6,16 @@ All notable changes to Prune are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- A damaged line in the operation log could hide every entry after it. The history is listed
+  newest first, so what was lost was exactly what the screen is for. A write cut short by a crash
+  can leave a line that is not valid UTF-8; reading the log as text stopped at the first one.
+  The same line made the log's periodic shortening fail on every later write, so a log with one
+  bad line in it would never be shortened again. And a record written after an unfinished line
+  was glued onto it and lost along with it. The log is now read as bytes, bad lines are skipped,
+  and a new record always starts on a line of its own.
+
 ## [0.1.5] - 2026-10-06
 
 Three corrections to the interface and one to how removal starts out. The engine is untouched, so

@@ -1,7 +1,7 @@
 //! Local, append-only operation log (JSON lines). Never leaves the machine.
 
 use std::fs::OpenOptions;
-use std::io::{BufRead, BufReader, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
@@ -45,13 +45,19 @@ impl OperationLog {
     pub fn append(&self, record: &OperationRecord) -> Result<()> {
         let _guard = self.lock.lock_recover();
         std::fs::create_dir_all(&self.dir).map_err(|e| PruneError::io(&self.dir, e))?;
+        let mut line = serde_json::to_string(record)?;
+        line.push('\n');
+        // A write cut short by a crash leaves a line with no newline. Appending straight onto it
+        // would make one corrupt line out of that and this record, and this record — the one
+        // that says what was just removed — would be the one lost.
+        if self.ends_mid_line() {
+            line.insert(0, '\n');
+        }
         let mut file = OpenOptions::new()
             .create(true)
             .append(true)
             .open(&self.path)
             .map_err(|e| PruneError::io(&self.path, e))?;
-        let mut line = serde_json::to_string(record)?;
-        line.push('\n');
         file.write_all(line.as_bytes())
             .map_err(|e| PruneError::io(&self.path, e))?;
         drop(file);
@@ -70,20 +76,52 @@ impl OperationLog {
         std::fs::metadata(&self.path).ok().map(|m| m.len())
     }
 
+    /// Whether the file is non-empty and its last byte is not a newline.
+    fn ends_mid_line(&self) -> bool {
+        use std::io::{Read, Seek, SeekFrom};
+        let Ok(mut f) = std::fs::File::open(&self.path) else {
+            return false;
+        };
+        let Ok(len) = f.metadata().map(|m| m.len()) else {
+            return false;
+        };
+        if len == 0 || f.seek(SeekFrom::Start(len - 1)).is_err() {
+            return false;
+        }
+        let mut last = [0u8; 1];
+        f.read_exact(&mut last).is_ok() && last[0] != b'\n'
+    }
+
+    /// Every non-blank line of the file, as bytes.
+    ///
+    /// Bytes rather than text, because a line need not be text: a write interrupted inside a
+    /// multi-byte character leaves one that is not valid UTF-8. Reading as text stopped at the
+    /// first such line, which in a list that runs newest first discards exactly the entries
+    /// someone opened it to see — and made compaction fail on every append thereafter.
+    fn read_lines(&self) -> std::io::Result<Vec<Vec<u8>>> {
+        let bytes = std::fs::read(&self.path)?;
+        Ok(bytes
+            .split(|b| *b == b'\n')
+            .filter(|l| !l.iter().all(u8::is_ascii_whitespace))
+            .map(<[u8]>::to_vec)
+            .collect())
+    }
+
     /// Rewrites the log with only the most recent entries.
     ///
     /// Written to a temporary file and renamed, so an interrupted compaction leaves the
     /// previous log intact rather than a truncated one.
     fn compact(&self) -> Result<()> {
-        let text =
-            std::fs::read_to_string(&self.path).map_err(|e| PruneError::io(&self.path, e))?;
-        let lines: Vec<&str> = text.lines().filter(|l| !l.trim().is_empty()).collect();
+        let lines = self
+            .read_lines()
+            .map_err(|e| PruneError::io(&self.path, e))?;
         if lines.len() <= KEEP_RECORDS {
             return Ok(());
         }
-        let kept = lines[lines.len() - KEEP_RECORDS..].join("\n");
+        let mut kept = lines[lines.len() - KEEP_RECORDS..].join(&b'\n');
+        kept.push(b'\n');
         let temp = self.path.with_extension("jsonl.writing");
-        std::fs::write(&temp, format!("{kept}\n")).map_err(|e| PruneError::io(&temp, e))?;
+        std::fs::write(&temp, kept).map_err(|e| PruneError::io(&temp, e))?;
         std::fs::rename(&temp, &self.path).map_err(|e| {
             let _ = std::fs::remove_file(&temp);
             PruneError::io(&self.path, e)
@@ -102,18 +140,17 @@ impl OperationLog {
         // A log that cannot be opened has no history to show: nothing could have been written
         // to it either. Reporting an error here would put a failure in front of the user on
         // every visit to a screen that would have been empty anyway.
-        let file = match std::fs::File::open(&self.path) {
-            Ok(f) => f,
+        let lines = match self.read_lines() {
+            Ok(l) => l,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(vec![]),
             Err(e) => {
                 tracing::warn!(path = %self.path.display(), error = %e, "cannot read the operation log");
                 return Ok(vec![]);
             }
         };
-        let mut records: Vec<OperationRecord> = BufReader::new(file)
-            .lines()
-            .map_while(|l| l.ok())
-            .filter_map(|l| serde_json::from_str(&l).ok())
+        let mut records: Vec<OperationRecord> = lines
+            .iter()
+            .filter_map(|l| serde_json::from_slice(l).ok())
             .collect();
         records.reverse();
         records.truncate(limit);
@@ -272,5 +309,110 @@ mod growth_tests {
         assert_eq!(listed[4].id, "op0");
         // No temporary file left behind.
         assert!(!dir.path().join("operations.jsonl.writing").exists());
+    }
+}
+
+#[cfg(test)]
+mod damage_tests {
+    use super::*;
+    use chrono::Utc;
+
+    fn record(id: &str) -> OperationRecord {
+        OperationRecord {
+            id: id.into(),
+            at: Utc::now(),
+            title: "Clean".into(),
+            mode: crate::models::DeleteMode::Trash,
+            status: crate::models::CleanupStatus::Success,
+            removed_targets: 1,
+            removed_files: 1,
+            removed_bytes: 1,
+            failed_count: 0,
+            providers: vec![],
+        }
+    }
+
+    fn ids(log: &OperationLog) -> Vec<String> {
+        log.list(usize::MAX)
+            .unwrap()
+            .into_iter()
+            .map(|r| r.id)
+            .collect()
+    }
+
+    /// A line that is not text: what a write interrupted inside a multi-byte character leaves.
+    const NOT_UTF8: &[u8] = &[b'{', b'"', b'i', b'd', b'"', b':', b'"', 0xE2, 0x82];
+
+    #[test]
+    fn a_line_that_is_not_text_does_not_hide_what_came_after_it() {
+        // `list` is newest first, so what a stop at the first bad line throws away is exactly
+        // what the person came to see.
+        let dir = tempfile::tempdir().unwrap();
+        let log = OperationLog::open(dir.path());
+        log.append(&record("old")).unwrap();
+        let mut f = OpenOptions::new().append(true).open(log.path()).unwrap();
+        f.write_all(NOT_UTF8).unwrap();
+        f.write_all(b"\n").unwrap();
+        drop(f);
+        log.append(&record("new")).unwrap();
+
+        assert_eq!(ids(&log), ["new", "old"]);
+    }
+
+    #[test]
+    fn an_unfinished_last_line_does_not_swallow_the_next_record() {
+        // A crash can leave half a line with no newline. The next record was appended straight
+        // onto it, making one corrupt line out of a good record and a bad one.
+        let dir = tempfile::tempdir().unwrap();
+        let log = OperationLog::open(dir.path());
+        log.append(&record("before")).unwrap();
+        let mut f = OpenOptions::new().append(true).open(log.path()).unwrap();
+        f.write_all(br#"{"id":"half"#).unwrap();
+        drop(f);
+        log.append(&record("after")).unwrap();
+
+        assert_eq!(ids(&log), ["after", "before"]);
+    }
+
+    #[test]
+    fn a_log_with_damage_in_it_is_still_shortened() {
+        // Compaction read the whole file as text, so one bad byte made it fail on every append
+        // from then on, and the log grew for good.
+        let dir = tempfile::tempdir().unwrap();
+        let log = OperationLog::open(dir.path());
+        let mut f = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(log.path())
+            .unwrap();
+        f.write_all(NOT_UTF8).unwrap();
+        f.write_all(b"\n").unwrap();
+        drop(f);
+
+        for i in 0..(KEEP_RECORDS + 1_500) {
+            let mut r = record(&format!("op{i}"));
+            r.title = format!("Clean {}", "x".repeat(400));
+            log.append(&r).unwrap();
+        }
+
+        let size = std::fs::metadata(log.path()).unwrap().len();
+        assert!(size <= MAX_BYTES * 2, "the log kept growing: {size} bytes");
+        assert_eq!(
+            log.list(1).unwrap()[0].id,
+            format!("op{}", KEEP_RECORDS + 1_499)
+        );
+    }
+
+    #[test]
+    fn empty_and_unparseable_lines_are_skipped() {
+        let dir = tempfile::tempdir().unwrap();
+        let log = OperationLog::open(dir.path());
+        log.append(&record("a")).unwrap();
+        let mut f = OpenOptions::new().append(true).open(log.path()).unwrap();
+        f.write_all(b"\n\nnot json at all\n{\"id\": 3}\n").unwrap();
+        drop(f);
+        log.append(&record("b")).unwrap();
+
+        assert_eq!(ids(&log), ["b", "a"]);
     }
 }

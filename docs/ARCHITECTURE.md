@@ -295,9 +295,14 @@ others and scanning again offers the data normally, so nothing is permanently un
 
 ## 5f. Settings
 
-`settings.json` in the application data directory holds only what the engine needs; theme and
-delete mode stay in the frontend because the engine has no use for them. Today that is the list
-of folders searched for project artifacts.
+`settings.json` in the application data directory holds only what the engine needs; the theme
+stays in the frontend because the engine has no use for it. Today that is the list of folders
+searched for project artifacts.
+
+The delete mode is deliberately in neither place. It is not remembered at all: Prune starts every
+run recoverable, and "delete permanently" lasts only until the app is quit. It used to be kept
+in the frontend's storage, which carried the one setting that cannot be undone silently across
+restarts.
 
 Three rules make this safe to get wrong:
 
@@ -428,6 +433,14 @@ life of the process was a slow leak. Asking for an evicted scan returns `unknown
 the UI already handles. The operation log is bounded the same way but on disk: past
 `MAX_BYTES` it is rewritten with the newest `KEEP_RECORDS` entries, so a machine cleaned
 regularly for years does not carry a history that has to be read in full every time.
+
+The log is read and rewritten as bytes, not text, and a record is never appended onto an
+unfinished line. A write cut short by a crash can leave a line that is not valid UTF-8, or one
+with no newline. Reading as text stopped at the first bad line, which in a list that runs newest
+first discards exactly the entries someone opened it to see, and made compaction fail on every
+append from then on; appending straight onto an unfinished line turned the new record — the one
+describing what was just removed — into part of a corrupt one. Bad lines are skipped and the
+rest are kept.
 
 Both files Prune owns are written whole or not at all. Writing in place truncates first, so a
 crash or a full disk between the truncate and the write leaves an empty file where the user's
