@@ -8,7 +8,7 @@ use crate::AppState;
 /// reports that.
 #[tauri::command]
 pub async fn docker_status() -> CommandResult<DockerState> {
-    tauri::async_runtime::spawn_blocking(|| docker::status(&SystemRunner))
+    tauri::async_runtime::spawn_blocking(|| docker::status(&SystemRunner::for_query()))
         .await
         .map_err(|e| CommandError::new("join", e.to_string()))
 }
@@ -23,9 +23,11 @@ pub async fn docker_prune(
     state: State<'_, AppState>,
     action: DockerAction,
 ) -> CommandResult<DockerPruneResult> {
-    let result = tauri::async_runtime::spawn_blocking(move || docker::prune(&SystemRunner, action))
-        .await
-        .map_err(|e| CommandError::new("join", e.to_string()))??;
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        docker::prune(&SystemRunner::for_action(), action)
+    })
+    .await
+    .map_err(|e| CommandError::new("join", e.to_string()))??;
 
     // Docker cleanups belong in the same history as every other cleanup.
     let record = prune_core::models::OperationRecord {

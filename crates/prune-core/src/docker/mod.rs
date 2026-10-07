@@ -13,7 +13,9 @@
 //!   images that are tagged and in use, and **never** passes `--volumes`, because volumes hold
 //!   databases and other state a developer expects to survive a cleanup.
 
-use std::process::Output;
+use std::io::Read;
+use std::process::{Command, Output, Stdio};
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
@@ -26,14 +28,119 @@ pub trait CommandRunner: Send + Sync {
     fn run(&self, program: &str, args: &[&str]) -> std::io::Result<Output>;
 }
 
+/// How long a question to Docker may take before Prune stops waiting for the answer.
+///
+/// `docker system df` walks every image and layer, so a machine with a lot of them can need a
+/// good while; this is generous, and exists for the daemon that never answers at all.
+pub const QUERY_TIMEOUT: Duration = Duration::from_secs(45);
+
 /// Runs commands for real.
-pub struct SystemRunner;
+pub struct SystemRunner {
+    timeout: Option<Duration>,
+}
+
+impl SystemRunner {
+    /// For asking Docker something. Gives up after [`QUERY_TIMEOUT`].
+    ///
+    /// Docker Desktop that is starting, or frozen, accepts the connection and then says
+    /// nothing, and `docker` waits for it for as long as it is left to. Without a limit the
+    /// Developer screen showed "reading Docker" until Prune was quit, and every refresh started
+    /// another blocked thread behind it.
+    pub fn for_query() -> Self {
+        Self {
+            timeout: Some(QUERY_TIMEOUT),
+        }
+    }
+
+    /// For asking Docker to do something. Waits as long as it takes.
+    ///
+    /// Reclaiming space from a large cache can legitimately run for minutes, and stopping
+    /// Prune's wait would not stop Docker's work, only hide that it is still going.
+    pub fn for_action() -> Self {
+        Self { timeout: None }
+    }
+
+    /// A runner with its own limit. Not for production code: the point of the two above is that
+    /// the limit is decided once, by what is being asked.
+    #[cfg(test)]
+    fn with_timeout(timeout: Duration) -> Self {
+        Self {
+            timeout: Some(timeout),
+        }
+    }
+}
 
 impl CommandRunner for SystemRunner {
     fn run(&self, program: &str, args: &[&str]) -> std::io::Result<Output> {
-        std::process::Command::new(program).args(args).output()
+        let mut command = Command::new(program);
+        command.args(args);
+        hide_window(&mut command);
+        let Some(limit) = self.timeout else {
+            return command.output();
+        };
+
+        command
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        let mut child = command.spawn()?;
+        // Drained on their own threads: a child that fills a pipe's buffer blocks until
+        // someone reads it, so waiting on the process alone would deadlock on large output.
+        let stdout = drain(child.stdout.take());
+        let stderr = drain(child.stderr.take());
+
+        let deadline = Instant::now() + limit;
+        let status = loop {
+            if let Some(status) = child.try_wait()? {
+                break status;
+            }
+            if Instant::now() >= deadline {
+                let _ = child.kill();
+                let _ = child.wait();
+                // The readers are left to finish by themselves when the pipes close; joining
+                // them here would hang on anything that outlived the kill and kept one open.
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::TimedOut,
+                    format!(
+                        "{program} did not answer within {} seconds",
+                        limit.as_secs()
+                    ),
+                ));
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        };
+        Ok(Output {
+            status,
+            stdout: stdout.join().unwrap_or_default(),
+            stderr: stderr.join().unwrap_or_default(),
+        })
     }
 }
+
+fn drain<R: Read + Send + 'static>(pipe: Option<R>) -> std::thread::JoinHandle<Vec<u8>> {
+    std::thread::spawn(move || {
+        let mut bytes = Vec::new();
+        if let Some(mut pipe) = pipe {
+            let _ = pipe.read_to_end(&mut bytes);
+        }
+        bytes
+    })
+}
+
+/// Keeps a console program from opening a console window of its own.
+///
+/// The desktop app is a windowed program with no console, and Windows gives a console program
+/// started from one a new window — a black box that flashes up each time Docker is asked
+/// something. A no-op elsewhere.
+#[cfg(windows)]
+fn hide_window(command: &mut Command) {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    command.creation_flags(CREATE_NO_WINDOW);
+}
+
+#[cfg(not(windows))]
+fn hide_window(_command: &mut Command) {}
 
 /// What kind of data Docker is holding.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -402,5 +509,131 @@ mod tests {
         let fake = FakeDocker::new(|_| failed_output("permission denied while trying to connect"));
         let err = prune(&fake, DockerAction::BuilderPrune).unwrap_err();
         assert!(err.to_string().contains("permission denied"), "{err}");
+    }
+}
+
+#[cfg(test)]
+mod runner_tests {
+    use super::*;
+
+    /// A program that is still running long after any limit used here.
+    fn sleeper() -> (&'static str, Vec<&'static str>) {
+        if cfg!(windows) {
+            (
+                "powershell",
+                vec!["-NoProfile", "-Command", "Start-Sleep 30"],
+            )
+        } else {
+            ("sleep", vec!["30"])
+        }
+    }
+
+    fn say_hello() -> (&'static str, Vec<&'static str>) {
+        if cfg!(windows) {
+            ("cmd", vec!["/C", "echo hello"])
+        } else {
+            ("echo", vec!["hello"])
+        }
+    }
+
+    /// Exits with status 3 after writing to standard error.
+    fn fail_loudly() -> (&'static str, Vec<&'static str>) {
+        if cfg!(windows) {
+            ("cmd", vec!["/C", "echo no daemon 1>&2 & exit 3"])
+        } else {
+            ("sh", vec!["-c", "echo no daemon >&2; exit 3"])
+        }
+    }
+
+    #[test]
+    fn a_command_that_never_answers_is_given_up_on() {
+        // What a frozen Docker daemon looks like from outside: the process starts, holds its
+        // connection open, and says nothing.
+        let runner = SystemRunner::with_timeout(Duration::from_millis(500));
+        let (program, args) = sleeper();
+        let started = Instant::now();
+        let err = runner.run(program, &args).unwrap_err();
+
+        assert_eq!(err.kind(), std::io::ErrorKind::TimedOut);
+        assert!(
+            started.elapsed() < Duration::from_secs(10),
+            "waited {:?} for a command it had a 500ms limit on",
+            started.elapsed()
+        );
+        assert!(err.to_string().contains("did not answer"));
+    }
+
+    #[test]
+    fn a_timeout_becomes_an_answer_the_screen_can_show() {
+        // Through the real `status`, which turns an error into "not running" with the reason —
+        // what replaces the spinner that used to stay up until Prune was quit. Only the program
+        // is swapped: `docker` becomes a sleeper that never finishes within the limit.
+        let runner = Redirected(SystemRunner::with_timeout(Duration::from_millis(500)));
+        match status(&runner) {
+            DockerState::NotRunning { message } => assert!(message.contains("did not answer")),
+            other => panic!("expected NotRunning, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_command_that_answers_in_time_returns_its_output() {
+        let runner = SystemRunner::with_timeout(Duration::from_secs(30));
+        let (program, args) = say_hello();
+        let out = runner.run(program, &args).unwrap();
+        assert!(out.status.success());
+        assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "hello");
+    }
+
+    #[test]
+    fn a_failing_command_still_reports_its_error_text() {
+        let runner = SystemRunner::with_timeout(Duration::from_secs(30));
+        let (program, args) = fail_loudly();
+        let out = runner.run(program, &args).unwrap();
+        assert!(!out.status.success());
+        assert_eq!(String::from_utf8_lossy(&out.stderr).trim(), "no daemon");
+    }
+
+    #[test]
+    fn a_missing_program_is_still_not_installed() {
+        let runner = SystemRunner::with_timeout(Duration::from_secs(30));
+        let err = runner
+            .run("definitely-not-a-program-prune", &[])
+            .unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::NotFound);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn output_larger_than_a_pipe_does_not_deadlock() {
+        // A pipe holds 64KB or so; a child that writes more blocks until it is read, so a runner
+        // that only waited for it to exit would wait forever. `docker system df` is small, but
+        // the runner is not the place to depend on that.
+        let runner = SystemRunner::with_timeout(Duration::from_secs(10));
+        let out = runner
+            .run("sh", &["-c", "head -c 500000 /dev/zero | tr '\\0' x"])
+            .unwrap();
+        assert!(out.status.success());
+        assert_eq!(out.stdout.len(), 500_000);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn an_action_is_not_cut_short() {
+        // Reclaiming space can run for minutes. The action runner has no limit, so a command that
+        // takes longer than a query would be allowed to still finishes.
+        let runner = SystemRunner::for_action();
+        let out = runner.run("sh", &["-c", "sleep 1; echo done"]).unwrap();
+        assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "done");
+    }
+
+    /// Answers every question to `docker` with a sleeper, so the real `status` can be driven
+    /// into a timeout without Docker being installed.
+    struct Redirected(SystemRunner);
+
+    impl CommandRunner for Redirected {
+        fn run(&self, _program: &str, _args: &[&str]) -> std::io::Result<Output> {
+            let (program, args) = sleeper();
+            self.0.run(program, &args)
+        }
     }
 }

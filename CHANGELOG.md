@@ -8,6 +8,13 @@ All notable changes to Prune are documented here. The format follows
 
 ### Fixed
 
+- Docker that did not answer left the Developer screen reading it for good. Docker Desktop that
+  is starting, or has frozen, accepts the connection and says nothing, and Prune waited with no
+  limit — and every refresh started another blocked wait behind the first. Asking Docker what it
+  holds now gives up after 45 seconds and says so. Asking it to reclaim space is not limited: that
+  can legitimately take minutes, and stopping Prune's wait would not stop Docker's work.
+- On Windows, each question put to Docker briefly opened a console window, because Windows gives
+  a console program started from a windowed one a window of its own. It no longer does.
 - A damaged line in the operation log could hide every entry after it. The history is listed
   newest first, so what was lost was exactly what the screen is for. A write cut short by a crash
   can leave a line that is not valid UTF-8; reading the log as text stopped at the first one.

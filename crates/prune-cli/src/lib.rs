@@ -476,8 +476,6 @@ fn docker(
     json: bool,
     out: &mut impl Write,
 ) -> std::io::Result<i32> {
-    let runner = docker_api::SystemRunner;
-
     let action = match (prune_unused, prune_cache) {
         (true, _) => Some(docker_api::DockerAction::SystemPrune),
         (_, true) => Some(docker_api::DockerAction::BuilderPrune),
@@ -491,7 +489,7 @@ fn docker(
             writeln!(out, "Nothing was removed. Add --yes to run it.")?;
             return Ok(EXIT_OK);
         }
-        return match docker_api::prune(&runner, action) {
+        return match docker_api::prune(&docker_api::SystemRunner::for_action(), action) {
             Ok(result) => {
                 if json {
                     write_json(out, &result)?;
@@ -512,7 +510,7 @@ fn docker(
         };
     }
 
-    let state = docker_api::status(&runner);
+    let state = docker_api::status(&docker_api::SystemRunner::for_query());
     if json {
         write_json(out, &state)?;
         return Ok(match state {
