@@ -89,8 +89,11 @@ fn command_for(command: &str) -> std::io::Result<std::process::Command> {
     let tail = cmd_tail(command).map_err(|refusal| {
         std::io::Error::new(std::io::ErrorKind::InvalidInput, refusal.to_string())
     })?;
+    // TEMPORARY: the previous behaviour, to show the program test failing against it.
+    let _ = tail;
     let mut cmd = std::process::Command::new("cmd");
-    cmd.raw_arg(tail).creation_flags(CREATE_NO_WINDOW);
+    cmd.args(["/C", "start", "", command.trim()])
+        .creation_flags(CREATE_NO_WINDOW);
     Ok(cmd)
 }
 
