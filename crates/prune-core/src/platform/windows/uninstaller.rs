@@ -255,18 +255,47 @@ mod launch_tests {
     }
 
     /// What `cmd.exe` itself says when handed the same command line, for a failure message.
+    ///
+    /// With a limit. A command `start` cannot find puts up an error dialog, and `start` then
+    /// waits for it to be closed, so asking for its output without a limit hung the test run for
+    /// as long as the job was allowed to.
     fn what_cmd_says(command: &str) -> String {
-        match command_for(command) {
-            Ok(mut cmd) => match cmd.output() {
-                Ok(out) => format!(
-                    "exit {:?}, stdout {:?}, stderr {:?}",
-                    out.status.code(),
-                    String::from_utf8_lossy(&out.stdout),
-                    String::from_utf8_lossy(&out.stderr)
-                ),
-                Err(e) => format!("could not run: {e}"),
-            },
-            Err(e) => format!("refused: {e}"),
+        use std::process::Stdio;
+        let mut cmd = match command_for(command) {
+            Ok(cmd) => cmd,
+            Err(e) => return format!("refused: {e}"),
+        };
+        let mut child = match cmd
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+        {
+            Ok(child) => child,
+            Err(e) => return format!("could not run: {e}"),
+        };
+        let deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            match child.try_wait() {
+                Ok(Some(status)) => {
+                    let mut out = String::new();
+                    let mut err = String::new();
+                    use std::io::Read;
+                    if let Some(mut o) = child.stdout.take() {
+                        let _ = o.read_to_string(&mut out);
+                    }
+                    if let Some(mut e) = child.stderr.take() {
+                        let _ = e.read_to_string(&mut err);
+                    }
+                    return format!("exit {:?}, stdout {out:?}, stderr {err:?}", status.code());
+                }
+                Ok(None) if Instant::now() >= deadline => {
+                    let _ = child.kill();
+                    return "still running after 10s: start is waiting on something, most likely an error dialog because it could not find the program".into();
+                }
+                Ok(None) => std::thread::sleep(Duration::from_millis(100)),
+                Err(e) => return format!("could not wait: {e}"),
+            }
         }
     }
 
