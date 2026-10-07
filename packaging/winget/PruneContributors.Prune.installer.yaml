@@ -1,14 +1,14 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.10.0.schema.json
 
 PackageIdentifier: PruneContributors.Prune
-PackageVersion: 0.1.5
+PackageVersion: 0.1.6
 Platform:
 - Windows.Desktop
 # The compatibility table in the README says Windows 10, and nothing narrower has been tested,
 # so this claims no more than that.
 MinimumOSVersion: 10.0.0.0
 UpgradeBehavior: install
-ReleaseDate: 2026-10-06
+ReleaseDate: 2026-10-07
 # Only the MSI is listed. The NSIS installer finishes in two seconds when run directly, but
 # `winget install` never sees it exit and waits until it is killed — on a clean machine as well
 # as a used one, three times out of three. Offering it here would hand that to anyone who runs
@@ -21,8 +21,8 @@ Installers:
   InstallerType: wix
   Scope: machine
   InstallerLocale: en-US
-  InstallerUrl: https://github.com/bonjin-app/prune/releases/download/v0.1.5/Prune_0.1.5_x64_en-US.msi
-  InstallerSha256: B5461BBFD84A0D9D0A2C62D32ADF4434801C87154DD604D98F74D66DBA69FFBA
-  ProductCode: '{C9AD3C4A-0EAF-41E5-85C7-7D78ED37A5D9}'
+  InstallerUrl: https://github.com/bonjin-app/prune/releases/download/v0.1.6/Prune_0.1.6_x64_en-US.msi
+  InstallerSha256: 742D76D60F8F7E45B61091B8503211133C86898213D7A9B21AD7129D50E9DCD7
+  ProductCode: '{A8324386-7385-4F95-A2E9-02E9635DB919}'
 ManifestType: installer
 ManifestVersion: 1.10.0
