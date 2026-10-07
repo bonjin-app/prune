@@ -84,11 +84,19 @@ pub fn cmd_tail(command: &str) -> Result<String, Refusal> {
 /// shows whatever it shows.
 #[cfg(windows)]
 pub fn launch(command: &str) -> std::io::Result<()> {
-    // The behaviour this replaces, kept for one commit so CI can show it failing: the command is
-    // passed as one ordinary argument, which Rust re-quotes for the C runtime. Everything else
-    // matches the fix, so the quoting is the only difference.
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+    let tail = cmd_tail(command).map_err(|refusal| {
+        std::io::Error::new(std::io::ErrorKind::InvalidInput, refusal.to_string())
+    })?;
+    // Not waited for: `start` returns as soon as it has launched the program, and a program it
+    // cannot find puts up an error dialog that would hold this call until someone closed it.
+    // Standard streams are closed rather than inherited so nothing started here keeps a pipe of
+    // ours open after we are done with it.
     std::process::Command::new("cmd")
-        .args(["/C", "start", "", command])
+        .raw_arg(tail)
+        .creation_flags(CREATE_NO_WINDOW)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
