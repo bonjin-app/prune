@@ -30,6 +30,12 @@ pub mod windows;
 #[path = "windows/rules.rs"]
 pub mod windows_rules;
 
+/// Which uninstall command Windows applications may be offered, and what is refused before it
+/// reaches `cmd.exe`. Compiled everywhere for the reason above.
+#[cfg(not(target_os = "windows"))]
+#[path = "windows/uninstaller.rs"]
+pub mod windows_uninstaller;
+
 /// Well-known user directories for the current OS. Missing directories are simply `None`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

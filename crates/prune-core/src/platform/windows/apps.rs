@@ -68,7 +68,7 @@ pub fn list(_known: &KnownPaths) -> Result<Vec<ApplicationInfo>> {
                 modified_at: None,
                 source: source.to_string(),
                 is_system,
-                uninstall_command: get("QuietUninstallString").or_else(|| get("UninstallString")),
+                uninstall_command: super::uninstaller::interactive_command(get),
             });
         }
     }

@@ -10,6 +10,7 @@ use crate::Result;
 mod apps;
 mod rules;
 mod startup;
+pub mod uninstaller;
 
 pub struct WindowsPlatform;
 
