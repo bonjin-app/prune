@@ -126,10 +126,10 @@ pub fn apps_run_uninstaller(state: State<'_, AppState>, app_id: String) -> Comma
 
 #[cfg(target_os = "windows")]
 fn run_uninstaller(cmd: &str) -> CommandResult<()> {
-    std::process::Command::new("cmd")
-        .args(["/C", "start", "", cmd])
-        .spawn()?;
-    Ok(())
+    // The command line is built and checked in prune-core, where it is tested: it has to reach
+    // cmd.exe verbatim, and it is refused if it would start a second command.
+    prune_core::platform::windows::uninstaller::launch(cmd)
+        .map_err(|e| CommandError::new("uninstaller_failed", e.to_string()))
 }
 
 #[cfg(not(target_os = "windows"))]
