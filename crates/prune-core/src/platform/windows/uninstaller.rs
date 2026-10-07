@@ -78,28 +78,35 @@ pub fn cmd_tail(command: &str) -> Result<String, Refusal> {
     Ok(format!("/C start \"\" {command}"))
 }
 
-/// Starts the uninstaller. Windows only.
+/// The `cmd.exe` invocation that starts `command`, before its streams are set.
 ///
-/// The `cmd.exe` that carries out `start` gets no window of its own; the uninstaller it starts
-/// shows whatever it shows.
+/// `cmd.exe` gets no window of its own; the uninstaller it starts shows whatever it shows.
 #[cfg(windows)]
-pub fn launch(command: &str) -> std::io::Result<()> {
+fn command_for(command: &str) -> std::io::Result<std::process::Command> {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
     let tail = cmd_tail(command).map_err(|refusal| {
         std::io::Error::new(std::io::ErrorKind::InvalidInput, refusal.to_string())
     })?;
-    // Not waited for: `start` returns as soon as it has launched the program, and a program it
-    // cannot find puts up an error dialog that would hold this call until someone closed it.
-    // Standard streams are closed rather than inherited so nothing started here keeps a pipe of
-    // ours open after we are done with it.
-    std::process::Command::new("cmd")
-        .raw_arg(tail)
-        .creation_flags(CREATE_NO_WINDOW)
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
+    let mut cmd = std::process::Command::new("cmd");
+    cmd.raw_arg(tail).creation_flags(CREATE_NO_WINDOW);
+    Ok(cmd)
+}
+
+/// Starts the uninstaller. Windows only.
+///
+/// Not waited for: `start` returns as soon as it has launched the program, and one it cannot find
+/// puts up an error dialog that would hold this call until someone closed it. Standard streams
+/// are closed rather than inherited so nothing started here keeps a pipe of ours open after we
+/// are done with it.
+#[cfg(windows)]
+pub fn launch(command: &str) -> std::io::Result<()> {
+    use std::process::Stdio;
+    command_for(command)?
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .spawn()?;
     Ok(())
 }
@@ -223,39 +230,88 @@ mod tests {
     }
 }
 
-/// Starts a real batch file through [`launch`], which is the only way to know that a path with a
+/// Starts a real program through [`launch`], which is the only way to know that a path with a
 /// space in it and quoted arguments reach it intact. Windows only, so it runs in the Windows CI job.
+///
+/// The program is a copy of `cmd.exe`, which is on every Windows machine and can be placed in any
+/// folder. A batch file would also have been a test of how `start` runs batch files, which is a
+/// different question from how the command line is passed on.
 #[cfg(all(test, windows))]
 mod launch_tests {
     use super::*;
+    use std::path::Path;
     use std::time::{Duration, Instant};
 
-    #[test]
-    fn a_quoted_path_with_a_space_and_quoted_arguments_arrive_intact() {
-        let dir = tempfile::tempdir().unwrap();
-        let home = dir.path().join("A Folder With Spaces");
-        std::fs::create_dir_all(&home).unwrap();
-        let marker = home.join("what it was given.txt");
-        let script = home.join("uninstall me.cmd");
-        // Writes the arguments it received into the marker.
-        std::fs::write(
-            &script,
-            format!("@echo off\r\n>\"{}\" echo %*\r\n", marker.display()),
-        )
-        .unwrap();
+    /// Puts a copy of `cmd.exe` in `folder` under `name`, and returns its path.
+    fn tool_in(folder: &Path, name: &str) -> std::path::PathBuf {
+        std::fs::create_dir_all(folder).unwrap();
+        let system = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
+        let tool = folder.join(name);
+        std::fs::copy(Path::new(&system).join("System32").join("cmd.exe"), &tool).unwrap();
+        tool
+    }
 
-        launch(&format!("\"{}\" /S \"two words\"", script.display())).unwrap();
+    /// What `cmd.exe` itself says when handed the same command line, for a failure message.
+    fn what_cmd_says(command: &str) -> String {
+        match command_for(command) {
+            Ok(mut cmd) => match cmd.output() {
+                Ok(out) => format!(
+                    "exit {:?}, stdout {:?}, stderr {:?}",
+                    out.status.code(),
+                    String::from_utf8_lossy(&out.stdout),
+                    String::from_utf8_lossy(&out.stderr)
+                ),
+                Err(e) => format!("could not run: {e}"),
+            },
+            Err(e) => format!("refused: {e}"),
+        }
+    }
 
+    fn started(marker: &Path) -> bool {
         let deadline = Instant::now() + Duration::from_secs(20);
         while !marker.exists() && Instant::now() < deadline {
             std::thread::sleep(Duration::from_millis(100));
         }
-        assert!(marker.exists(), "the uninstaller never ran");
-        // Give the batch file a moment to finish writing before reading.
-        std::thread::sleep(Duration::from_millis(300));
-        let got = std::fs::read_to_string(&marker).unwrap();
-        assert!(got.contains("/S"), "arguments lost: {got:?}");
-        assert!(got.contains("\"two words\""), "quoting lost: {got:?}");
+        marker.exists()
+    }
+
+    #[test]
+    fn control_a_plain_path_with_no_spaces_starts() {
+        // If this fails, nothing about quoting is being measured: starting a console program this
+        // way does not work on the machine running the test.
+        let dir = tempfile::tempdir().unwrap();
+        let tool = tool_in(&dir.path().join("plain"), "tool.exe");
+        let marker = dir.path().join("plain-marker.txt");
+        let command = format!("{} /C copy NUL {}", tool.display(), marker.display());
+
+        launch(&command).unwrap();
+        assert!(
+            started(&marker),
+            "control did not run: {}",
+            what_cmd_says(&command)
+        );
+    }
+
+    #[test]
+    fn a_quoted_path_with_a_space_and_quoted_arguments_arrive_intact() {
+        // The marker is in a folder with a space in it too: it can only be created if the quoted
+        // argument reached the program as one argument, with its quotes meaning what they mean.
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path().join("A Folder With Spaces");
+        let tool = tool_in(&folder, "uninstall me.exe");
+        let marker = folder.join("what it made.txt");
+        let command = format!(
+            "\"{}\" /C copy NUL \"{}\"",
+            tool.display(),
+            marker.display()
+        );
+
+        launch(&command).unwrap();
+        assert!(
+            started(&marker),
+            "quoted command did not run: {}",
+            what_cmd_says(&command)
+        );
     }
 
     #[test]
