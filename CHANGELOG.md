@@ -8,6 +8,19 @@ All notable changes to Prune are documented here. The format follows
 
 ### Fixed
 
+- **"Run vendor uninstaller" on Windows did nothing for almost every application.** The
+  command was handed to `start` as one piece, so `MsiExec.exe /X{...}` reached it as a single
+  program with that whole text for a name, which does not exist. Only a command that was a bare
+  path with no arguments ran; that rules out nearly every MSI uninstaller and most others. It now
+  reaches the shell as written.
+- **That button also chose the silent uninstall when an application registered one.** Many
+  installers register both an ordinary and a "quiet" uninstall command; the quiet one has no
+  window and no confirmation. The button is a single click with no preview, so with the quiet
+  command it uninstalled the application on the spot, around the rule that nothing is removed
+  before you have read what will go — and an application cannot be got back. Only the ordinary
+  command is offered now, and an application that registered only a quiet one is offered no
+  button. Command text containing `&`, `|`, `<`, `>` or `^` outside quotes is refused rather than
+  handed to the shell.
 - Docker that did not answer left the Developer screen reading it for good. Docker Desktop that
   is starting, or has frozen, accepts the connection and says nothing, and Prune waited with no
   limit — and every refresh started another blocked wait behind the first. Asking Docker what it
