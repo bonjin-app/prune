@@ -6,6 +6,47 @@ All notable changes to Prune are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Storage overview with live volume capacity, a low-space warning, and quick analysis paths.
+- Clickable folder space map, ranked folders, search, breadcrumbs, and 100-row pagination.
+- Whole-disk/external-drive analysis shortcuts and a folder-to-project-review handoff that
+  suggests a scan scope without automatically scanning, selecting or deleting anything.
+- Per-folder skipped-path details and explicit partial results after cancellation or read errors.
+- Post-cleanup available-capacity readings, with retry independent of the cleanup operation.
+- Unity `Library` cache discovery only when sibling `Assets` and `ProjectSettings` directories
+  identify a Unity project. Assets, Packages and ProjectSettings are excluded from artifact
+  discovery. Library is Low Risk, never automatically selected, and still requires preview.
+
+### Fixed
+
+- Older folder/filter requests can no longer replace the latest navigation or scan results.
+- Folder loading failures offer retry instead of an endless loading placeholder.
+- Cancelled disk analysis retains its cancelled state in the cleanup session.
+- Very short analyses no longer lose completion events that precede the launch response.
+- Summary reconciliation recovers results when native completion notifications are missed,
+  without duplicate completions resetting folder navigation.
+- Cleanup invalidates earlier folder/filter reads and refreshes the intended destination, so
+  deleted rows and pre-cleanup folder totals cannot reappear from an older request.
+- Cleaner and Storage immediately acknowledge cancellation, including requests made before
+  scan launch returns, and wait for completion rather than claiming OS work already stopped.
+- Cleaner recovers missed completion events, rejects stale previews and duplicate cleanup,
+  and retains rows when a cleanup result cannot be verified.
+- Storage and app removal share Cleaner's preview lifecycle, so late previews cannot overwrite
+  a cleanup in progress. Rescan and dismissal cannot abandon pending cleanup, and incomplete
+  or contradictory IPC results are rejected before changing lists or claiming success.
+- Folder pages stay bounded to 100 rows instead of accumulating every preceding page.
+- Preview explicitly distinguishes high-risk items and excludes blocked items from totals.
+- Cleanup results distinguish reported file sizes from current available disk space; moving
+  files to Trash is not presented as reclaiming space.
+
+### Notes
+
+- Folder bytes describe logical file sizes, not unique allocated APFS blocks. Clones, sparse
+  files and Trash can make the change in available disk space different from the preview total.
+- This version is a local build until a release is published. Apple Developer ID signing and
+  notarization remain required for a verified public macOS distribution.
+
 ## [0.1.6] - 2026-10-07
 
 Fixes to the Windows uninstaller button, to how Prune waits for Docker, and to reading a damaged

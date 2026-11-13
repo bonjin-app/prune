@@ -52,7 +52,7 @@ safety as the primary feature.
   node-gyp, Deno, Playwright, Puppeteer, Cypress, Electron, Gradle, Maven, Cargo, Go, NuGet,
   CocoaPods, Swift Package Manager, pub, RubyGems, Composer, JetBrains, Homebrew, Xcode
   DerivedData and Archives, Simulator caches — plus project artifacts found per project:
-  `node_modules`, Rust `target/`, `build/`, `dist/`, Python caches and virtualenvs. Point it
+  `node_modules`, Rust `target/`, `build/`, `dist/`, Unity `Library`, Python caches and virtualenvs. Point it
   at the folders where your code actually lives.
 - **Safe by default.** A whitelist of removable roots, a list of protected paths, a mandatory
   dry run, Trash before permanent deletion, and a local operation log. See
@@ -64,20 +64,26 @@ safety as the primary feature.
 
 ## Features
 
-| Area            | Status     | What it does                                                                           |
-| --------------- | ---------- | -------------------------------------------------------------------------------------- |
-| Dashboard       | ✅         | Storage, memory, CPU at a glance; reclaimable space by category; recent activity       |
-| Cleaner         | ✅         | Application caches, logs, temporary files, Trash, old installers, browser caches       |
-| Developer       | ✅         | Global tool caches + project artifact finder with per-item risk levels                 |
-| Monitor         | ✅         | Live CPU per core, memory, swap, disks, top processes                                  |
-| Command palette | ✅         | `⌘K` / `Ctrl+K` to jump anywhere or start a scan                                       |
-| Disk analyzer   | ✅         | Directory tree with drill-down, largest files, file type statistics, cancellable       |
-| Uninstaller     | ✅         | Apps with their caches, preferences and containers, matched by bundle identifier       |
-| Startup manager | ✅         | Login items and launch agents, enable / disable without deleting anything              |
-| Docker          | ✅         | What Docker is holding, and two conservative prune commands. Volumes are never touched |
-| CLI             | ✅         | `prune scan`, `clean`, `disk`, `apps`, `startup`, `docker`, `processes`, `log`, `--json` |
+| Area            | Status | What it does                                                                                        |
+| --------------- | ------ | --------------------------------------------------------------------------------------------------- |
+| Dashboard       | ✅     | Storage, memory, CPU at a glance; reclaimable space by category; recent activity                    |
+| Cleaner         | ✅     | Application caches, logs, temporary files, Trash, old installers, browser caches                    |
+| Developer       | ✅     | Global tool caches + project artifact finder with per-item risk levels                              |
+| Monitor         | ✅     | Live CPU per core, memory, swap, disks, top processes                                               |
+| Command palette | ✅     | `⌘K` / `Ctrl+K` to jump anywhere or start a scan                                                    |
+| Disk analyzer   | ✅     | Live capacity, clickable folder map, ranked/searchable folders, largest files, partial-scan details |
+| Uninstaller     | ✅     | Apps with their caches, preferences and containers, matched by bundle identifier                    |
+| Startup manager | ✅     | Login items and launch agents, enable / disable without deleting anything                           |
+| Docker          | ✅     | What Docker is holding, and two conservative prune commands. Volumes are never touched              |
+| CLI             | ✅     | `prune scan`, `clean`, `disk`, `apps`, `startup`, `docker`, `processes`, `log`, `--json`            |
 
 Every removable item carries a risk level:
+
+Folder totals are **logical file sizes**, not unique allocated storage. APFS clones and sparse
+files may occupy less physical space. Moving items to Trash is recoverable but does not free
+their storage until Trash is emptied; Prune does not empty it automatically. Unity Library
+cleanup should be done with Unity closed; the next import rebuilds the cache and may take time.
+Unity source assets and project configuration are not cleanup candidates.
 
 ```
 Safe        regenerated automatically, no user state      browser cache, npm cache, logs
@@ -91,7 +97,7 @@ Only `Safe` items are ever ticked for you, and only when you ask — by pressing
 items**, or `prune clean` without `--include-low`. Everything else you choose yourself.
 
 There is one exception in the other direction. A few things cannot be moved to the Trash at
-all — what is already *in* the Trash, for one — so they are deleted outright whatever mode is
+all — what is already _in_ the Trash, for one — so they are deleted outright whatever mode is
 chosen. Those are left unticked while the mode is "Move to Trash", because a recommendation
 that reads as reversible should not contain the one item that is not.
 
@@ -155,11 +161,11 @@ real interface.</sub>
 Pick the one for your machine. Every file is built by GitHub Actions from the tagged commit —
 nothing is uploaded from anyone's laptop.
 
-| Platform                   | File                                                                                                            |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| **macOS** (Apple Silicon)  | [`Prune_0.1.6_aarch64.dmg`](https://github.com/bonjin-app/prune/releases/latest/download/Prune_0.1.6_aarch64.dmg) |
-| **macOS** (Intel)          | [`Prune_0.1.6_x64.dmg`](https://github.com/bonjin-app/prune/releases/latest/download/Prune_0.1.6_x64.dmg)         |
-| **Windows** (x64)          | [`Prune_0.1.6_x64-setup.exe`](https://github.com/bonjin-app/prune/releases/latest/download/Prune_0.1.6_x64-setup.exe) · [`.msi`](https://github.com/bonjin-app/prune/releases/latest/download/Prune_0.1.6_x64_en-US.msi) |
+| Platform                  | File                                                                                                                                                                                                                     |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **macOS** (Apple Silicon) | [`Prune_0.1.6_aarch64.dmg`](https://github.com/bonjin-app/prune/releases/latest/download/Prune_0.1.6_aarch64.dmg)                                                                                                        |
+| **macOS** (Intel)         | [`Prune_0.1.6_x64.dmg`](https://github.com/bonjin-app/prune/releases/latest/download/Prune_0.1.6_x64.dmg)                                                                                                                |
+| **Windows** (x64)         | [`Prune_0.1.6_x64-setup.exe`](https://github.com/bonjin-app/prune/releases/latest/download/Prune_0.1.6_x64-setup.exe) · [`.msi`](https://github.com/bonjin-app/prune/releases/latest/download/Prune_0.1.6_x64_en-US.msi) |
 
 The `prune` command line ships from the same release, as
 [`prune-v0.1.6-<target>.tar.gz`](https://github.com/bonjin-app/prune/releases/latest) (`.zip` on
