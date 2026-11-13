@@ -80,9 +80,18 @@ The `Release` workflow then builds:
 | `Prune_0.2.0_x64.dmg`                   | macOS, Intel         |
 | `Prune_0.2.0_x64-setup.exe`, `.msi`     | Windows x64          |
 | `prune-v0.2.0-<target>.tar.gz` / `.zip` | the CLI, per target  |
+| `SHA256SUMS`                            | every file above     |
 
 It opens the release as a **draft**. Read the notes, check the artifacts are all there, then
 publish.
+
+`SHA256SUMS` is written last, by the `Checksums` job, from the files as the release serves them.
+If a job is re-run and replaces a file, re-run `Checksums` too, or regenerate it by hand:
+
+```bash
+scripts/release-checksums.sh v0.2.0            # prints it, changes nothing
+scripts/release-checksums.sh v0.2.0 --upload   # replaces the one on the release
+```
 
 ## 5. Signing
 
