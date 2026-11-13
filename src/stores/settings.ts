@@ -33,6 +33,7 @@ export const useSettings = create<SettingsState>((set, get) => ({
   },
 
   setProjectRoots: async (roots) => {
+    if (get().saving) return false;
     set({ saving: true, error: null });
     try {
       set({ view: await backend.settingsSetProjectRoots(roots), saving: false });
@@ -44,9 +45,13 @@ export const useSettings = create<SettingsState>((set, get) => ({
   },
 
   addProjectRoot: async (root) => {
+    const { view, saving } = get();
+    if (saving || !view) return false;
     const trimmed = root.trim();
     if (!trimmed) return false;
-    const current = get().view?.settings.projectRoots ?? [];
+    const current = view.projectRootsConfigured
+      ? view.settings.projectRoots
+      : view.effectiveProjectRoots;
     if (current.includes(trimmed)) return true;
     return get().setProjectRoots([...current, trimmed]);
   },

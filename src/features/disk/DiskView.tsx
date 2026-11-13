@@ -1,21 +1,26 @@
-import { useMemo, useState } from "react";
-import { Ban, ChevronRight, FileBox, FolderOpen, HardDrive, Home, RefreshCw } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Ban, FolderOpen, HardDrive, Home, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { PermissionBanner } from "@/components/ui/PermissionBanner";
 import { RiskBadge } from "@/components/ui/RiskBadge";
 import { Spinner } from "@/components/ui/Spinner";
 import { cn } from "@/lib/cn";
 import { abbreviatePath, formatBytes, formatRelative, plural } from "@/lib/format";
-import { backend } from "@/lib/tauri";
+import { backend, isTauri } from "@/lib/tauri";
 import { SIZE_FILTERS, useDisk, type DiskTab } from "@/stores/disk";
 import { useScan } from "@/stores/scan";
-import { useSystem } from "@/stores/system";
+import { startSnapshotPolling, useSystem } from "@/stores/system";
+import { useSettings } from "@/stores/settings";
 import { DeleteModeToggle } from "../cleaner/DeleteModeToggle";
+import { StorageOverview } from "./StorageOverview";
+import { FolderExplorer } from "./FolderExplorer";
 
 export function DiskView() {
   const scanning = useDisk((s) => s.scanning);
+  const cancelling = useDisk((s) => s.cancelling);
   const summary = useDisk((s) => s.summary);
   const progress = useDisk((s) => s.progress);
   const root = useDisk((s) => s.root);
@@ -28,21 +33,56 @@ export function DiskView() {
   // threshold from the size filter, so it said 11 above a list of 9.
   const largeFileCount = useDisk((s) => s.largeFiles.length);
   const info = useSystem((s) => s.info);
+  const permissions = useSystem((s) => s.permissions);
   const home = info?.homeDir;
+  const disks = useSystem((s) => s.snapshot?.disks);
+  const settings = useSettings((s) => s.view);
+  const loadSettings = useSettings((s) => s.load);
+  useEffect(() => startSnapshotPolling(5000), []);
+  useEffect(() => {
+    if (!settings) void loadSettings();
+  }, [settings, loadSettings]);
+  const separator = home?.includes("\\") ? "\\" : "/";
+  const scopes = home
+    ? [
+        { label: "This disk", path: /^[A-Za-z]:/.test(home) ? `${home.slice(0, 2)}\\` : "/" },
+        { label: "Home", path: home },
+        { label: "Documents", path: `${home}${separator}Documents` },
+        { label: "Downloads", path: `${home}${separator}Downloads` },
+        ...(settings?.effectiveProjectRoots ?? []).slice(0, 3).map((path) => ({
+          label: path.split(/[\\/]/).filter(Boolean).at(-1) || "Projects",
+          path,
+        })),
+        ...(disks ?? [])
+          .filter((disk) => disk.isRemovable)
+          .map((disk) => ({ label: disk.name || "External drive", path: disk.mountPoint })),
+      ].filter((scope, index, all) => all.findIndex((other) => other.path === scope.path) === index)
+    : [];
 
   return (
     <div className="flex h-full flex-col">
       <PageHeader
-        title="Disk"
-        description="Where your space goes. Scans are read-only; large files can be reviewed and removed."
+        title="Storage"
+        description="See what takes up space. Explore folders, then review what can go."
         actions={tab === "large" ? <DeleteModeToggle /> : undefined}
       />
+
+      <div className="px-7 pb-5">
+        <StorageOverview path={summary?.root || root || home} />
+      </div>
+      {!isTauri && (
+        <p className="px-7 pb-3 text-[11px] text-fg-faint">
+          Sample data · Open the desktop app to analyze your computer.
+        </p>
+      )}
+      <PermissionBanner />
 
       <div className="flex items-center gap-2 px-7 pb-3">
         <div className="field flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md border border-line bg-surface px-2.5">
           <HardDrive size={13} className="shrink-0 text-fg-faint" />
           <input
             value={root}
+            disabled={scanning}
             onChange={(e) => setRoot(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && !scanning && void startScan()}
             placeholder={home ? `${home}  (default: home directory)` : "Directory to analyze"}
@@ -55,6 +95,7 @@ export function DiskView() {
               type="button"
               title="Use home directory"
               onClick={() => setRoot(home)}
+              disabled={scanning}
               className="rounded p-1 text-fg-faint hover:bg-surface-2 hover:text-fg"
             >
               <Home size={13} />
@@ -62,8 +103,8 @@ export function DiskView() {
           )}
         </div>
         {scanning ? (
-          <Button variant="secondary" onClick={() => void cancelScan()}>
-            <Ban size={14} /> Cancel
+          <Button variant="secondary" disabled={cancelling} onClick={() => void cancelScan()}>
+            <Ban size={14} /> {cancelling ? "Cancelling…" : "Cancel"}
           </Button>
         ) : (
           <Button variant={summary ? "secondary" : "primary"} onClick={() => void startScan()}>
@@ -71,22 +112,55 @@ export function DiskView() {
           </Button>
         )}
       </div>
+      {scopes.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 px-7 pb-4">
+          <span className="mr-1 text-[11px] text-fg-faint">Analyze</span>
+          {scopes.map((scope) => (
+            <button
+              key={scope.path}
+              type="button"
+              disabled={scanning}
+              onClick={() => {
+                setRoot(scope.path);
+                void startScan(scope.path);
+              }}
+              title={scope.path}
+              className="max-w-[200px] truncate rounded-full border border-line bg-surface px-3 py-1 text-[11px] text-fg-muted hover:border-accent/40 hover:bg-accent-soft hover:text-accent disabled:opacity-40"
+            >
+              {scope.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {scanning && (
         <div className="mx-7 mb-3 rounded-lg border border-line bg-surface px-4 py-3">
           <div className="flex items-center gap-2 text-[12.5px]">
             <Spinner size={13} className="text-accent" />
             <span className="font-medium">
-              Analyzing {abbreviatePath(root || home || "", home)}…
+              {cancelling ? "Stopping analysis of " : "Analyzing "}
+              {abbreviatePath(root || home || "", home)}…
             </span>
             <span className="ml-auto text-fg-muted tnum">
-              {plural(progress?.files ?? 0, "file")} · {plural(progress?.dirs ?? 0, "folder")}
-              · {formatBytes(progress?.bytes ?? 0)}
+              {plural(progress?.files ?? 0, "file")} · {plural(progress?.dirs ?? 0, "folder")}·{" "}
+              {formatBytes(progress?.bytes ?? 0)}
             </span>
           </div>
           <div className="mt-1.5 truncate font-mono text-[11px] text-fg-faint">
             {progress?.currentPath ?? " "}
           </div>
+          {cancelling && (
+            <p role="status" className="mt-2 text-[11px] text-fg-muted">
+              Cancellation requested. Waiting for file access to return; partial results will be
+              shown when the scan stops.
+            </p>
+          )}
+          {!progress && permissions?.fullDiskAccess === "denied" && (
+            <p className="mt-2 text-[11px] text-fg-muted">
+              If progress stays at zero, check for a macOS folder access request. The OS can wait
+              for your decision before file access returns, including after Cancel.
+            </p>
+          )}
         </div>
       )}
 
@@ -97,13 +171,13 @@ export function DiskView() {
           description="Prune walks the directory once and shows folder sizes, the largest files and which file types take the most space. Nothing is modified."
           action={
             <Button variant="primary" onClick={() => void startScan()}>
-              <RefreshCw size={14} /> Analyze home directory
+              <RefreshCw size={14} /> Analyze {root ? "this directory" : "home directory"}
             </Button>
           }
         />
       ) : summary ? (
         <>
-          <div className="flex items-center gap-1 px-7 pb-3">
+          <div className="flex flex-wrap items-center gap-x-1 gap-y-2 px-7 pb-3">
             <Tab id="tree" current={tab} onSelect={setTab} label="Folders" />
             <Tab
               id="large"
@@ -122,8 +196,8 @@ export function DiskView() {
               <span className="text-[13px] font-medium text-fg">
                 {formatBytes(summary.totalBytes)}
               </span>
-              <span className="text-fg-faint">
-                in {plural(summary.fileCount, "file")}
+              <span className="text-fg-faint" title={summary.root}>
+                measured · {plural(summary.fileCount, "file")}
               </span>
               {summary.status === "cancelled" && (
                 <span className="text-warn">stopped early, partial</span>
@@ -133,8 +207,20 @@ export function DiskView() {
               )}
             </div>
           </div>
+          {(summary.issueCount > 0 || summary.status === "cancelled") && (
+            <div
+              role="status"
+              className="mx-7 mb-3 rounded-lg border border-warn/25 bg-warn/5 px-3 py-2 text-[12px] text-fg-muted"
+            >
+              {summary.status === "cancelled" ? "Scan stopped early. " : ""}
+              {summary.issueCount > 0
+                ? `${plural(summary.issueCount, "path")} could not be read. `
+                : ""}
+              These are partial results; unreadable folders may contain more data.
+            </div>
+          )}
           <div className="min-h-0 flex-1 px-7 pb-8">
-            {tab === "tree" && <FolderTree />}
+            {tab === "tree" && <FolderExplorer />}
             {tab === "large" && <LargeFiles />}
             {tab === "types" && <FileTypes />}
           </div>
@@ -177,106 +263,6 @@ function Tab({
   );
 }
 
-function FolderTree() {
-  const node = useDisk((s) => s.node);
-  const openNode = useDisk((s) => s.openNode);
-  const home = useSystem((s) => s.info?.homeDir);
-  if (!node) return null;
-  const max = Math.max(node.children[0]?.sizeBytes ?? 0, node.node.ownFileBytes, 1);
-  return (
-    <div className="overflow-hidden rounded-lg border border-line bg-surface">
-      <div className="flex items-center gap-1 border-b border-line px-3 py-2 text-[12px]">
-        {node.breadcrumbs.map((b) => (
-          <span key={b.path} className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => void openNode(b.path)}
-              className="rounded px-1 text-fg-muted hover:bg-surface-2 hover:text-fg"
-            >
-              {b.name || b.path}
-            </button>
-            <ChevronRight size={12} className="text-fg-faint" />
-          </span>
-        ))}
-        <span className="rounded px-1 font-medium">{node.node.name || node.node.path}</span>
-        <span className="ml-auto text-fg-muted tnum">{formatBytes(node.node.sizeBytes)}</span>
-        <button
-          type="button"
-          onClick={() => void backend.fsReveal(node.node.path)}
-          className="rounded p-1 text-fg-faint hover:bg-surface-2 hover:text-fg"
-          title="Reveal"
-        >
-          <FolderOpen size={13} />
-        </button>
-      </div>
-      {node.children.length === 0 && node.node.ownFileBytes === 0 && (
-        <div className="px-3 py-6 text-center text-[12.5px] text-fg-faint">Empty folder</div>
-      )}
-      {node.children.map((c) => (
-        <button
-          key={c.path}
-          type="button"
-          onClick={() => void openNode(c.path)}
-          className="group flex w-full items-center gap-3 border-t border-line/60 px-3 py-[7px] text-left hover:bg-surface-2/60"
-        >
-          <div className="w-[38%] min-w-0">
-            <div className="truncate text-[12.5px] font-medium">{c.name}</div>
-            <div className="truncate text-[11px] text-fg-faint tnum">
-              {plural(c.fileCount, "file")} · {plural(c.dirCount, "folder")}
-            </div>
-          </div>
-          <div className="flex-1">
-            <div className="h-[8px] w-full overflow-hidden rounded-sm bg-black/[0.06] dark:bg-white/[0.07]">
-              <div
-                className="h-full rounded-sm bg-accent/80 transition-[width] duration-300"
-                style={{ width: `${Math.max(0.5, (c.sizeBytes / max) * 100)}%` }}
-              />
-            </div>
-          </div>
-          <div className="w-[52px] text-right text-[11px] text-fg-faint tnum">
-            {node.node.sizeBytes > 0
-              ? `${((c.sizeBytes / node.node.sizeBytes) * 100).toFixed(0)}%`
-              : ""}
-          </div>
-          <div className="w-[76px] text-right text-[12.5px] font-medium tnum">
-            {formatBytes(c.sizeBytes)}
-          </div>
-          <ChevronRight size={13} className="text-fg-faint" />
-        </button>
-      ))}
-      {node.node.ownFileBytes > 0 && (
-        <div className="flex items-center gap-3 border-t border-line/60 px-3 py-[7px] text-fg-muted">
-          <div className="w-[38%] min-w-0">
-            <div className="flex items-center gap-1.5 truncate text-[12.5px]">
-              <FileBox size={12} /> Files in this folder
-            </div>
-            <div className="truncate text-[11px] text-fg-faint">
-              {abbreviatePath(node.node.path, home)}
-            </div>
-          </div>
-          <div className="flex-1">
-            <div className="h-[8px] w-full overflow-hidden rounded-sm bg-black/[0.06] dark:bg-white/[0.07]">
-              <div
-                className="h-full rounded-sm bg-fg-faint/50"
-                style={{ width: `${Math.max(0.5, (node.node.ownFileBytes / max) * 100)}%` }}
-              />
-            </div>
-          </div>
-          <div className="w-[52px] text-right text-[11px] text-fg-faint tnum">
-            {node.node.sizeBytes > 0
-              ? `${((node.node.ownFileBytes / node.node.sizeBytes) * 100).toFixed(0)}%`
-              : ""}
-          </div>
-          <div className="w-[76px] text-right text-[12.5px] font-medium tnum">
-            {formatBytes(node.node.ownFileBytes)}
-          </div>
-          <div className="w-[13px]" />
-        </div>
-      )}
-    </div>
-  );
-}
-
 function LargeFiles() {
   const files = useDisk((s) => s.largeFiles);
   const minBytes = useDisk((s) => s.minBytes);
@@ -288,7 +274,8 @@ function LargeFiles() {
   const home = useSystem((s) => s.info?.homeDir);
   const deleteMode = useScan((s) => s.deleteMode);
   const [custom, setCustom] = useState("");
-  const [previewing, setPreviewing] = useState(false);
+  const previewing = useScan((s) => s.previewing);
+  const preview = useScan((s) => s.preview);
 
   const selectedFiles = useMemo(
     () => files.filter((f) => selected.has(f.targetId)),
@@ -299,19 +286,10 @@ function LargeFiles() {
 
   const review = async () => {
     if (!scanId || selectedFiles.length === 0) return;
-    setPreviewing(true);
-    try {
-      const plan = await backend.cleanerPreview(
-        scanId,
-        selectedFiles.map((f) => f.targetId),
-        deleteMode,
-      );
-      useScan.setState({ plan, cleanupProgress: null });
-    } catch (e) {
-      useDisk.setState({ error: String((e as { message?: string }).message ?? e) });
-    } finally {
-      setPreviewing(false);
-    }
+    await preview(
+      selectedFiles.map((f) => f.targetId),
+      scanId,
+    );
   };
 
   return (

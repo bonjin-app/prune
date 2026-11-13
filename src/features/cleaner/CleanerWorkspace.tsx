@@ -30,6 +30,7 @@ export function CleanerWorkspace({
   const session = useScan((s) => s.session);
   const cancelled = session?.status === "cancelled";
   const scanning = useScan((s) => s.scanning);
+  const cancelling = useScan((s) => s.cancelling);
   const selected = useScan((s) => s.selected);
   const startScan = useScan((s) => s.startScan);
   const cancelScan = useScan((s) => s.cancelScan);
@@ -90,8 +91,8 @@ export function CleanerWorkspace({
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2 px-7 pb-4">
         {scanning ? (
-          <Button variant="secondary" onClick={() => void cancelScan()}>
-            <Ban size={14} /> Cancel
+          <Button variant="secondary" disabled={cancelling} onClick={() => void cancelScan()}>
+            <Ban size={14} /> {cancelling ? "Cancelling…" : "Cancel"}
           </Button>
         ) : (
           <Button

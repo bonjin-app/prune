@@ -35,6 +35,7 @@ export function applyTheme(pref: ThemePreference) {
 
 interface UiState {
   view: ViewId;
+  projectRootDraft: string | null;
   theme: ThemePreference;
   paletteOpen: boolean;
   /**
@@ -47,6 +48,7 @@ interface UiState {
    */
   permissionNoticeDismissed: boolean;
   setView: (view: ViewId) => void;
+  openProjectReview: (path: string) => void;
   setTheme: (theme: ThemePreference) => void;
   setPaletteOpen: (open: boolean) => void;
   dismissPermissionNotice: () => void;
@@ -54,10 +56,12 @@ interface UiState {
 
 export const useUi = create<UiState>((set) => ({
   view: "dashboard",
+  projectRootDraft: null,
   theme: loadTheme(),
   paletteOpen: false,
   permissionNoticeDismissed: false,
   setView: (view) => set({ view }),
+  openProjectReview: (path) => set({ view: "developer", projectRootDraft: path }),
   setTheme: (theme) => {
     try {
       localStorage.setItem(THEME_KEY, theme);

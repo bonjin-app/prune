@@ -5,6 +5,8 @@ import { PermissionBanner } from "@/components/ui/PermissionBanner";
 import { Spinner } from "@/components/ui/Spinner";
 import { cn } from "@/lib/cn";
 import { InsightsCard } from "./InsightsCard";
+import { StorageOverview } from "@/features/disk/StorageOverview";
+import { useDisk } from "@/stores/disk";
 import { formatBytes, formatPercent, formatRelative, splitBytes } from "@/lib/format";
 import { useScan } from "@/stores/scan";
 import { startSnapshotPolling, useSystem } from "@/stores/system";
@@ -29,6 +31,7 @@ export function DashboardView() {
   const cancelScan = useScan((s) => s.cancelScan);
   const selectRecommended = useScan((s) => s.selectRecommended);
   const setView = useUi((s) => s.setView);
+  const home = useSystem((s) => s.info?.homeDir);
 
   useEffect(() => startSnapshotPolling(3000), []);
 
@@ -53,7 +56,16 @@ export function DashboardView() {
   };
 
   return (
-    <div className="mx-auto flex min-h-full w-full max-w-[720px] flex-col px-6 pt-12 pb-10">
+    <div className="mx-auto flex min-h-full w-full max-w-[720px] flex-col px-6 pt-7 pb-10">
+      <div className="mb-10">
+        <StorageOverview
+          path={home}
+          onExplore={() => {
+            if (home) useDisk.getState().setRoot(home);
+            setView("disk");
+          }}
+        />
+      </div>
       <div className="flex flex-col items-center text-center">
         {session ? (
           <>

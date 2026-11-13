@@ -71,7 +71,9 @@ describe("PreviewDialog", () => {
     );
     show(plan);
 
-    expect(screen.getByText(/2 items already in the Trash will be deleted permanently/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/2 items already in the Trash will be deleted permanently/),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Move to Trash/ })).toBeInTheDocument();
   });
 
@@ -87,6 +89,23 @@ describe("PreviewDialog", () => {
   it("warns when the plan is not all safe", () => {
     show(factory.plan([factory.target({ id: "a", risk: "medium" })]));
     expect(screen.getByText(/Includes medium-risk items/)).toBeInTheDocument();
+  });
+
+  it("does not downplay high-risk targets as medium risk", () => {
+    show(factory.plan([factory.target({ id: "a", risk: "high" })]));
+    expect(screen.getByText(/Includes high-risk items/)).toBeInTheDocument();
+    expect(screen.queryByText(/Includes medium-risk items/)).toBeNull();
+  });
+
+  it("explains planned logical bytes and excluded blocked items", () => {
+    show(
+      factory.plan([factory.target({ id: "a" })], {
+        blocked: [{ targetId: "blocked", path: "/protected", reason: "protected tree" }],
+      }),
+    );
+    expect(screen.getByText(/Reported file sizes, not guaranteed free space/)).toBeInTheDocument();
+    expect(screen.getByText(/1 blocked item excluded from these totals/)).toBeInTheDocument();
+    expect(screen.getByText(/may need to be rebuilt or downloaded/)).toBeInTheDocument();
   });
 
   it("stays quiet when there is nothing to warn about", () => {

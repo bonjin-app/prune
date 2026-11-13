@@ -21,6 +21,7 @@ export function PreviewDialog() {
   const permanent = plan.mode === "permanent";
   const permanentOnly = plan.targets.filter((t) => t.permanentOnly).length;
   const riskiest = plan.targets.some((t) => t.risk === "medium" || t.risk === "high");
+  const highRisk = plan.targets.some((t) => t.risk === "high");
   const pct = progress && progress.total > 0 ? (progress.done / progress.total) * 100 : 0;
 
   return (
@@ -29,8 +30,9 @@ export function PreviewDialog() {
       onClose={() => !executing && closePreview()}
       closeOnBackdrop={!executing}
       label="Preview cleanup"
+      className="flex max-h-[calc(100vh-48px)] flex-col"
     >
-      <div className="px-5 pt-5 pb-4">
+      <div className="min-h-0 overflow-y-auto px-5 pt-5 pb-4">
         <div className="flex items-start gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent">
             {permanent ? <AlertTriangle size={18} /> : <ShieldCheck size={18} />}
@@ -43,6 +45,16 @@ export function PreviewDialog() {
             </p>
           </div>
         </div>
+
+        <p className="mt-2 text-[11.5px] text-fg-muted">
+          Reported file sizes, not guaranteed free space.{" "}
+          {plan.blocked.length > 0 && (
+            <>{plural(plan.blocked.length, "blocked item")} excluded from these totals.</>
+          )}
+        </p>
+        <p className="mt-1 text-[11.5px] text-fg-muted">
+          Caches and build artifacts may need to be rebuilt or downloaded when their apps run again.
+        </p>
 
         <div className="mt-4 grid grid-cols-3 gap-2">
           <Stat label="Would remove" value={formatBytes(plan.totalBytes)} strong />
@@ -59,14 +71,14 @@ export function PreviewDialog() {
             )}
             {!permanent && permanentOnly > 0 && (
               <li className="flex items-center gap-2 text-fg-muted">
-                <Trash2 size={13} /> {plural(permanentOnly, "item")} already in the {trash} will
-                be deleted permanently.
+                <Trash2 size={13} /> {plural(permanentOnly, "item")} already in the {trash} will be
+                deleted permanently.
               </li>
             )}
             {riskiest && (
               <li className="flex items-center gap-2 text-warn">
-                <AlertTriangle size={13} /> Includes medium-risk items. Make sure you don't need
-                them.
+                <AlertTriangle size={13} /> Includes {highRisk ? "high" : "medium"}-risk items. Make
+                sure you don't need them.
               </li>
             )}
           </ul>
@@ -120,7 +132,7 @@ export function PreviewDialog() {
         )}
       </div>
 
-      <div className="flex items-center justify-end gap-2 border-t border-line bg-surface-2/60 px-5 py-3">
+      <div className="flex shrink-0 items-center justify-end gap-2 border-t border-line bg-surface-2/60 px-5 py-3">
         <Button variant="ghost" onClick={closePreview} disabled={executing}>
           Cancel
         </Button>

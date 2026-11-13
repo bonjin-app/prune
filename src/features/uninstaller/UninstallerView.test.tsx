@@ -132,6 +132,27 @@ describe("UninstallerView", () => {
     expect(screen.getByRole("button", { name: /Uninstall|Remove leftovers/ })).toBeDisabled();
     expect(backend.cleanerPreview).not.toHaveBeenCalled();
   });
+
+  it("cannot overwrite an executing Cleaner plan with late app review", async () => {
+    let resolve!: (plan: ReturnType<typeof factory.plan>) => void;
+    vi.mocked(backend.cleanerPreview).mockReturnValueOnce(
+      new Promise((done) => {
+        resolve = done;
+      }),
+    );
+    const user = userEvent.setup();
+    showDetail([factory.appItem("caches", "safe", 100)]);
+    await user.click(screen.getByRole("checkbox", { name: "caches" }));
+    await user.click(screen.getByRole("button", { name: /Remove leftovers/ }));
+    const cleanerPlan = factory.plan([factory.target({ id: "cleaner" })]);
+    act(() => useScan.setState({ plan: cleanerPlan, executing: true, previewing: false }));
+    await act(async () => {
+      resolve(factory.plan([factory.target({ id: "caches" })], { scanId: "app:app1" }));
+    });
+    expect(useScan.getState().plan).toBe(cleanerPlan);
+    expect(useScan.getState().executing).toBe(true);
+    act(() => useScan.setState({ executing: false }));
+  });
 });
 
 describe("UninstallerView list", () => {

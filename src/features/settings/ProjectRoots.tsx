@@ -12,14 +12,18 @@ import { useSettings } from "@/stores/settings";
  * Until this is set Prune guesses from a list of common folder names, which both misses code
  * kept somewhere unusual and walks trees the user never wanted scanned.
  */
-export function ProjectRoots() {
+export function ProjectRoots({ suggestedPath }: { suggestedPath?: string | null }) {
+  return <ProjectRootsForm key={suggestedPath ?? ""} suggestedPath={suggestedPath} />;
+}
+
+function ProjectRootsForm({ suggestedPath }: { suggestedPath?: string | null }) {
   const view = useSettings((s) => s.view);
   const load = useSettings((s) => s.load);
   const saving = useSettings((s) => s.saving);
   const add = useSettings((s) => s.addProjectRoot);
   const remove = useSettings((s) => s.removeProjectRoot);
   const error = useSettings((s) => s.error);
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useState(suggestedPath ?? "");
 
   useEffect(() => {
     if (!view) void load();
@@ -30,6 +34,7 @@ export function ProjectRoots() {
   const effective = view?.effectiveProjectRoots ?? [];
 
   const submit = async () => {
+    if (saving || !view) return;
     if (await add(draft)) setDraft("");
   };
 
@@ -44,6 +49,11 @@ export function ProjectRoots() {
         }
       />
       <div className="px-4 pb-4">
+        {suggestedPath && (
+          <p className="mb-2 break-all text-[12px] text-fg-muted" role="status">
+            Suggested project scan folder: {suggestedPath}. Review it before adding.
+          </p>
+        )}
         <ul className="mb-2 flex flex-col gap-1">
           {(view?.projectRootsConfigured ? configured : effective).map((root) => (
             <li
@@ -84,16 +94,25 @@ export function ProjectRoots() {
               onKeyDown={(e) => e.key === "Enter" && void submit()}
               placeholder={home ? `${home}/Projects` : "Folder to search"}
               spellCheck={false}
-              aria-label="Folder to add"
+              aria-label="Project scan folder to add"
               className="min-w-0 flex-1 bg-transparent font-mono text-[12px] outline-none placeholder:text-fg-faint"
             />
           </div>
-          <Button size="md" onClick={() => void submit()} disabled={!draft.trim() || saving}>
-            {saving ? <Spinner size={12} /> : <FolderPlus size={13} />} Add
+          <Button
+            size="md"
+            onClick={() => void submit()}
+            disabled={!draft.trim() || saving || !view}
+          >
+            {saving ? <Spinner size={12} /> : <FolderPlus size={13} />} Add scan folder
           </Button>
         </div>
 
         {error && <p className="mt-2 text-[12px] text-danger">{error}</p>}
+        <p className="mt-2 text-[11.5px] text-fg-faint">
+          Adding a folder only updates the configured scan scope. It does not start a scan or delete
+          anything. Source files stay untouched. Scan and review the cleanup preview before choosing
+          to delete generated artifacts.
+        </p>
         <p className="mt-2 text-[11.5px] text-fg-faint">
           Folders must be inside your home folder, because that is the only place Prune is allowed
           to remove anything.

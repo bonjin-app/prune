@@ -4,6 +4,7 @@ import { Spinner } from "@/components/ui/Spinner";
 
 export function ScanProgressBar({ providerIds }: { providerIds: string[] }) {
   const progress = useScan((s) => s.progress);
+  const cancelling = useScan((s) => s.cancelling);
   const providers = useScan((s) => s.providers);
   const entries = Object.values(progress).filter((p) => providerIds.includes(p.providerId));
   const files = entries.reduce((a, p) => a + p.scannedFiles, 0);
@@ -18,7 +19,9 @@ export function ScanProgressBar({ providerIds }: { providerIds: string[] }) {
     <div className="mx-7 mb-3 rounded-lg border border-line bg-surface px-4 py-3">
       <div className="flex items-center gap-2 text-[12.5px]">
         <Spinner size={13} className="text-accent" />
-        <span className="font-medium">Scanning{name ? ` ${name}` : ""}…</span>
+        <span className="font-medium">
+          {cancelling ? "Cancelling…" : `Scanning${name ? ` ${name}` : ""}…`}
+        </span>
         <span className="ml-auto text-fg-muted tnum">
           {plural(files, "file")} · {formatBytes(bytes)}
         </span>
@@ -29,7 +32,11 @@ export function ScanProgressBar({ providerIds }: { providerIds: string[] }) {
         aria-valuemin={0}
         aria-valuemax={total}
         aria-valuenow={done}
-        aria-valuetext={`${done} of ${total} places searched`}
+        aria-valuetext={
+          cancelling
+            ? "Cancelling; waiting for the current operation to finish"
+            : `${done} of ${total} places searched`
+        }
         className="mt-2 h-1 w-full overflow-hidden rounded-full bg-black/[0.07] dark:bg-white/[0.08]"
       >
         <div
@@ -46,7 +53,11 @@ export function ScanProgressBar({ providerIds }: { providerIds: string[] }) {
         region fed from those would talk over everything the user does.
       */}
       <span className="sr-only" aria-live="polite">
-        {name ? `Searching ${name}` : "Searching"}
+        {cancelling
+          ? "Cancelling; waiting for the current operation to finish"
+          : name
+            ? `Searching ${name}`
+            : "Searching"}
       </span>
     </div>
   );

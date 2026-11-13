@@ -290,6 +290,12 @@ export interface DiskNodeView {
   node: DiskNode;
   children: DiskNode[];
   breadcrumbs: DiskNode[];
+  /** Full count under this node, including pathless global issues. Defaults to 0. */
+  issueCount?: number;
+  /** Up to 50 matching path/message pairs. Defaults to an empty array. */
+  issues?: ScanIssue[];
+  /** Cancelled scan or matching issues. Defaults to false. */
+  partial?: boolean;
 }
 
 export interface LargeFile {
