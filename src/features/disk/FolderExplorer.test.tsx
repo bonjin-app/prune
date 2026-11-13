@@ -1,5 +1,5 @@
 import { act } from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { resetStores } from "@/test/reset";
@@ -87,13 +87,21 @@ describe("FolderExplorer", () => {
     const user = userEvent.setup();
     useDisk.setState({ node: view(1001) });
     render(<FolderExplorer />);
-    const rows = () => screen.queryAllByRole("button", { name: /^folder\d+ / });
+    // Count the page's list items rather than every button with a matching name. The map's
+    // tiles are buttons too, and computing an accessible name and visibility for each of them on
+    // every one of ~30 calls is what made this test run longer than CI allows. `hidden: true`
+    // skips the per-element visibility walk; the list itself is checked to be visible below.
+    const list = () => screen.getByRole("list", { name: "Folders" });
+    const rows = () => within(list()).queryAllByRole("listitem", { hidden: true });
+    const folder = (n: number) =>
+      within(list()).queryByRole("button", { name: new RegExp(`^folder${n} `), hidden: true });
     const next = screen.getByRole("button", { name: "Next page of folders" });
     const previous = screen.getByRole("button", { name: "Previous page of folders" });
+    expect(list()).toBeVisible();
     expect(rows()).toHaveLength(100);
     expect(previous).toBeDisabled();
     expect(screen.getByText(/Page 1 of 11/)).toHaveTextContent("1–100 of 1,001 folders");
-    expect(screen.queryByRole("button", { name: /^folder100 / })).not.toBeInTheDocument();
+    expect(folder(100)).not.toBeInTheDocument();
     next.focus();
     for (let page = 2; page <= 11; page++) {
       await user.keyboard("{Enter}");
@@ -101,24 +109,24 @@ describe("FolderExplorer", () => {
       expect(next).toHaveFocus();
       expect(screen.getByText(new RegExp(`Page ${page} of 11`))).toBeInTheDocument();
     }
-    expect(screen.getByRole("button", { name: /^folder1000 / })).toBeInTheDocument();
+    expect(folder(1000)).toBeInTheDocument();
     expect(next).toBeDisabled();
     expect(screen.getByText(/Page 11 of 11/)).toHaveTextContent("1001–1001 of 1,001 folders");
     await user.click(previous);
     expect(previous).toHaveFocus();
     expect(rows()).toHaveLength(100);
-    expect(screen.getByRole("button", { name: /^folder900 / })).toBeInTheDocument();
+    expect(folder(900)).toBeInTheDocument();
     const search = screen.getByRole("textbox", { name: "Filter folders" });
     await user.type(search, "folder1000");
     expect(rows()).toHaveLength(1);
-    expect(screen.getByRole("button", { name: /^folder1000 / })).toBeInTheDocument();
+    expect(folder(1000)).toBeInTheDocument();
     expect(screen.getByText(/Page 1 of 1/)).toHaveTextContent("1–1 of 1 folder");
     await user.clear(search);
     expect(rows()).toHaveLength(100);
-    expect(screen.getByRole("button", { name: /^folder0 / })).toBeInTheDocument();
+    expect(folder(0)).toBeInTheDocument();
     expect(previous).toBeDisabled();
     await user.click(next);
-    expect(screen.getByRole("button", { name: /^folder100 / })).toBeInTheDocument();
+    expect(folder(100)).toBeInTheDocument();
     await user.type(search, "missing");
     expect(rows()).toHaveLength(0);
     expect(screen.getByText("No folders match your search.")).toBeVisible();

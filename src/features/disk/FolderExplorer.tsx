@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ArrowUp, ChevronRight, FileBox, FolderOpen, Search } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { Button } from "@/components/ui/Button";
@@ -50,8 +50,16 @@ function Explorer({ view, loading }: { view: DiskNodeView; loading: boolean }) {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
   const [showMap, setShowMap] = useState(true);
-  const filtered = view.children.filter((child) =>
-    child.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
+  // Both depend only on the folder (and, for the filter, the query), not on the page or on
+  // whether the map is shown. Recomputed on every render, each keystroke in the search box laid
+  // out the whole map again — for a folder of a thousand children, enough to make typing lag.
+  const filtered = useMemo(() => {
+    const q = query.toLocaleLowerCase();
+    return view.children.filter((child) => child.name.toLocaleLowerCase().includes(q));
+  }, [view.children, query]);
+  const tiles = useMemo(
+    () => layoutMap(mapEntries(view.children, view.node.ownFileBytes)),
+    [view.children, view.node.ownFileBytes],
   );
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount - 1);
@@ -59,7 +67,6 @@ function Explorer({ view, loading }: { view: DiskNodeView; loading: boolean }) {
   if (page !== currentPage) setPage(currentPage);
   const start = currentPage * PAGE_SIZE;
   const end = Math.min(start + PAGE_SIZE, filtered.length);
-  const tiles = layoutMap(mapEntries(view.children, view.node.ownFileBytes));
   const max = Math.max(
     ...view.children.slice(0, 1).map((child) => child.sizeBytes),
     view.node.ownFileBytes,
@@ -278,40 +285,45 @@ function Explorer({ view, loading }: { view: DiskNodeView; loading: boolean }) {
           Find build artifacts here
         </button>
       </div>
-      {filtered.slice(start, end).map((child) => (
-        <button
-          key={child.path}
-          type="button"
-          disabled={loading}
-          onClick={() => void openNode(child.path)}
-          className="group flex w-full items-center gap-3 border-t border-line/60 px-4 py-3 text-left hover:bg-surface-2/60 disabled:opacity-60"
-        >
-          <FolderOpen size={16} className="shrink-0 text-fg-faint" />
-          <div className="w-[38%] min-w-0">
-            <div className="truncate text-[12.5px] font-medium">{child.name}</div>
-            <div className="truncate text-[11px] text-fg-faint tnum">
-              {plural(child.fileCount, "file")} · {plural(child.dirCount, "folder")}
-            </div>
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="h-1.5 overflow-hidden rounded-full bg-surface-2">
-              <div
-                className="h-full rounded-full bg-accent/70"
-                style={{ width: `${Math.max(0.5, (child.sizeBytes / max) * 100)}%` }}
-              />
-            </div>
-          </div>
-          <span className="w-[40px] text-right text-[11px] text-fg-faint tnum">
-            {view.node.sizeBytes > 0
-              ? `${((child.sizeBytes / view.node.sizeBytes) * 100).toFixed(1)}%`
-              : ""}
-          </span>
-          <span className="w-[78px] text-right text-[12.5px] font-medium tnum">
-            {formatBytes(child.sizeBytes)}
-          </span>
-          <ChevronRight size={13} className="shrink-0 text-fg-faint" />
-        </button>
-      ))}
+      {/* A list, so a screen reader announces how many folders the page holds, and so the rows
+          are one place apart from the map's tiles, which are buttons too. */}
+      <ul aria-label="Folders">
+        {filtered.slice(start, end).map((child) => (
+          <li key={child.path}>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => void openNode(child.path)}
+              className="group flex w-full items-center gap-3 border-t border-line/60 px-4 py-3 text-left hover:bg-surface-2/60 disabled:opacity-60"
+            >
+              <FolderOpen size={16} className="shrink-0 text-fg-faint" />
+              <div className="w-[38%] min-w-0">
+                <div className="truncate text-[12.5px] font-medium">{child.name}</div>
+                <div className="truncate text-[11px] text-fg-faint tnum">
+                  {plural(child.fileCount, "file")} · {plural(child.dirCount, "folder")}
+                </div>
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="h-1.5 overflow-hidden rounded-full bg-surface-2">
+                  <div
+                    className="h-full rounded-full bg-accent/70"
+                    style={{ width: `${Math.max(0.5, (child.sizeBytes / max) * 100)}%` }}
+                  />
+                </div>
+              </div>
+              <span className="w-[40px] text-right text-[11px] text-fg-faint tnum">
+                {view.node.sizeBytes > 0
+                  ? `${((child.sizeBytes / view.node.sizeBytes) * 100).toFixed(1)}%`
+                  : ""}
+              </span>
+              <span className="w-[78px] text-right text-[12.5px] font-medium tnum">
+                {formatBytes(child.sizeBytes)}
+              </span>
+              <ChevronRight size={13} className="shrink-0 text-fg-faint" />
+            </button>
+          </li>
+        ))}
+      </ul>
       <nav
         aria-label="Folder pages"
         className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3"
