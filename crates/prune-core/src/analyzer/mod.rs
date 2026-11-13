@@ -39,6 +39,8 @@ const LARGE_FILE_CAPACITY: usize = 2000;
 type LargeCandidate = (u64, PathBuf, Option<DateTime<Utc>>);
 const TOP_EXTENSIONS: usize = 40;
 const PROGRESS_EVERY: u64 = 2048;
+/// Bound the issue details returned by a drill-down query, independently of its full count.
+const NODE_ISSUE_LIMIT: usize = 50;
 
 /// One directory in the analyzed tree.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -63,6 +65,15 @@ pub struct DiskNodeView {
     pub children: Vec<DiskNode>,
     /// Ancestors from the scan root down to (excluding) this node.
     pub breadcrumbs: Vec<DiskNode>,
+    /// Issues at or below this directory, including pathless global unknowns.
+    #[serde(default)]
+    pub issue_count: usize,
+    /// First 50 matching issues; `issue_count` includes those omitted by this limit.
+    #[serde(default)]
+    pub issues: Vec<ScanIssue>,
+    /// Cancellation or matching issues mean this directory's totals may be incomplete.
+    #[serde(default)]
+    pub partial: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -222,10 +233,28 @@ impl DiskAnalysis {
             cur = self.nodes[p].parent;
         }
         breadcrumbs.reverse();
+        // Compute only the requested node's issues. Precomputing for every directory would
+        // multiply the scan's work and storage by the number of nodes.
+        let node_path = self.path_of(idx);
+        let mut issue_count = 0;
+        let mut issues = Vec::new();
+        for issue in &self.issues {
+            // Path::starts_with compares components: an error under `a-backup` is not
+            // under `a`. An absent path cannot be localized, so it affects every view.
+            if issue.path.is_empty() || Path::new(&issue.path).starts_with(&node_path) {
+                issue_count += 1;
+                if issues.len() < NODE_ISSUE_LIMIT {
+                    issues.push(issue.clone());
+                }
+            }
+        }
         Some(DiskNodeView {
             node: self.view_of(idx),
             children,
             breadcrumbs,
+            issue_count,
+            issues,
+            partial: self.status == DiskScanStatus::Cancelled || issue_count > 0,
         })
     }
 
@@ -697,5 +726,94 @@ mod tests {
         let policy = SafetyPolicy::from_protected(ProtectedPaths::default());
         let analysis = analyze("t", dir.path(), &policy, &AtomicBool::new(true), &|_| {});
         assert_eq!(analysis.status, DiskScanStatus::Cancelled);
+        let view = analysis.node(None).unwrap();
+        assert!(view.partial);
+        assert_eq!(view.issue_count, 0);
+        assert!(view.issues.is_empty());
+    }
+
+    #[test]
+    fn node_issues_follow_directory_boundaries_and_unknowns_are_global() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        for folder in ["a/b", "a-backup", "clean"] {
+            write(&root.join(folder).join("file.bin"), 1);
+        }
+        let policy = SafetyPolicy::from_protected(ProtectedPaths::default());
+        let mut analysis = analyze("t", root, &policy, &AtomicBool::new(false), &|_| {});
+        analysis.issues = [
+            (root.join("a"), "directory unreadable"),
+            (root.join("a/b/missing/file.bin"), "nested file vanished"),
+            (root.join("a-backup/file.bin"), "sibling unreadable"),
+            (
+                dir.path().with_extension("outside").join("file.bin"),
+                "outside root",
+            ),
+        ]
+        .into_iter()
+        .map(|(path, message)| ScanIssue {
+            path: path.to_string_lossy().into_owned(),
+            message: message.into(),
+        })
+        .collect();
+
+        for (path, expected) in [
+            (None, 3),
+            (Some("a"), 2),
+            (Some("a/b"), 1),
+            (Some("a-backup"), 1),
+            (Some("clean"), 0),
+        ] {
+            let path = path.map(|p| root.join(p));
+            let view = analysis.node(path.as_deref()).unwrap();
+            assert_eq!(view.issue_count, expected);
+            assert_eq!(view.issues.len(), expected);
+            assert_eq!(view.partial, expected > 0);
+        }
+        let nested = analysis.node(Some(&root.join("a/b"))).unwrap();
+        assert_eq!(nested.issues, vec![analysis.issues[1].clone()]);
+
+        analysis.issues.push(ScanIssue {
+            path: String::new(),
+            message: "unknown scan error".into(),
+        });
+        let clean = analysis.node(Some(&root.join("clean"))).unwrap();
+        assert!(clean.partial);
+        assert_eq!(clean.issue_count, 1);
+        assert_eq!(clean.issues, vec![analysis.issues.last().unwrap().clone()]);
+        assert_eq!(analysis.node(None).unwrap().issue_count, 4);
+
+        analysis.issues.clear();
+        analysis.status = DiskScanStatus::Cancelled;
+        let nested = analysis.node(Some(&root.join("a/b"))).unwrap();
+        assert!(nested.partial);
+        assert_eq!(nested.issue_count, 0);
+    }
+
+    #[test]
+    fn node_issue_details_are_bounded_but_count_is_not() {
+        let dir = tempfile::tempdir().unwrap();
+        write(&dir.path().join("a/file.bin"), 1);
+        let policy = SafetyPolicy::from_protected(ProtectedPaths::default());
+        let mut analysis = analyze("t", dir.path(), &policy, &AtomicBool::new(false), &|_| {});
+        analysis.issues = (0..NODE_ISSUE_LIMIT + 7)
+            .map(|i| ScanIssue {
+                path: dir
+                    .path()
+                    .join(format!("a/missing-{i}"))
+                    .to_string_lossy()
+                    .into_owned(),
+                message: format!("error {i}"),
+            })
+            .collect();
+        let view = analysis.node(Some(&dir.path().join("a"))).unwrap();
+        assert!(view.partial);
+        assert_eq!(view.issue_count, NODE_ISSUE_LIMIT + 7);
+        assert_eq!(view.issues, analysis.issues[..NODE_ISSUE_LIMIT]);
+        let json = serde_json::to_value(&view).unwrap();
+        assert_eq!(json["issueCount"], NODE_ISSUE_LIMIT + 7);
+        assert_eq!(json["issues"][0]["path"], analysis.issues[0].path);
+        assert_eq!(json["issues"][0]["message"], "error 0");
+        assert_eq!(json["partial"], true);
     }
 }

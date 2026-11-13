@@ -135,6 +135,9 @@ fn disk_scan_preview_and_execute_round_trip() {
     assert_eq!(summary["fileCount"].as_u64().unwrap(), 3);
 
     let node = ok(&webview, "disk_get_node", json!({ "scanId": scan_id }));
+    assert_eq!(node["issueCount"], 0);
+    assert_eq!(node["issues"], json!([]));
+    assert_eq!(node["partial"], false);
     let children = node["children"].as_array().unwrap();
     assert_eq!(children[0]["name"], "big");
     assert_eq!(children[0]["sizeBytes"].as_u64().unwrap(), 52_000);
@@ -145,6 +148,9 @@ fn disk_scan_preview_and_execute_round_trip() {
         json!({ "scanId": scan_id, "path": root.join("big").to_string_lossy() }),
     );
     assert_eq!(deeper["breadcrumbs"].as_array().unwrap().len(), 1);
+    assert_eq!(deeper["issueCount"], 0);
+    assert_eq!(deeper["issues"], json!([]));
+    assert_eq!(deeper["partial"], false);
 
     let files = ok(
         &webview,
