@@ -84,8 +84,9 @@ safety as the primary feature.
 
 Every removable item carries a risk level:
 
-Folder totals are **logical file sizes**, not unique allocated storage. APFS clones and sparse
-files may occupy less physical space. Moving items to Trash is recoverable but does not free
+Folder totals are **file sizes**, not unique allocated storage. A sparse file, such as a
+virtual machine's disk image, counts by the space it occupies rather than the size it could
+grow to; APFS clones still count once per copy, so they may free less than shown. Moving items to Trash is recoverable but does not free
 their storage until Trash is emptied; Prune does not empty it automatically. Unity Library
 cleanup should be done with Unity closed; the next import rebuilds the cache and may take time.
 Unity source assets and project configuration are not cleanup candidates.

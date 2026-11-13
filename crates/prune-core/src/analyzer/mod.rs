@@ -475,7 +475,7 @@ pub fn analyze(
 
         total_files += 1;
         #[cfg_attr(not(unix), allow(unused_mut))]
-        let mut size = meta.len();
+        let mut size = crate::fs::file_bytes(&meta);
         #[cfg(unix)]
         {
             use std::os::unix::fs::MetadataExt;

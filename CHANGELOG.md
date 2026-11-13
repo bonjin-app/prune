@@ -31,6 +31,11 @@ All notable changes to Prune are documented here. The format follows
 
 ### Fixed
 
+- Sparse files are counted by the space they occupy, not the size they report. A temporary
+  directory holding eight hundred 160 GB virtual machine images that took no space was
+  reported as 139 TB found on a 2 TB disk.
+- A local release build on recent macOS toolchains failed with "can't find crate for
+  `ctor_proc_macro`"; build-time crates are no longer stripped.
 - Older folder/filter requests can no longer replace the latest navigation or scan results.
 - Folder loading failures offer retry instead of an endless loading placeholder.
 - Cancelled disk analysis retains its cancelled state in the cleanup session.
