@@ -13,6 +13,7 @@ export type Category =
   | "temporary_files"
   | "trash"
   | "developer_files"
+  | "ai_data"
   | "old_installers"
   | "large_files"
   | "applications";
@@ -253,6 +254,7 @@ export const CATEGORY_LABEL: Record<Category, string> = {
   temporary_files: "Temporary Files",
   trash: "Trash",
   developer_files: "Developer Files",
+  ai_data: "AI Models & Data",
   old_installers: "Old Installers",
   large_files: "Large Files",
   applications: "Applications",
@@ -277,7 +279,8 @@ export const CLEANER_CATEGORIES: Category[] = [
   "old_installers",
 ];
 
-export const DEVELOPER_CATEGORIES: Category[] = ["developer_files"];
+/** The Developer view: toolchain caches and project artifacts, and what AI tools keep. */
+export const DEVELOPER_CATEGORIES: Category[] = ["developer_files", "ai_data"];
 
 // ---- Disk analyzer (crates/prune-core/src/analyzer) ----
 

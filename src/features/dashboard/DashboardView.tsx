@@ -12,7 +12,12 @@ import { reclaimableBytes, sessionReclaimableBytes } from "@/lib/reclaimable";
 import { useScan } from "@/stores/scan";
 import { startSnapshotPolling, useSystem } from "@/stores/system";
 import { useUi } from "@/stores/ui";
-import { CATEGORY_LABEL, CLEANER_CATEGORIES, type Category } from "@/types/models";
+import {
+  CATEGORY_LABEL,
+  CLEANER_CATEGORIES,
+  DEVELOPER_CATEGORIES,
+  type Category,
+} from "@/types/models";
 
 /**
  * The screen Prune opens on.
@@ -134,7 +139,9 @@ export function DashboardView() {
               <li key={category}>
                 <button
                   type="button"
-                  onClick={() => setView(category === "developer_files" ? "developer" : "cleaner")}
+                  onClick={() =>
+                    setView(DEVELOPER_CATEGORIES.includes(category) ? "developer" : "cleaner")
+                  }
                   className="group relative flex w-full items-baseline gap-4 overflow-hidden rounded-md border-t border-line/70 px-3 py-2.5 text-left first:border-t-0"
                 >
                   <span

@@ -4,7 +4,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { CleanerWorkspace } from "./CleanerWorkspace";
 import { useScan } from "@/stores/scan";
 import { resetStores } from "@/test/reset";
-import { session } from "@/test/factories";
+import { result, session, target } from "@/test/factories";
 
 vi.mock("@/lib/tauri", async () => {
   const actual = await vi.importActual<typeof import("@/lib/tauri")>("@/lib/tauri");
@@ -33,4 +33,23 @@ it("disables repeat cancellation and announces waiting until completion", async 
   act(() => useScan.getState().onScanCompleted({ ...session([]), status: "cancelled" }));
   expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
   expect(screen.getByText(/results are partial/)).toBeInTheDocument();
+});
+
+it("keeps what is protected out of the amount there is to review", () => {
+  useScan.setState({
+    session: session([
+      result("ai_hugging_face", "ai_data", [target({ sizeBytes: 3_000_000_000, risk: "medium" })]),
+      result("ai_ollama", "ai_data", [target({ sizeBytes: 40_000_000_000, risk: "protected" })]),
+    ]),
+  });
+  render(
+    <CleanerWorkspace
+      scope="developer"
+      categories={["ai_data"]}
+      emptyTitle="Prune your toolchain"
+      emptyDescription="Find caches"
+    />,
+  );
+  expect(screen.getByText(/3\.00 GB to review, 40\.0 GB protected/)).toBeInTheDocument();
+  expect(screen.queryByText(/43\.0 GB/)).not.toBeInTheDocument();
 });

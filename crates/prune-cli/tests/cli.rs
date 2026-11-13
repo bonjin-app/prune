@@ -168,6 +168,65 @@ fn include_low_also_takes_project_artifacts() {
 }
 
 #[test]
+fn clean_never_takes_ai_models_or_history_on_its_own() {
+    let h = harness();
+    let home = h.sandbox.home();
+    for (path, size) in [
+        (".cache/huggingface/hub/models--org--m/blobs/a", 5_000),
+        (".cache/some-tool/index.db", 1_000),
+        (".codex/sessions/2026/rollout.jsonl", 2_000),
+        (".claude/projects/app/session.jsonl", 2_000),
+        (".ollama/models/blobs/sha256-x", 6_000),
+    ] {
+        h.sandbox.write(path, size).unwrap();
+    }
+
+    let (code, out) = run(&h, &["clean", "--include-low", "--permanent", "--yes"]);
+    assert_eq!(code, EXIT_OK, "{out}");
+    for kept in [
+        ".cache/huggingface/hub/models--org--m",
+        ".cache/some-tool/index.db",
+        ".codex/sessions/2026/rollout.jsonl",
+        ".claude/projects/app/session.jsonl",
+        ".ollama/models/blobs/sha256-x",
+    ] {
+        assert!(home.join(kept).exists(), "{kept} went: {out}");
+    }
+}
+
+#[test]
+fn scan_says_how_much_of_what_it_found_is_protected() {
+    let h = harness();
+    h.sandbox
+        .write(".codex/sessions/2026/rollout.jsonl", 2_000)
+        .unwrap();
+    h.sandbox
+        .write(".claude/projects/app/session.jsonl", 3_000)
+        .unwrap();
+
+    // Only history: found, but nothing in it can be cleaned.
+    let (code, out) = run(
+        &h,
+        &[
+            "scan",
+            "--only",
+            "ai_codex_history",
+            "ai_claude_code_history",
+        ],
+    );
+    assert_eq!(code, EXIT_NOTHING, "{out}");
+    assert!(out.contains("Codex history and work"), "{out}");
+    assert!(out.contains("all of it protected"), "{out}");
+    assert!(out.contains("Nothing here can be removed"), "{out}");
+
+    // With something that can go as well, both amounts are named.
+    let (code, out) = run(&h, &["scan"]);
+    assert_eq!(code, EXIT_OK, "{out}");
+    assert!(out.contains("5.00 KB of it is protected"), "{out}");
+    assert!(out.contains("can be reviewed for removal"), "{out}");
+}
+
+#[test]
 fn clean_says_so_when_there_is_nothing_to_do() {
     let h = harness();
     let (code, out) = run(&h, &["clean", "--only", "maven_repo", "--yes"]);

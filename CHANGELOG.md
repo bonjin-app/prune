@@ -17,6 +17,17 @@ All notable changes to Prune are documented here. The format follows
 - Unity `Library` cache discovery only when sibling `Assets` and `ProjectSettings` directories
   identify a Unity project. Assets, Packages and ProjectSettings are excluded from artifact
   discovery. Library is Low Risk, never automatically selected, and still requires preview.
+- AI models and data, a category of its own shown in the Developer view. Downloaded models —
+  Hugging Face, LM Studio, PyTorch hub, Whisper — are Medium Risk: they come back, but only by
+  downloading them again. Codex scratch folders are Medium and skip anything touched in the last
+  day. Anything else in `~/.cache` is High Risk, since Prune cannot tell a cache from a
+  program's own files there. Ollama models, Codex conversations and worktrees, Claude Code
+  transcripts and the Claude desktop virtual machine are Protected: listed with their size so
+  the space is accounted for, never removable through Prune. None of it is ever selected
+  automatically, by the interface or by `prune clean --yes`.
+- Protected space is reported apart from what can be reclaimed, in the dashboard headline, the
+  category list, and `prune scan`'s summary; a scan that finds only protected data exits as
+  having found nothing to clean.
 
 ### Fixed
 

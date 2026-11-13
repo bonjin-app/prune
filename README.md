@@ -54,6 +54,11 @@ safety as the primary feature.
   DerivedData and Archives, Simulator caches — plus project artifacts found per project:
   `node_modules`, Rust `target/`, `build/`, `dist/`, Unity `Library`, Python caches and virtualenvs. Point it
   at the folders where your code actually lives.
+- **AI tools accounted for.** Models downloaded by Hugging Face, LM Studio, PyTorch and Whisper,
+  Codex scratch folders, and the rest of `~/.cache` — often the largest thing on a developer's
+  disk, and in none of the places a cleaner looks. What cannot come back — Ollama's models,
+  Codex and Claude Code conversations, agent worktrees that may hold uncommitted changes — is
+  shown with its size and never offered for removal.
 - **Safe by default.** A whitelist of removable roots, a list of protected paths, a mandatory
   dry run, Trash before permanent deletion, and a local operation log. See
   [SECURITY.md](SECURITY.md) for the guarantees.
@@ -68,7 +73,7 @@ safety as the primary feature.
 | --------------- | ------ | --------------------------------------------------------------------------------------------------- |
 | Dashboard       | ✅     | Storage, memory, CPU at a glance; reclaimable space by category; recent activity                    |
 | Cleaner         | ✅     | Application caches, logs, temporary files, Trash, old installers, browser caches                    |
-| Developer       | ✅     | Global tool caches + project artifact finder with per-item risk levels                              |
+| Developer       | ✅     | Global tool caches, AI models and data, project artifact finder with per-item risk levels           |
 | Monitor         | ✅     | Live CPU per core, memory, swap, disks, top processes                                               |
 | Command palette | ✅     | `⌘K` / `Ctrl+K` to jump anywhere or start a scan                                                    |
 | Disk analyzer   | ✅     | Live capacity, clickable folder map, ranked/searchable folders, largest files, partial-scan details |
@@ -88,9 +93,9 @@ Unity source assets and project configuration are not cleanup candidates.
 ```
 Safe        regenerated automatically, no user state      browser cache, npm cache, logs
 Low Risk    cheap to rebuild                              node_modules, build directories
-Medium Risk may hold state you care about                 Xcode archives, virtualenvs
-High Risk   removal is likely to break something
-Protected   never removable through Prune
+Medium Risk may hold state you care about                 Xcode archives, virtualenvs, AI models
+High Risk   removal is likely to break something          unknown folders in ~/.cache
+Protected   never removable through Prune                 AI conversation history, agent worktrees
 ```
 
 Only `Safe` items are ever ticked for you, and only when you ask — by pressing **Select safe

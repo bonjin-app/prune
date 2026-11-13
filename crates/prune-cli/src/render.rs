@@ -124,7 +124,14 @@ pub fn scan_table(
     }
     // Protected targets are listed so a person knows what is there, but they can never be
     // removed, so they are not part of anything called reclaimable.
-    if session.protected_bytes > 0 {
+    if session.protected_bytes > 0 && session.reclaimable_bytes() == 0 {
+        writeln!(
+            out,
+            "\nFound {} in {} files, all of it protected and shown only. Nothing here can be removed.",
+            human_bytes(session.total_bytes),
+            session.total_files
+        )
+    } else if session.protected_bytes > 0 {
         writeln!(
             out,
             "\nFound {} in {} files. {} of it is protected and shown only; {} can be reviewed for removal.",

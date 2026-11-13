@@ -1,10 +1,12 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { act } from "react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { DashboardView } from "./DashboardView";
 import * as factory from "@/test/factories";
 import { resetStores } from "@/test/reset";
 import { useScan } from "@/stores/scan";
+import { useUi } from "@/stores/ui";
 
 describe("DashboardView", () => {
   beforeEach(() => resetStores());
@@ -29,5 +31,21 @@ describe("DashboardView", () => {
     expect(screen.queryByText("52.0")).not.toBeInTheDocument();
     // A category holding only protected items has nothing to offer, so it is not listed.
     expect(screen.queryByText("Developer Files")).not.toBeInTheDocument();
+  });
+
+  it("sends AI models to the Developer view, where they are listed with the toolchain", async () => {
+    const user = userEvent.setup();
+    act(() =>
+      useScan.setState({
+        session: factory.session([
+          factory.result("ai_hugging_face", "ai_data", [
+            factory.target({ sizeBytes: 9_000_000_000, risk: "medium" }),
+          ]),
+        ]),
+      }),
+    );
+    render(<DashboardView />);
+    await user.click(screen.getByRole("button", { name: /AI Models & Data/ }));
+    expect(useUi.getState().view).toBe("developer");
   });
 });

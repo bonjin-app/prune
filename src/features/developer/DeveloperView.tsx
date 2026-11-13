@@ -44,7 +44,7 @@ export function DeveloperView() {
         description={
           roots.length > 0 ? (
             <>
-              Tool caches, plus project artifacts in{" "}
+              Tool caches, AI models and data, and project artifacts in{" "}
               <span className="font-mono text-[11.5px]">{shown.join(", ")}</span>
               {rest > 0 && ` and ${rest} more`}
               {!view?.projectRootsConfigured && " (guessed)"}.{" "}
@@ -57,7 +57,7 @@ export function DeveloperView() {
               </button>
             </>
           ) : (
-            "Package manager caches, build outputs and project artifacts your tools can regenerate."
+            "Package manager caches, build outputs, project artifacts, and what AI tools keep on disk."
           )
         }
         actions={<DeleteModeToggle />}
@@ -70,7 +70,7 @@ export function DeveloperView() {
         scope="developer"
         categories={DEVELOPER_CATEGORIES}
         emptyTitle="Prune your toolchain"
-        emptyDescription="node_modules, Rust target/, Gradle and Maven caches, Xcode DerivedData, pnpm, npm, Cargo, pip and more. Everything here is rebuilt by your tools on demand."
+        emptyDescription="node_modules, Rust target/, Gradle and Maven caches, Xcode DerivedData, pnpm, npm, Cargo, pip, and the models Hugging Face, LM Studio and Ollama download. Conversation history and agent worktrees are shown for their size only, never offered for removal."
       />
     </div>
   );

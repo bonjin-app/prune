@@ -7,6 +7,7 @@ pub mod custom;
 mod registry;
 pub(crate) mod simple;
 
+pub mod ai;
 pub mod browser;
 pub mod developer;
 pub mod system;
