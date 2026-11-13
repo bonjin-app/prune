@@ -54,8 +54,11 @@ export interface ScanResult {
   providerName: string;
   category: Category;
   targets: CleanupTarget[];
+  /** Everything found, protected targets included. */
   totalBytes: number;
   totalFiles: number;
+  /** The part of `totalBytes` held by protected targets, which can never be removed. */
+  protectedBytes?: number;
   durationMs: number;
   issues: ScanIssue[];
 }
@@ -78,8 +81,10 @@ export interface ScanSession {
   startedAt: string;
   finishedAt?: string;
   results: ScanResult[];
+  /** Everything found, protected targets included. */
   totalBytes: number;
   totalFiles: number;
+  protectedBytes?: number;
 }
 
 export interface ProviderInfo {

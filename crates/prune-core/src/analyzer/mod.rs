@@ -313,6 +313,7 @@ impl DiskAnalysis {
             targets,
             total_bytes: 0,
             total_files: 0,
+            protected_bytes: 0,
             duration_ms: self.duration_ms,
             issues: Vec::new(),
         };

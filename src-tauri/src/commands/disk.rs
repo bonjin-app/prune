@@ -29,6 +29,7 @@ fn large_files_session(analysis: &DiskAnalysis) -> ScanSession {
         results: vec![analysis.large_files_result()],
         total_bytes: 0,
         total_files: 0,
+        protected_bytes: 0,
     };
     session.recompute_totals();
     session

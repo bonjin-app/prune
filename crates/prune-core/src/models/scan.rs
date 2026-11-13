@@ -95,8 +95,13 @@ pub struct ScanResult {
     pub provider_name: String,
     pub category: Category,
     pub targets: Vec<CleanupTarget>,
+    /// Everything found, protected targets included.
     pub total_bytes: u64,
     pub total_files: u64,
+    /// The part of `total_bytes` held by `Protected` targets: shown so a person knows what is
+    /// there, but never removable. Subtract it before calling anything reclaimable.
+    #[serde(default)]
+    pub protected_bytes: u64,
     pub duration_ms: u64,
     pub issues: Vec<ScanIssue>,
 }
@@ -105,6 +110,17 @@ impl ScanResult {
     pub fn recompute_totals(&mut self) {
         self.total_bytes = self.targets.iter().map(|t| t.size_bytes).sum();
         self.total_files = self.targets.iter().map(|t| t.file_count).sum();
+        self.protected_bytes = self
+            .targets
+            .iter()
+            .filter(|t| t.risk == RiskLevel::Protected)
+            .map(|t| t.size_bytes)
+            .sum();
+    }
+
+    /// What could be removed: everything found, less what is protected.
+    pub fn reclaimable_bytes(&self) -> u64 {
+        self.total_bytes.saturating_sub(self.protected_bytes)
     }
 }
 
@@ -144,8 +160,12 @@ pub struct ScanSession {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub finished_at: Option<DateTime<Utc>>,
     pub results: Vec<ScanResult>,
+    /// Everything found, protected targets included.
     pub total_bytes: u64,
     pub total_files: u64,
+    /// The part of `total_bytes` that is protected and can never be removed.
+    #[serde(default)]
+    pub protected_bytes: u64,
 }
 
 impl ScanSession {
@@ -159,6 +179,12 @@ impl ScanSession {
     pub fn recompute_totals(&mut self) {
         self.total_bytes = self.results.iter().map(|r| r.total_bytes).sum();
         self.total_files = self.results.iter().map(|r| r.total_files).sum();
+        self.protected_bytes = self.results.iter().map(|r| r.protected_bytes).sum();
+    }
+
+    /// What could be removed: everything found, less what is protected.
+    pub fn reclaimable_bytes(&self) -> u64 {
+        self.total_bytes.saturating_sub(self.protected_bytes)
     }
 }
 
@@ -176,4 +202,85 @@ pub struct ProviderInfo {
     /// Whether it came from the user's `providers.json` rather than from Prune.
     #[serde(default)]
     pub custom: bool,
+}
+
+#[cfg(test)]
+mod reclaimable_tests {
+    use super::*;
+
+    fn target(path: &str, bytes: u64, risk: RiskLevel) -> CleanupTarget {
+        CleanupTarget {
+            id: CleanupTarget::make_id("p", Path::new(path)),
+            provider_id: "p".into(),
+            path: path.into(),
+            kind: TargetKind::Directory,
+            size_bytes: bytes,
+            file_count: 1,
+            risk,
+            label: path.into(),
+            description: None,
+            modified_at: None,
+            permanent_only: false,
+            group: None,
+        }
+    }
+
+    fn result(targets: Vec<CleanupTarget>) -> ScanResult {
+        let mut r = ScanResult {
+            provider_id: "p".into(),
+            provider_name: "p".into(),
+            category: Category::DeveloperFiles,
+            targets,
+            total_bytes: 0,
+            total_files: 0,
+            protected_bytes: 0,
+            duration_ms: 0,
+            issues: vec![],
+        };
+        r.recompute_totals();
+        r
+    }
+
+    #[test]
+    fn protected_targets_are_found_but_never_reclaimable() {
+        // What an inventory of AI data looks like: a cache that can go, and a history that can't.
+        let r = result(vec![
+            target("/h/model", 10, RiskLevel::Medium),
+            target("/h/sessions", 90, RiskLevel::Protected),
+        ]);
+        assert_eq!(r.total_bytes, 100);
+        assert_eq!(r.protected_bytes, 90);
+        assert_eq!(r.reclaimable_bytes(), 10);
+    }
+
+    #[test]
+    fn a_session_adds_up_what_its_results_protect() {
+        let mut session = ScanSession {
+            id: "s".into(),
+            status: ScanStatus::Completed,
+            started_at: chrono::Utc::now(),
+            finished_at: None,
+            results: vec![
+                result(vec![target("/a", 5, RiskLevel::Safe)]),
+                result(vec![target("/b", 7, RiskLevel::Protected)]),
+            ],
+            total_bytes: 0,
+            total_files: 0,
+            protected_bytes: 0,
+        };
+        session.recompute_totals();
+        assert_eq!(session.total_bytes, 12);
+        assert_eq!(session.protected_bytes, 7);
+        assert_eq!(session.reclaimable_bytes(), 5);
+    }
+
+    #[test]
+    fn older_data_without_the_field_reads_as_nothing_protected() {
+        // Results serialised before the field existed must still load.
+        let json = r#"{"providerId":"p","providerName":"p","category":"logs","targets":[],
+            "totalBytes":3,"totalFiles":1,"durationMs":0,"issues":[]}"#;
+        let r: ScanResult = serde_json::from_str(json).unwrap();
+        assert_eq!(r.protected_bytes, 0);
+        assert_eq!(r.reclaimable_bytes(), 3);
+    }
 }

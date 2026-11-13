@@ -144,7 +144,8 @@ pub fn run(
             } else {
                 render::scan_table(out, engine, &session)?;
             }
-            Ok(if session.total_bytes == 0 {
+            // Only protected items found is still nothing to clean.
+            Ok(if session.reclaimable_bytes() == 0 {
                 EXIT_NOTHING
             } else {
                 EXIT_OK

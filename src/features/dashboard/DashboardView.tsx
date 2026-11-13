@@ -8,6 +8,7 @@ import { InsightsCard } from "./InsightsCard";
 import { StorageOverview } from "@/features/disk/StorageOverview";
 import { useDisk } from "@/stores/disk";
 import { formatBytes, formatPercent, formatRelative, splitBytes } from "@/lib/format";
+import { reclaimableBytes, sessionReclaimableBytes } from "@/lib/reclaimable";
 import { useScan } from "@/stores/scan";
 import { startSnapshotPolling, useSystem } from "@/stores/system";
 import { useUi } from "@/stores/ui";
@@ -43,11 +44,14 @@ export function DashboardView() {
 
   const byCategory = useMemo(() => {
     const map = new Map<Category, number>();
-    session?.results.forEach((r) => map.set(r.category, (map.get(r.category) ?? 0) + r.totalBytes));
+    session?.results.forEach((r) =>
+      map.set(r.category, (map.get(r.category) ?? 0) + reclaimableBytes(r)),
+    );
     return [...map.entries()].filter(([, b]) => b > 0).sort((a, b) => b[1] - a[1]);
   }, [session]);
 
-  const total = session?.totalBytes ?? 0;
+  // What can be pruned, not everything found: protected items are listed elsewhere, never offered.
+  const total = session ? sessionReclaimableBytes(session) : 0;
   const [amount, unit] = splitBytes(total);
 
   const review = () => {
