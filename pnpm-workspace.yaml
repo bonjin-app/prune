@@ -1,2 +1,8 @@
 allowBuilds:
   esbuild: true
+
+# typescript-eslint still asks for minimatch 10, which has a denial-of-service advisory fixed
+# only in 11 (GHSA, "globparts amplification"). The API it uses is unchanged in 11. Remove this
+# once typescript-eslint depends on 11 itself.
+overrides:
+  minimatch@>=7.0.0 <11.0.1: ^11.0.1
