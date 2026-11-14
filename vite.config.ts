@@ -34,7 +34,10 @@ export default defineConfig(async () => ({
   },
   envPrefix: ["VITE_", "TAURI_ENV_*"],
   build: {
-    target: process.env.TAURI_ENV_PLATFORM === "windows" ? "chrome105" : "safari13",
+    // The oldest WebView each platform runs Prune in: WebView2 on Windows, and on macOS the
+    // WebKit of the oldest supported release — 12.0, `minimumSystemVersion` in tauri.conf.json,
+    // which is Safari 15. Vite 8 cannot lower destructuring to Safari 13, which this used to say.
+    target: process.env.TAURI_ENV_PLATFORM === "windows" ? "chrome105" : "safari15",
     minify: !process.env.TAURI_ENV_DEBUG ? ("esbuild" as const) : false,
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
   },

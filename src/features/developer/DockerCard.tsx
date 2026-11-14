@@ -24,7 +24,8 @@ import {
  */
 export function DockerCard() {
   const [state, setState] = useState<DockerState | null>(null);
-  const [loading, setLoading] = useState(false);
+  // The first reading starts as the card mounts, so it begins loading rather than idle.
+  const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState<DockerAction | null>(null);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<DockerPruneResult | null>(null);
@@ -42,9 +43,19 @@ export function DockerCard() {
     }
   };
 
-  // Read once per visit; Docker usage does not move on its own.
+  // Read once per visit; Docker usage does not move on its own. `loading` already starts set,
+  // so the effect changes state only when the reply arrives, never while it runs.
   useEffect(() => {
-    void load();
+    backend
+      .dockerStatus()
+      .then(
+        (status) => {
+          setState(status);
+          setError(null);
+        },
+        (e: unknown) => setError(errorMessage(e)),
+      )
+      .finally(() => setLoading(false));
   }, []);
 
   const run = async (action: DockerAction) => {

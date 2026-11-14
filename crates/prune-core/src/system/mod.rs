@@ -77,20 +77,35 @@ struct DiskCache {
     refreshed_at: Option<Instant>,
 }
 
+/// A sysinfo handle on a platform Prune is built for.
+///
+/// Since sysinfo 0.40 its constructors return a `Result`, but the only error they produce is
+/// `Unsupported`, for an operating system sysinfo cannot read at all. On macOS, Windows and Linux
+/// each of them is `Ok` unconditionally, and Prune is built for nothing else, so an error here is
+/// a build for the wrong platform rather than something a running machine can do. Failing at
+/// start-up with a message that says so beats carrying an empty monitor that reports zeros as if
+/// they were readings.
+fn supported<T>(made: std::result::Result<T, sysinfo::Error>, what: &str) -> T {
+    made.unwrap_or_else(|e| panic!("sysinfo cannot read {what} on this platform: {e}"))
+}
+
 impl SystemMonitor {
     pub fn new(home: &Path) -> Self {
-        let mut sys = System::new();
+        let mut sys = supported(System::new(), "the system");
         sys.refresh_cpu_usage();
         sys.refresh_memory();
         Self {
             inner: Mutex::new(sys),
-            networks: Mutex::new((Networks::new_with_refreshed_list(), Instant::now())),
+            networks: Mutex::new((
+                supported(Networks::new_with_refreshed_list(), "network interfaces"),
+                Instant::now(),
+            )),
             disks: Mutex::new(DiskCache {
-                disks: Disks::new(),
+                disks: supported(Disks::new(), "disks"),
                 status: Vec::new(),
                 refreshed_at: None,
             }),
-            users: Mutex::new((Users::new(), Instant::now() - USERS_TTL)),
+            users: Mutex::new((supported(Users::new(), "users"), Instant::now() - USERS_TTL)),
             processes_read_at: Mutex::new(None),
             home: home.to_path_buf(),
         }
@@ -115,13 +130,13 @@ impl SystemMonitor {
             .unwrap_or_default();
         SystemInfo {
             platform: Platform::current(),
-            os_name: System::name().unwrap_or_else(|| "Unknown".into()),
+            os_name: System::name().unwrap_or_else(|_| "Unknown".into()),
             os_version: System::os_version().unwrap_or_default(),
             kernel_version: System::kernel_version().unwrap_or_default(),
             hostname: System::host_name().unwrap_or_default(),
             arch: System::cpu_arch(),
             cpu_brand,
-            physical_cores: System::physical_core_count(),
+            physical_cores: System::physical_core_count().ok(),
             logical_cores: sys.cpus().len(),
             total_memory_bytes: sys.total_memory(),
             home_dir: self.home.to_string_lossy().into_owned(),
@@ -151,7 +166,7 @@ impl SystemMonitor {
         SystemSnapshot {
             cpu: CpuStatus {
                 usage_percent: sys.global_cpu_usage(),
-                per_core_percent: sys.cpus().iter().map(|c| c.cpu_usage()).collect(),
+                per_core_percent: sys.cpus().iter().map(|c| c.usage()).collect(),
             },
             memory: MemoryStatus {
                 total_bytes: sys.total_memory(),
@@ -162,7 +177,7 @@ impl SystemMonitor {
             },
             disks: disk_list,
             network: self.network(),
-            uptime_seconds: System::uptime(),
+            uptime_seconds: System::uptime().unwrap_or_default(),
             process_count: sys.processes().len(),
         }
     }

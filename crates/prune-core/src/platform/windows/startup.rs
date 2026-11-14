@@ -38,7 +38,7 @@ fn write_approved(subkey: &str, name: &str, enabled: bool) -> Result<()> {
     let existing = key.get_raw_value(name).map(|v| v.bytes).ok();
     let bytes = startup_approved::with_state(existing.as_deref(), enabled);
     let value = winreg::RegValue {
-        bytes,
+        bytes: bytes.into(),
         vtype: winreg::enums::RegType::REG_BINARY,
     };
     key.set_raw_value(name, &value)

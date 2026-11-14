@@ -6,6 +6,15 @@ All notable changes to Prune are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Dependencies brought up to date: Tauri 2.12, sysinfo 0.40, winreg 0.56, dirs 7, Vite 8,
+  jsdom 31, lucide-react 1, eslint-plugin-react-hooks 7, and tauri-action 1 for releases. The
+  frontend is now compiled for Safari 15, the WebKit of macOS 12, the oldest release Prune
+  supports; Vite 8 cannot target the Safari 13 the build used to name.
+- The Docker card starts out loading, rather than idle for the moment before its first reading
+  arrives.
+
 ## [0.2.1] - 2026-11-14
 
 The same Prune as 0.2.0, packaged so that macOS will open it.
