@@ -226,6 +226,49 @@ fn scan_says_how_much_of_what_it_found_is_protected() {
     assert!(out.contains("can be reviewed for removal"), "{out}");
 }
 
+// The application cache provider reads ~/Library/Caches only on macOS and Linux; Windows has
+// no single cache directory, so the fixture below is not found there.
+#[cfg(unix)]
+#[test]
+fn except_leaves_out_what_is_under_it_and_nothing_else() {
+    let h = harness();
+    let home = h.sandbox.home();
+    h.sandbox
+        .write("Library/Caches/com.example.other/blob.bin", 2_000)
+        .unwrap();
+    let kept = home.join("Library/Caches/com.example.app");
+    let gone = home.join("Library/Caches/com.example.other");
+    let except = kept.to_string_lossy().into_owned();
+
+    let (code, out) = run(&h, &["clean", "--only", "user_cache", "--except", &except]);
+    assert_eq!(code, EXIT_OK, "{out}");
+    assert!(
+        out.contains("Leaving out 1 item(s) under --except"),
+        "{out}"
+    );
+    assert!(
+        !out.contains("com.example.app"),
+        "listed what was excepted: {out}"
+    );
+    assert!(out.contains("com.example.other"), "{out}");
+
+    let (code, out) = run(
+        &h,
+        &[
+            "clean",
+            "--only",
+            "user_cache",
+            "--except",
+            &except,
+            "--permanent",
+            "--yes",
+        ],
+    );
+    assert_eq!(code, EXIT_OK, "{out}");
+    assert!(kept.join("blob.bin").exists(), "the excepted cache went");
+    assert!(!gone.exists(), "the other cache should be gone");
+}
+
 #[test]
 fn clean_says_so_when_there_is_nothing_to_do() {
     let h = harness();

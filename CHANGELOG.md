@@ -25,6 +25,8 @@ All notable changes to Prune are documented here. The format follows
   transcripts and the Claude desktop virtual machine are Protected: listed with their size so
   the space is accounted for, never removable through Prune. None of it is ever selected
   automatically, by the interface or by `prune clean --yes`.
+- `prune clean --except <path>` leaves out anything at or under a path, compared with links
+  resolved, so `/var/folders` and `/private/var/folders` match. Repeat it for more paths.
 - Every release carries `SHA256SUMS`, taken from the release's own files after they are
   attached; README explains how to check a download.
 - CodeQL analysis of the engine, the interface and the workflows, grouped Dependabot updates,

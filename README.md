@@ -294,6 +294,7 @@ prune scan --only npm_cache --json | jq '.totalBytes'
 prune clean                      # show what would go — a dry run
 prune clean --yes                # move safe items to the trash
 prune clean --include-low --yes  # also node_modules, build directories, …
+prune clean --yes --except ~/Library/Caches/com.example.app   # leave a path out
 prune disk ~/Projects --large 500
 prune docker
 prune docker --prune-cache --yes

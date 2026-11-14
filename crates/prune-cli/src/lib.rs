@@ -72,6 +72,9 @@ pub enum Command {
         /// Actually remove what the plan lists.
         #[arg(long, short = 'y')]
         yes: bool,
+        /// Leave out anything at or under this path. Repeat it for more than one.
+        #[arg(long = "except", value_name = "PATH")]
+        except: Vec<std::path::PathBuf>,
     },
     /// Show where the space goes in a directory. Read-only.
     Disk {
@@ -156,6 +159,7 @@ pub fn run(
             include_low,
             permanent,
             yes,
+            except,
         } => clean(
             engine,
             log,
@@ -163,6 +167,7 @@ pub fn run(
             *include_low,
             *permanent,
             *yes,
+            except,
             cli.json,
             out,
         ),
@@ -275,6 +280,47 @@ pub fn auto_selected(session: &ScanSession, include_low: bool, permanent: bool) 
         .collect()
 }
 
+/// Drops from `ids` every target at or under one of `except`, and says how many went.
+///
+/// Each path is compared as given and with links resolved, so `/var/folders/…` and
+/// `/private/var/folders/…` on macOS, which are one directory, match either way round, and a
+/// target that is itself a link is still left out by the name it was found under.
+pub fn leave_out(
+    session: &ScanSession,
+    ids: &mut Vec<String>,
+    except: &[std::path::PathBuf],
+) -> usize {
+    use std::path::{Path, PathBuf};
+    if except.is_empty() {
+        return 0;
+    }
+    let forms = |p: &Path| -> Vec<PathBuf> {
+        let mut v = vec![p.to_path_buf()];
+        if let Ok(real) = p.canonicalize() {
+            v.push(real);
+        }
+        // The parent resolved, the name kept: a link's own location, as the filesystem has it.
+        if let (Some(parent), Some(name)) = (p.parent(), p.file_name()) {
+            if let Ok(parent) = parent.canonicalize() {
+                v.push(parent.join(name));
+            }
+        }
+        v
+    };
+    let except: Vec<PathBuf> = except.iter().flat_map(|p| forms(p)).collect();
+    let before = ids.len();
+    ids.retain(|id| {
+        let Some(target) = session.find_target(id) else {
+            return true;
+        };
+        let kept_out = forms(&target.path_buf())
+            .iter()
+            .any(|path| except.iter().any(|e| path.starts_with(e)));
+        !kept_out
+    });
+    before - ids.len()
+}
+
 #[allow(clippy::too_many_arguments)]
 fn clean(
     engine: &PruneEngine,
@@ -283,11 +329,16 @@ fn clean(
     include_low: bool,
     permanent: bool,
     yes: bool,
+    except: &[std::path::PathBuf],
     json: bool,
     out: &mut impl Write,
 ) -> std::io::Result<i32> {
     let session = scan(engine, only, out, !json)?;
-    let ids = auto_selected(&session, include_low, permanent);
+    let mut ids = auto_selected(&session, include_low, permanent);
+    let excepted = leave_out(&session, &mut ids, except);
+    if excepted > 0 && !json {
+        writeln!(out, "Leaving out {excepted} item(s) under --except.")?;
+    }
     let mode = if permanent {
         DeleteMode::Permanent
     } else {
