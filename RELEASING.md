@@ -96,10 +96,18 @@ scripts/release-checksums.sh v0.2.0 --upload   # replaces the one on the release
 ## 5. Signing
 
 Unsigned builds still run, but macOS shows a Gatekeeper warning and Windows SmartScreen
-complains. Signing is off unless `APPLE_CERTIFICATE` is set — a secret that was never configured
-reaches the workflow as an empty string rather than as nothing, so the workflow checks for one
-before putting any of these into the environment. Without that check the macOS builds fail
-outright trying to import an empty certificate, which is how it behaved the first time it ran.
+complains. Developer ID signing is off unless `APPLE_CERTIFICATE` is set — a secret that was
+never configured reaches the workflow as an empty string rather than as nothing, so the workflow
+checks for one before putting any of these into the environment. Without that check the macOS
+builds fail outright trying to import an empty certificate, which is how it behaved the first
+time it ran.
+
+Without a certificate the workflow signs the whole bundle ad hoc (`APPLE_SIGNING_IDENTITY=-`),
+then runs `codesign --verify --deep --strict` on it. Left to the linker, only the executable is
+signed while the bundle claims sealed resources; macOS reads that as tampering and reports a
+downloaded copy as **damaged**, with no way to allow it. 0.1.6 and the first 0.2.0 build shipped
+like that. `syspolicy_check distribution Prune.app` shows the difference: a fatal codesign error
+for the broken form, only an "adhoc signed" warning for the fixed one.
 
 To sign, set these repository secrets; the workflow picks them up automatically and
 skips signing when they are absent.
@@ -112,10 +120,9 @@ skips signing when they are absent.
 | `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` | notarization, using an app-specific password               |
 
 The macOS build already sets the hardened runtime and ships `src-tauri/entitlements.plist`,
-which notarization requires. Both only take effect when a signing identity is present: without
-one Tauri produces an ad-hoc signature and neither is applied, so `codesign -d --entitlements -`
-on a local build shows nothing. That is expected, not a misconfiguration. That file asks for the two exceptions a WebView needs and nothing
-else: no network, camera, microphone or location entitlement, and no sandbox — a cleanup tool
+which notarization requires. Both are applied whenever a signing identity is given, including
+the ad-hoc `-`; a plain `pnpm tauri build` gives none, so `codesign -d --entitlements -` on it
+shows nothing. That file asks for the two exceptions a WebView needs and nothing else: no network, camera, microphone or location entitlement, and no sandbox — a cleanup tool
 confined to its own container would have nothing to clean. Reading the user's files stays
 governed by the macOS privacy prompts at runtime, not by an entitlement.
 

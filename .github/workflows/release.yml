@@ -63,6 +63,15 @@ jobs:
             echo "APPLE_PASSWORD=${{ secrets.APPLE_PASSWORD }}"
             echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}"
           } >> "$GITHUB_ENV"
+      # Without a certificate, sign the whole bundle ad hoc rather than leave it to the linker.
+      # The linker signs only the executable while the bundle says it has sealed resources, and
+      # macOS reads that as tampering: a downloaded copy is reported as damaged, with no way to
+      # allow it. Signed ad hoc, it is merely unidentified, which Privacy & Security can allow.
+      # 0.1.6 and the first 0.2.0 build shipped the broken form.
+      - name: Sign ad hoc, if there is no certificate
+        if: env.HAS_APPLE_CERTIFICATE != 'true' && runner.os == 'macOS'
+        shell: bash
+        run: echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -73,6 +82,12 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+      # The check macOS makes before it opens a download. A bundle that would be reported as
+      # damaged fails the job, and the Checksums job after it, before anyone publishes the draft.
+      - name: Check the app's signature
+        if: runner.os == 'macOS'
+        shell: bash
+        run: codesign --verify --deep --strict --verbose=2 "target/${{ matrix.target }}/release/bundle/macos/Prune.app"
 
   # The `prune` command line, attached to the same release. Built after the bundles so the
   # draft release already exists.
