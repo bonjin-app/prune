@@ -6,6 +6,12 @@ All notable changes to Prune are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Development tools brought up to date: TypeScript 6, ESLint 10, Vitest 5, jest-dom 7 and the
+  Node type definitions. `baseUrl` is gone from `tsconfig.json`, which TypeScript 6 deprecates;
+  the `@/` import alias now resolves relative to `tsconfig.json` itself. Nothing Prune ships changes.
+
 ## [0.2.2] - 2026-11-14
 
 Up-to-date foundations, no change in what Prune does. Tauri, the system readings, the Windows
