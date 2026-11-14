@@ -6,7 +6,18 @@ All notable changes to Prune are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `scripts/verify-release.sh` checks a release, draft or published, the way a download meets it:
+  every file against `SHA256SUMS`, the CLI's version, and for each disk image the app's version,
+  architecture, signature and what Gatekeeper makes of it. RELEASING.md runs it before
+  publishing; it fails on 0.2.0 and passes on 0.2.2.
+
 ### Changed
+
+- README's first-run steps for macOS 15 and later, which no longer accept right-click → Open
+  for an unverified app: Privacy & Security → Open Anyway instead. It also says what a
+  "damaged" warning means.
 
 - Development tools brought up to date: TypeScript 6, ESLint 10, Vitest 5, jest-dom 7 and the
   Node type definitions. `baseUrl` is gone from `tsconfig.json`, which TypeScript 6 deprecates;
