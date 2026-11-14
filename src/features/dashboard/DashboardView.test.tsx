@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { act } from "react";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -47,5 +47,59 @@ describe("DashboardView", () => {
     render(<DashboardView />);
     await user.click(screen.getByRole("button", { name: /AI Models & Data/ }));
     expect(useUi.getState().view).toBe("developer");
+  });
+
+  it("says how much more is protected, without counting it", () => {
+    act(() =>
+      useScan.setState({
+        session: factory.session([
+          factory.result("ai_ollama", "ai_data", [
+            factory.target({ sizeBytes: 65_000_000_000, risk: "protected" }),
+          ]),
+          factory.result("caches", "application_cache", [
+            factory.target({ sizeBytes: 1_000_000_000, risk: "safe" }),
+          ]),
+        ]),
+      }),
+    );
+    render(<DashboardView />);
+    expect(screen.getByText(/65\.0 GB more is protected and only shown/)).toBeInTheDocument();
+  });
+
+  it("keeps to one screen by folding the smallest categories", () => {
+    const categories = [
+      "developer_files",
+      "ai_data",
+      "application_cache",
+      "browser_cache",
+      "logs",
+      "temporary_files",
+      "trash",
+      "old_installers",
+    ] as const;
+    act(() =>
+      useScan.setState({
+        session: factory.session(
+          categories.map((category, i) =>
+            factory.result(`p${i}`, category, [
+              factory.target({ sizeBytes: (10 - i) * 1_000_000_000, risk: "safe" }),
+            ]),
+          ),
+        ),
+      }),
+    );
+    render(<DashboardView />);
+    const list = screen.getByRole("list", { name: "By category" });
+    // Six largest, then one line for the rest.
+    expect(within(list).getAllByRole("button")).toHaveLength(7);
+    expect(within(list).getByText("and 2 more categories")).toBeInTheDocument();
+    expect(within(list).queryByText("Old Installers")).not.toBeInTheDocument();
+  });
+
+  it("opens the Monitor from the system readings", async () => {
+    const user = userEvent.setup();
+    render(<DashboardView />);
+    await user.click(screen.getByRole("button", { name: "Open the Monitor" }));
+    expect(useUi.getState().view).toBe("monitor");
   });
 });

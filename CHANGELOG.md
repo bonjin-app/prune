@@ -29,6 +29,13 @@ All notable changes to Prune are documented here. The format follows
   category list, and `prune scan`'s summary; a scan that finds only protected data exits as
   having found nothing to clean.
 
+### Changed
+
+- The dashboard fits on one screen at the default window size and at the smallest, with
+  nothing below the fold: the disk as one line, what can be pruned beside where it is, three
+  observations in one row, and live CPU per core, memory, network and uptime, which open the
+  Monitor. Protected space is named under the figure rather than left out silently.
+
 ### Fixed
 
 - Sparse files are counted by the space they occupy, not the size they report. A temporary

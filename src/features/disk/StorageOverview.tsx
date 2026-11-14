@@ -7,14 +7,76 @@ import { capacity, diskForPath } from "./storage";
 export function StorageOverview({
   path = "",
   onExplore,
+  compact = false,
 }: {
   path?: string;
   onExplore?: () => void;
+  /** One line, for the dashboard, where the disk is context for the figure below it. */
+  compact?: boolean;
 }) {
   const disks = useSystem((s) => s.snapshot?.disks);
   const disk = diskForPath(disks ?? [], path);
   const usage = disk ? capacity(disk) : undefined;
   const tight = (usage?.percent ?? 0) >= 90;
+  if (compact) {
+    return (
+      <section aria-label="Disk capacity" className="flex items-center gap-4 text-[12px]">
+        <span className="flex shrink-0 items-center gap-2 font-medium">
+          <HardDrive size={15} className="text-fg-muted" />
+          {disk?.name || "Your storage"}
+        </span>
+        <span className="shrink-0 text-fg-muted tnum">
+          {usage ? (
+            <>
+              <span className={cn("font-semibold text-fg", tight && "text-danger")}>
+                {formatBytes(usage.available)}
+              </span>{" "}
+              free of {formatBytes(usage.total)}
+            </>
+          ) : (
+            "Reading disk capacity…"
+          )}
+        </span>
+        <div
+          role="progressbar"
+          aria-label="Disk space used"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={usage ? Math.round(usage.percent) : 0}
+          aria-valuetext={
+            usage
+              ? `${usage.percent.toFixed(1)}% used; ${formatBytes(usage.available)} available`
+              : "Unknown"
+          }
+          className="h-1.5 min-w-[60px] flex-1 overflow-hidden rounded-full bg-fg-faint/15"
+        >
+          {usage && (
+            <div
+              className={cn(
+                "h-full rounded-full transition-[width] duration-500 motion-reduce:transition-none",
+                tight ? "bg-danger/80" : "bg-accent/70",
+              )}
+              style={{ width: `${usage.percent}%` }}
+            />
+          )}
+        </div>
+        {usage && (
+          <span className={cn("shrink-0 text-fg-muted tnum", tight && "text-danger")}>
+            {Math.round(usage.percent)}% used
+          </span>
+        )}
+        {onExplore && (
+          <button
+            type="button"
+            onClick={onExplore}
+            className="flex shrink-0 items-center gap-0.5 font-medium text-accent hover:underline"
+          >
+            Explore storage <ArrowUpRight size={13} />
+          </button>
+        )}
+      </section>
+    );
+  }
   return (
     <section aria-label="Disk capacity" className="rounded-xl border border-line bg-surface p-5">
       <div className="flex items-start justify-between gap-4">

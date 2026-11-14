@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 import { ArrowRight, Lightbulb } from "lucide-react";
-import { Card, CardHeader } from "@/components/ui/Card";
 import { cn } from "@/lib/cn";
 import { useScan } from "@/stores/scan";
 import { useUi } from "@/stores/ui";
@@ -31,48 +30,53 @@ export function InsightsCard() {
     setView(insight.view);
   };
 
-  // The card owns its own gap above it. It returns nothing when there is nothing to say, and a
-  // margin on the caller would then leave an empty stripe above whatever comes next.
+  // Side by side, one per column, so three observations cost one row of the screen. Each is a
+  // way in, not a box of its own: one frame, divided.
   return (
-    <Card className="mt-8">
-      <CardHeader
-        title={
-          <span className="flex items-center gap-1.5">
-            <Lightbulb size={14} /> Worth a look
-          </span>
-        }
-        subtitle="What this scan found that a total cannot tell you."
-      />
-      <div className="px-4 pb-4">
-        <ul className="divide-y divide-line/60">
-          {insights.map((insight) => (
-            <li key={insight.id}>
-              <button
-                type="button"
-                onClick={() => follow(insight)}
-                className="group flex w-full items-center gap-3 py-2.5 text-left hover:bg-surface-2/50"
-              >
-                <span
-                  className={cn(
-                    "mt-[3px] h-1.5 w-1.5 shrink-0 self-start rounded-full",
-                    insight.tone === "opportunity" ? "bg-accent" : "bg-fg-faint",
-                  )}
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[12.5px] font-medium">{insight.headline}</span>
-                  <span className="block truncate text-[11.5px] text-fg-muted">
-                    {insight.detail}
-                  </span>
+    <section aria-labelledby="insights-title">
+      <h2
+        id="insights-title"
+        className="mb-2 flex items-center gap-1.5 text-[12px] font-medium text-fg-muted"
+      >
+        <Lightbulb size={13} /> Worth a look
+      </h2>
+      <ul
+        className={cn(
+          "grid overflow-hidden rounded-xl border border-line/70 bg-surface",
+          "divide-y divide-line/60 md:divide-x md:divide-y-0",
+          insights.length === 3 && "md:grid-cols-3",
+          insights.length === 2 && "md:grid-cols-2",
+        )}
+      >
+        {insights.map((insight) => (
+          <li key={insight.id} className="min-w-0">
+            <button
+              type="button"
+              onClick={() => follow(insight)}
+              className="group flex h-full w-full items-start gap-2.5 px-4 py-3 text-left hover:bg-surface-2/50"
+            >
+              <span
+                className={cn(
+                  "mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full",
+                  insight.tone === "opportunity" ? "bg-accent" : "bg-fg-faint",
+                )}
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[12.5px] leading-snug font-medium">
+                  {insight.headline}
                 </span>
-                <ArrowRight
-                  size={13}
-                  className="shrink-0 text-fg-faint transition-transform group-hover:translate-x-0.5 group-hover:text-fg"
-                />
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </Card>
+                <span className="mt-0.5 block truncate text-[11.5px] text-fg-muted">
+                  {insight.detail}
+                </span>
+              </span>
+              <ArrowRight
+                size={13}
+                className="mt-[3px] shrink-0 text-fg-faint transition-transform group-hover:translate-x-0.5 group-hover:text-fg"
+              />
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

@@ -112,7 +112,7 @@ that reads as reversible should not contain the one item that is not.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/dashboard-dark.png" />
-    <img src="docs/screenshots/dashboard-light.png" width="880" alt="Dashboard: how much can be reclaimed, by category, with what the scan found beyond the total" />
+    <img src="docs/screenshots/dashboard-light.png" width="880" alt="Dashboard on one screen: how much can be pruned and where, what is worth a look, and how the machine is doing" />
   </picture>
 </p>
 
