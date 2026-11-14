@@ -206,6 +206,19 @@ winget install --manifest packaging\winget
 All releases: [GitHub Releases](https://github.com/bonjin-app/prune/releases). Scoop is
 planned.
 
+### Checking a download
+
+Releases from 0.2.0 on carry a `SHA256SUMS` file listing the checksum of every file attached to
+them, taken from the release itself after it was built. Download it beside the installer, then:
+
+```bash
+shasum -a 256 --check --ignore-missing SHA256SUMS     # macOS
+sha256sum --check --ignore-missing SHA256SUMS         # Linux, Git Bash on Windows
+```
+
+A checksum shows the file is the one the release published. Being unsigned, it is not proof of
+who built it — see below.
+
 ### These builds are not signed yet
 
 macOS will say the app "cannot be opened because the developer cannot be verified", and Windows
