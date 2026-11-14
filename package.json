@@ -45,7 +45,7 @@
     "eslint-plugin-react-hooks": "^6.1.1",
     "eslint-plugin-react-refresh": "^0.4.23",
     "globals": "^16.4.0",
-    "jsdom": "^27.0.0",
+    "jsdom": "^31.0.0",
     "prettier": "^3.6.2",
     "tailwindcss": "^4.1.14",
     "typescript": "^5.9.3",
