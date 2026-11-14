@@ -70,16 +70,23 @@ pub fn scan_table(
             continue;
         }
         any = true;
+        let mut notes = Vec::new();
+        if result.protected_bytes > 0 {
+            notes.push(format!("{} protected", human_bytes(result.protected_bytes)));
+        }
+        if !result.issues.is_empty() {
+            notes.push(format!("{} skipped", result.issues.len()));
+        }
         writeln!(
             out,
             "{:<26} {:>10}  {:>4} items{}",
             truncate(&result.provider_name, 26),
             human_bytes(result.total_bytes),
             result.targets.len(),
-            if result.issues.is_empty() {
+            if notes.is_empty() {
                 String::new()
             } else {
-                format!("  ({} skipped)", result.issues.len())
+                format!("  ({})", notes.join(", "))
             }
         )?;
         if result.targets.iter().any(|t| t.group.is_some()) {
@@ -115,12 +122,32 @@ pub fn scan_table(
             permissions.how_to_grant.unwrap_or_default()
         )?;
     }
-    writeln!(
-        out,
-        "\nTotal {} in {} files.",
-        human_bytes(session.total_bytes),
-        session.total_files
-    )
+    // Protected targets are listed so a person knows what is there, but they can never be
+    // removed, so they are not part of anything called reclaimable.
+    if session.protected_bytes > 0 && session.reclaimable_bytes() == 0 {
+        writeln!(
+            out,
+            "\nFound {} in {} files, all of it protected and shown only. Nothing here can be removed.",
+            human_bytes(session.total_bytes),
+            session.total_files
+        )
+    } else if session.protected_bytes > 0 {
+        writeln!(
+            out,
+            "\nFound {} in {} files. {} of it is protected and shown only; {} can be reviewed for removal.",
+            human_bytes(session.total_bytes),
+            session.total_files,
+            human_bytes(session.protected_bytes),
+            human_bytes(session.reclaimable_bytes())
+        )
+    } else {
+        writeln!(
+            out,
+            "\nTotal {} in {} files.",
+            human_bytes(session.total_bytes),
+            session.total_files
+        )
+    }
 }
 
 /// Rows for a provider whose targets know what project they belong to.

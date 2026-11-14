@@ -157,6 +157,42 @@ const PROVIDERS: ProviderInfo[] = [
     available: true,
     custom: false,
   },
+  {
+    id: "ai_hugging_face",
+    name: "Hugging Face models",
+    category: "ai_data",
+    description: "Models and datasets downloaded from Hugging Face. Downloaded again when needed.",
+    defaultRisk: "medium",
+    available: true,
+    custom: false,
+  },
+  {
+    id: "ai_dot_cache",
+    name: "Other folders in ~/.cache",
+    category: "ai_data",
+    description: "Folders command-line and AI tools keep in ~/.cache. Look before removing.",
+    defaultRisk: "high",
+    available: true,
+    custom: false,
+  },
+  {
+    id: "ai_ollama",
+    name: "Ollama models",
+    category: "ai_data",
+    description: "Models Ollama has pulled. Shown for their size only: remove with `ollama rm`.",
+    defaultRisk: "protected",
+    available: true,
+    custom: false,
+  },
+  {
+    id: "ai_codex_history",
+    name: "Codex history and work",
+    category: "ai_data",
+    description: "Conversations, generated images and git worktrees kept by Codex.",
+    defaultRisk: "protected",
+    available: true,
+    custom: false,
+  },
 ];
 
 const daysAgo = (days: number) => new Date(Date.now() - days * 86400e3).toISOString();
@@ -365,6 +401,28 @@ function fakeResults(providerIds?: string[]): ScanResult[] {
         description: "Python virtualenv",
       }),
     ],
+    ai_hugging_face: [
+      target(
+        "ai_hugging_face",
+        `${HOME}/.cache/huggingface/hub/models--black-forest-labs--FLUX.1-dev`,
+        23.8 * gb,
+        "medium",
+      ),
+      target(
+        "ai_hugging_face",
+        `${HOME}/.cache/huggingface/hub/models--openai--whisper-large-v3`,
+        3.1 * gb,
+        "medium",
+      ),
+    ],
+    ai_dot_cache: [target("ai_dot_cache", `${HOME}/.cache/node-gyp`, 210e6, "high")],
+    ai_ollama: [target("ai_ollama", `${HOME}/.ollama/models`, 18.4 * gb, "protected")],
+    ai_codex_history: [
+      target("ai_codex_history", `${HOME}/.codex/sessions`, 1.2 * gb, "protected", {
+        label: "Conversations",
+      }),
+      target("ai_codex_history", `${HOME}/.codex/worktrees/4f1a`, 2.6 * gb, "protected"),
+    ],
   };
   return PROVIDERS.filter((p) => p.available)
     .filter((p) => !providerIds || providerIds.includes(p.id))
@@ -376,6 +434,9 @@ function fakeResults(providerIds?: string[]): ScanResult[] {
         category: p.category,
         targets,
         totalBytes: targets.reduce((a, t) => a + t.sizeBytes, 0),
+        protectedBytes: targets
+          .filter((t) => t.risk === "protected")
+          .reduce((a, t) => a + t.sizeBytes, 0),
         totalFiles: targets.reduce((a, t) => a + t.fileCount, 0),
         durationMs: 120,
         issues:
@@ -1003,6 +1064,7 @@ export const mockBackend: Backend = {
           finishedAt: new Date().toISOString(),
           results,
           totalBytes: results.reduce((a, r) => a + r.totalBytes, 0),
+          protectedBytes: results.reduce((a, r) => a + (r.protectedBytes ?? 0), 0),
           totalFiles: results.reduce((a, r) => a + r.totalFiles, 0),
         };
         sessions.set(id, finished);

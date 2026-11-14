@@ -7,4 +7,4 @@ mod delete;
 mod size;
 
 pub use delete::{remove, RemoveOutcome};
-pub use size::{dir_stats, entry_stats, DirStats, ProgressFn, SizeContext};
+pub use size::{dir_stats, entry_stats, file_bytes, DirStats, ProgressFn, SizeContext};

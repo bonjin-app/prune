@@ -36,6 +36,29 @@ impl DirStats {
     }
 }
 
+/// The bytes a file accounts for: its length, unless it occupies less than that on disk.
+///
+/// A sparse file — a virtual machine's disk image, most often — reports the size it could grow
+/// to, which can be larger than the disk it is on. One machine had eight hundred test folders
+/// in its temporary directory, each holding a 160 GB image that took no space at all, and the
+/// scan reported 139 TB found on a 2 TB disk. Removing such a file frees what it occupies, so
+/// that is what is counted. A small file occupies a whole block and is still counted by its
+/// length, so totals do not grow by rounding.
+///
+/// On Windows the length is used; sparse files are rare there outside of developer tooling.
+pub fn file_bytes(meta: &std::fs::Metadata) -> u64 {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        // `blocks` is in 512-byte units whatever the filesystem's block size.
+        meta.len().min(meta.blocks().saturating_mul(512))
+    }
+    #[cfg(not(unix))]
+    {
+        meta.len()
+    }
+}
+
 /// `(files_so_far, bytes_so_far, current_path)` progress callback.
 pub type ProgressFn<'a> = &'a (dyn Fn(u64, u64, &Path) + Send + Sync);
 
@@ -68,7 +91,7 @@ pub fn entry_stats(path: &Path, ctx: &mut SizeContext<'_>) -> DirStats {
     match std::fs::symlink_metadata(path) {
         Ok(meta) if meta.is_dir() => dir_stats(path, ctx),
         Ok(meta) => DirStats {
-            bytes: meta.len(),
+            bytes: file_bytes(&meta),
             files: 1,
             dirs: 0,
         },
@@ -170,11 +193,11 @@ fn fan_out(
                 if !seen.first_visit(&meta) {
                     continue;
                 }
-                stats.bytes += meta.len();
+                let size = file_bytes(&meta);
+                stats.bytes += size;
                 if let Some(cb) = ctx.on_progress {
                     let files = counters.files.fetch_add(1, Ordering::Relaxed) + 1;
-                    let bytes =
-                        counters.bytes.fetch_add(meta.len(), Ordering::Relaxed) + meta.len();
+                    let bytes = counters.bytes.fetch_add(size, Ordering::Relaxed) + size;
                     if files % PROGRESS_EVERY == 0 {
                         cb(files, bytes, &entry.path());
                     }
@@ -248,11 +271,12 @@ fn walk(
         if !seen.first_visit(&meta) {
             continue;
         }
-        stats.bytes += meta.len();
+        let size = file_bytes(&meta);
+        stats.bytes += size;
 
         if let Some(cb) = on_progress {
             let files = counters.files.fetch_add(1, Ordering::Relaxed) + 1;
-            let bytes = counters.bytes.fetch_add(meta.len(), Ordering::Relaxed) + meta.len();
+            let bytes = counters.bytes.fetch_add(size, Ordering::Relaxed) + size;
             if files % PROGRESS_EVERY == 0 {
                 cb(files, bytes, entry.path());
             }
@@ -448,5 +472,35 @@ mod tests {
         // Progress fires every 512 files and reports the global running count.
         assert!(seen_max.load(Ordering::Relaxed) >= 512);
         assert!(seen_max.load(Ordering::Relaxed) <= stats.files);
+    }
+
+    /// A disk image that could grow to 64 GB but holds 4 KB counts as 4 KB, as a file and inside
+    /// a folder, while a small file still counts by its length rather than a whole block.
+    #[cfg(unix)]
+    #[test]
+    fn sparse_files_count_what_they_occupy() {
+        use std::io::{Seek, SeekFrom, Write};
+        let dir = tempfile::tempdir().unwrap();
+        let image = dir.path().join("vm/disk.img");
+        std::fs::create_dir_all(image.parent().unwrap()).unwrap();
+        let mut f = std::fs::File::create(&image).unwrap();
+        f.write_all(&[1u8; 4096]).unwrap();
+        f.set_len(64 << 30).unwrap();
+        f.seek(SeekFrom::Start(0)).unwrap();
+        drop(f);
+        std::fs::write(dir.path().join("note.txt"), b"hello").unwrap();
+
+        let meta = std::fs::metadata(&image).unwrap();
+        assert_eq!(meta.len(), 64 << 30, "the image reports its full length");
+        let occupied = file_bytes(&meta);
+        assert!(
+            occupied < 1 << 20,
+            "counted {occupied} bytes for a sparse image"
+        );
+
+        let (stats, issues) = stats_of(dir.path());
+        assert!(issues.is_empty());
+        assert_eq!(stats.files, 2);
+        assert_eq!(stats.bytes, occupied + 5);
     }
 }

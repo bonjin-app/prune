@@ -2,7 +2,9 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use prune_core::analyzer::{self, DiskNodeView, DiskProgress, DiskSummary, LargeFile};
+use prune_core::analyzer::{
+    self, DiskAnalysis, DiskNodeView, DiskProgress, DiskScanStatus, DiskSummary, LargeFile,
+};
 use prune_core::models::{ScanSession, ScanStatus};
 use prune_core::sync::LockExt;
 use tauri::{AppHandle, Emitter, Manager, Runtime, State};
@@ -11,6 +13,27 @@ use crate::error::{CommandError, CommandResult};
 use crate::events;
 use crate::state::{DiskEntry, ScanEntry};
 use crate::AppState;
+
+/// Keep partial results available to the existing preview pipeline while retaining the
+/// analysis lifecycle, so a cancelled scan is never presented as completed.
+fn large_files_session(analysis: &DiskAnalysis) -> ScanSession {
+    let mut session = ScanSession {
+        id: analysis.scan_id.clone(),
+        status: match analysis.status {
+            DiskScanStatus::Running => ScanStatus::Running,
+            DiskScanStatus::Completed => ScanStatus::Completed,
+            DiskScanStatus::Cancelled => ScanStatus::Cancelled,
+        },
+        started_at: analysis.started_at,
+        finished_at: Some(chrono::Utc::now()),
+        results: vec![analysis.large_files_result()],
+        total_bytes: 0,
+        total_files: 0,
+        protected_bytes: 0,
+    };
+    session.recompute_totals();
+    session
+}
 
 /// Starts a read-only disk analysis of `root` (defaults to the home directory).
 /// Emits `prune://disk-progress` and `prune://disk-completed` (a `DiskSummary`).
@@ -55,16 +78,7 @@ pub fn disk_start_scan<R: Runtime>(
         if let Some(state) = app.try_state::<AppState>() {
             // Expose the large files as a scan session so the normal preview/execute pipeline
             // (target ids → validated paths) applies to them.
-            let mut session = ScanSession {
-                id: id.clone(),
-                status: ScanStatus::Completed,
-                started_at: analysis.started_at,
-                finished_at: Some(chrono::Utc::now()),
-                results: vec![analysis.large_files_result()],
-                total_bytes: 0,
-                total_files: 0,
-            };
-            session.recompute_totals();
+            let session = large_files_session(&analysis);
             state.scans.lock_recover().insert(
                 id.clone(),
                 ScanEntry {
@@ -143,4 +157,41 @@ pub fn disk_large_files(
         min_bytes.unwrap_or(1_000_000_000),
         limit.unwrap_or(200).min(2000),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use prune_core::{platform::ProtectedPaths, safety::SafetyPolicy};
+
+    #[test]
+    fn large_files_session_preserves_status_and_discovered_targets() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("file.bin"), [0; 17]).unwrap();
+        let policy = SafetyPolicy::from_protected(ProtectedPaths::default());
+        let mut analysis = analyzer::analyze(
+            "disk-session",
+            dir.path(),
+            &policy,
+            &AtomicBool::new(false),
+            &|_| {},
+        );
+        let completed = large_files_session(&analysis);
+        assert_eq!(completed.status, ScanStatus::Completed);
+
+        // Model a scan cancelled after discovering a file, without a timing-sensitive race.
+        analysis.status = DiskScanStatus::Cancelled;
+        let cancelled = large_files_session(&analysis);
+        assert_eq!(cancelled.status, ScanStatus::Cancelled);
+        assert_eq!(cancelled.id, analysis.scan_id);
+        assert_eq!(cancelled.started_at, analysis.started_at);
+        assert!(cancelled.finished_at.is_some());
+        assert_eq!(cancelled.total_bytes, 17);
+        assert_eq!(cancelled.total_files, 1);
+        assert_eq!(cancelled.results[0].targets.len(), 1);
+        assert_eq!(
+            cancelled.results[0].targets[0].id,
+            completed.results[0].targets[0].id
+        );
+    }
 }

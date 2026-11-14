@@ -43,6 +43,8 @@ pub enum Category {
     OldInstallers,
     LargeFiles,
     Applications,
+    /// Downloaded models, agent scratch space and conversation history kept by AI tools.
+    AiData,
 }
 
 impl Category {
@@ -58,6 +60,7 @@ impl Category {
             Category::OldInstallers => "Old Installers",
             Category::LargeFiles => "Large Files",
             Category::Applications => "Applications",
+            Category::AiData => "AI Models & Data",
         }
     }
 }

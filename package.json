@@ -12,6 +12,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit -p tsconfig.json && vite build",
+    "build:mac:local": "APPLE_SIGNING_IDENTITY=- tauri build --bundles app,dmg",
     "preview": "vite preview",
     "tauri": "tauri",
     "typecheck": "tsc --noEmit -p tsconfig.json",

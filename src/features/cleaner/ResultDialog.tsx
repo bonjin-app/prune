@@ -6,6 +6,7 @@ import { useTrashName } from "@/lib/wording";
 import { abbreviatePath, formatBytes, plural } from "@/lib/format";
 import { useScan } from "@/stores/scan";
 import { useSystem } from "@/stores/system";
+import { CleanupCapacity } from "./CleanupCapacity";
 
 export function ResultDialog() {
   const result = useScan((s) => s.result);
@@ -13,7 +14,7 @@ export function ResultDialog() {
   const home = useSystem((s) => s.info?.homeDir);
   const trash = useTrashName();
   if (!result) return null;
-  const ok = result.status === "success";
+  const ok = result.status === "success" && result.removedTargets > 0;
   // The largest thing on screen should not say "success" when nothing was removed. It is the
   // first thing read and often the only thing read.
   const tone = ok
@@ -22,13 +23,15 @@ export function ResultDialog() {
       ? "bg-warn-soft text-warn"
       : "bg-danger-soft text-danger";
   return (
-    <Dialog open onClose={dismiss} className="max-w-[460px]" label="Cleanup result">
-      <div className="px-5 pt-6 pb-4 text-center">
+    <Dialog
+      open
+      onClose={dismiss}
+      className="flex max-h-[calc(100vh-48px)] max-w-[460px] flex-col"
+      label="Cleanup result"
+    >
+      <div className="min-h-0 overflow-y-auto px-5 pt-6 pb-4 text-center">
         <div
-          className={cn(
-            "mx-auto flex h-12 w-12 items-center justify-center rounded-full",
-            tone,
-          )}
+          className={cn("mx-auto flex h-12 w-12 items-center justify-center rounded-full", tone)}
         >
           {ok ? <CheckCircle2 size={26} /> : <XCircle size={26} />}
         </div>
@@ -38,10 +41,23 @@ export function ResultDialog() {
         <div className="mt-1 text-[28px] font-semibold tracking-tight tnum">
           {formatBytes(result.removedBytes)}
         </div>
+        <p className="text-[11.5px] text-fg-muted">Reported file sizes · not disk space gained.</p>
         <p className="text-[12.5px] text-fg-muted">
-          {plural(result.removedFiles, "file")} in {plural(result.removedTargets, "item")}{" "}
-          {result.mode === "trash" ? `moved to the ${trash}` : "deleted permanently"}.
+          {result.status === "failed" || result.removedTargets === 0 ? (
+            "No targets were confirmed removed."
+          ) : (
+            <>
+              {plural(result.removedFiles, "file")} in {plural(result.removedTargets, "item")}{" "}
+              {result.mode === "trash" ? `moved to the ${trash}` : "deleted permanently"}.
+            </>
+          )}
         </p>
+        <p className="mt-2 text-[11.5px] text-fg-muted">
+          {result.mode === "trash"
+            ? `Moving files to the ${trash} usually does not free space until that ${trash} is emptied.`
+            : "Shared, compressed or sparse files can make actual free-space changes differ from reported file sizes."}
+        </p>
+        <CleanupCapacity key={result.operationId} />
         {result.logError && (
           <p className="mt-3 text-[12px] text-warn">
             The cleanup happened, but it could not be added to the operation log: {result.logError}
@@ -61,7 +77,7 @@ export function ResultDialog() {
           </div>
         )}
       </div>
-      <div className="flex justify-center border-t border-line bg-surface-2/60 px-5 py-3">
+      <div className="flex shrink-0 justify-center border-t border-line bg-surface-2/60 px-5 py-3">
         <Button variant="primary" onClick={dismiss} autoFocus>
           Done
         </Button>

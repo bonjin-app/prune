@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { filterResults, selectedTargets, sumBytes, useScan } from "./scan";
 import { useApps } from "./apps";
 import { useDisk } from "./disk";
@@ -12,6 +12,7 @@ vi.mock("@/lib/tauri", async () => {
     ...actual,
     backend: {
       cleanerStartScan: vi.fn(),
+      cleanerGetScan: vi.fn(),
       cleanerCancelScan: vi.fn(),
       cleanerPreview: vi.fn(),
       cleanerExecute: vi.fn(),
@@ -49,7 +50,345 @@ function threeTargets() {
 beforeEach(() => {
   resetStores();
   factory.resetIds();
-  vi.clearAllMocks();
+  vi.resetAllMocks();
+  vi.useFakeTimers();
+});
+
+afterEach(() => {
+  vi.clearAllTimers();
+  vi.useRealTimers();
+});
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((yes, no) => {
+    resolve = yes;
+    reject = no;
+  });
+  return { promise, resolve, reject };
+}
+
+describe("lifecycle races", () => {
+  it("accepts only the matching completion buffered before launch returns", async () => {
+    const launch = deferred<string>();
+    mocked.cleanerStartScan.mockReturnValueOnce(launch.promise);
+    const pending = useScan.getState().startScan();
+    useScan.getState().onScanCompleted(factory.session([], "other"));
+    const completed = factory.session([], "new");
+    useScan.getState().onScanCompleted(completed);
+    expect(useScan.getState().scanning).toBe(true);
+    launch.resolve("new");
+    await pending;
+    expect(useScan.getState().session).toBe(completed);
+    expect(useScan.getState().scanning).toBe(false);
+  });
+
+  it("queues cancellation during launch and waits for native completion", async () => {
+    const launch = deferred<string>();
+    mocked.cleanerStartScan.mockReturnValueOnce(launch.promise);
+    useScan.setState({ scanId: "previous" });
+    const pending = useScan.getState().startScan();
+    await useScan.getState().cancelScan();
+    await useScan.getState().cancelScan();
+    expect(useScan.getState()).toMatchObject({ scanning: true, cancelling: true });
+    expect(mocked.cleanerCancelScan).not.toHaveBeenCalled();
+    launch.resolve("new");
+    await pending;
+    expect(mocked.cleanerCancelScan).toHaveBeenCalledExactlyOnceWith("new");
+    expect(useScan.getState()).toMatchObject({ scanning: true, cancelling: true });
+    useScan.getState().onScanCompleted({ ...factory.session([], "new"), status: "cancelled" });
+    expect(useScan.getState()).toMatchObject({ scanning: false, cancelling: false });
+  });
+
+  it("allows retry after a rejected cancellation while leaving the scan running", async () => {
+    useScan.setState({ scanId: "scan1", scanning: true });
+    mocked.cleanerCancelScan
+      .mockRejectedValueOnce(new Error("unavailable"))
+      .mockResolvedValueOnce(undefined);
+    await useScan.getState().cancelScan();
+    expect(useScan.getState()).toMatchObject({
+      scanning: true,
+      cancelling: false,
+      error: "unavailable",
+    });
+    await useScan.getState().cancelScan();
+    expect(mocked.cleanerCancelScan).toHaveBeenCalledTimes(2);
+    expect(useScan.getState()).toMatchObject({ scanning: true, cancelling: true });
+  });
+
+  it("ignores a launch response superseded by a newer request", async () => {
+    const old = deferred<string>();
+    mocked.cleanerStartScan.mockReturnValueOnce(old.promise).mockResolvedValueOnce("new");
+    const pending = useScan.getState().startScan();
+    useScan.setState({ scanning: false });
+    await useScan.getState().startScan();
+    old.resolve("old");
+    await pending;
+    expect(useScan.getState().scanId).toBe("new");
+  });
+
+  it("retries scan_running and reconciles a missed completion after one second", async () => {
+    mocked.cleanerStartScan.mockResolvedValueOnce("new");
+    mocked.cleanerGetScan
+      .mockRejectedValueOnce({ code: "scan_running", message: "running" })
+      .mockResolvedValueOnce(factory.session([], "new"));
+    await useScan.getState().startScan();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(useScan.getState()).toMatchObject({ scanning: true, error: null });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(useScan.getState().session?.id).toBe("new");
+    expect(useScan.getState().scanning).toBe(false);
+  });
+
+  it("stops polling on terminal errors", async () => {
+    mocked.cleanerStartScan.mockResolvedValueOnce("new");
+    mocked.cleanerGetScan.mockRejectedValueOnce({ code: "io", message: "unavailable" });
+    await useScan.getState().startScan();
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(useScan.getState().scanning).toBe(false);
+    expect(useScan.getState().error).toContain("unavailable");
+    expect(mocked.cleanerGetScan).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores an old poll response after a newer scan completes", async () => {
+    const poll = deferred<ReturnType<typeof factory.session>>();
+    mocked.cleanerStartScan.mockResolvedValueOnce("old").mockResolvedValueOnce("new");
+    mocked.cleanerGetScan.mockReturnValueOnce(poll.promise);
+    await useScan.getState().startScan();
+    await vi.advanceTimersByTimeAsync(1000);
+    useScan.getState().onScanCompleted(factory.session([], "old"));
+    await useScan.getState().startScan();
+    const next = factory.session([], "new");
+    useScan.getState().onScanCompleted(next);
+    poll.reject({ code: "io", message: "old failure" });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(useScan.getState().session).toBe(next);
+    expect(useScan.getState().error).toBeNull();
+  });
+
+  it("does not replace completed results with late events for the same ID", () => {
+    useScan.setState({ scanId: "scan1", scanning: true });
+    const completed = factory.session([]);
+    useScan.getState().onScanCompleted(completed);
+    useScan.getState().onScanProgress({
+      scanId: "scan1",
+      providerId: "p",
+      scannedFiles: 1,
+      discoveredBytes: 1,
+      providersDone: 0,
+      providersTotal: 1,
+    });
+    useScan.getState().onScanCompleted(factory.session([threeTargets().session.results[0]!]));
+    expect(useScan.getState().session).toBe(completed);
+    expect(useScan.getState().progress).toEqual({});
+  });
+
+  it("keeps polling a resolved running session without completing early", async () => {
+    mocked.cleanerStartScan.mockResolvedValueOnce("new");
+    mocked.cleanerGetScan
+      .mockResolvedValueOnce({ ...factory.session([], "new"), status: "running" })
+      .mockResolvedValueOnce(factory.session([], "new"));
+    await useScan.getState().startScan();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(useScan.getState().scanning).toBe(true);
+    expect(useScan.getState().session).toBeNull();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(useScan.getState().scanning).toBe(false);
+  });
+
+  it("does not install a preview after it is closed", async () => {
+    const preview = deferred<ReturnType<typeof factory.plan>>();
+    mocked.cleanerPreview.mockReturnValueOnce(preview.promise);
+    useScan.setState({ scanId: "scan1", selected: new Set(["safe"]) });
+    const pending = useScan.getState().preview();
+    useScan.getState().closePreview();
+    preview.resolve(factory.plan([]));
+    await pending;
+    expect(useScan.getState().plan).toBeNull();
+    expect(useScan.getState().previewing).toBe(false);
+  });
+
+  it("does not install an old preview into a new scan", async () => {
+    const preview = deferred<ReturnType<typeof factory.plan>>();
+    mocked.cleanerPreview.mockReturnValueOnce(preview.promise);
+    useScan.setState({ scanId: "scan1", selected: new Set(["safe"]) });
+    const pending = useScan.getState().preview();
+    mocked.cleanerStartScan.mockResolvedValueOnce("new");
+    await useScan.getState().startScan();
+    preview.resolve(factory.plan([]));
+    await pending;
+    expect(useScan.getState().plan).toBeNull();
+  });
+
+  it.each(["disk", "app"])(
+    "drops a %s preview when its source changes and clears loading",
+    async (source) => {
+      const reply = deferred<ReturnType<typeof factory.plan>>();
+      mocked.cleanerPreview.mockReturnValueOnce(reply.promise);
+      const sourceId = source === "disk" ? "disk1" : "app:app1";
+      if (source === "disk") useDisk.setState({ scanId: "disk1" });
+      else useApps.setState({ selectedId: "app1" });
+      const pending = useScan.getState().preview(["a"], sourceId);
+      if (source === "disk") useDisk.setState({ scanId: "disk2" });
+      else useApps.setState({ selectedId: "app2" });
+      reply.resolve(factory.plan([factory.target({ id: "a" })], { scanId: sourceId }));
+      await pending;
+      expect(useScan.getState().plan).toBeNull();
+      expect(useScan.getState().previewing).toBe(false);
+    },
+  );
+
+  it("executes a confirmed plan only once while execution is pending", async () => {
+    const execution = deferred<ReturnType<typeof factory.cleanupResult>>();
+    mocked.cleanerExecute.mockReturnValue(execution.promise);
+    const { safe, session } = threeTargets();
+    useScan.setState({ scanId: session.id, session, plan: factory.plan([safe]) });
+    const pending = useScan.getState().execute();
+    const duplicate = useScan.getState().execute();
+    execution.resolve(
+      factory.cleanupResult({ removedBytes: safe.sizeBytes, removedFiles: safe.fileCount }),
+    );
+    await Promise.all([pending, duplicate]);
+    expect(mocked.cleanerExecute).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    { status: "failed" as const, removedTargets: 0, failed: [] },
+    { status: "success" as const, removedTargets: 0, failed: [] },
+    { planId: "unrelated" },
+  ])("retains rows for an inconsistent resolved cleanup result: %j", async (result) => {
+    const { safe, session } = threeTargets();
+    useScan.setState({
+      scanId: session.id,
+      session,
+      plan: factory.plan([safe]),
+      selected: new Set(["safe"]),
+    });
+    mocked.cleanerExecute.mockResolvedValueOnce(factory.cleanupResult(result));
+    await useScan.getState().execute();
+    expect(useScan.getState().session).toBe(session);
+    expect([...useScan.getState().selected]).toEqual(["safe"]);
+    expect(useScan.getState().error).toBeTruthy();
+  });
+
+  it("ignores cleanup results after another scan starts", async () => {
+    const execution = deferred<ReturnType<typeof factory.cleanupResult>>();
+    mocked.cleanerExecute.mockReturnValueOnce(execution.promise);
+    const { safe, session } = threeTargets();
+    useScan.setState({ scanId: session.id, session, plan: factory.plan([safe]) });
+    const pending = useScan.getState().execute();
+    // Simulate a truly superseding state, not an authorized rescan during execution.
+    useScan.setState({ executing: false });
+    mocked.cleanerStartScan.mockResolvedValueOnce("new");
+    await useScan.getState().startScan();
+    const next = factory.session([], "new");
+    useScan.getState().onScanCompleted(next);
+    execution.resolve(
+      factory.cleanupResult({ removedBytes: safe.sizeBytes, removedFiles: safe.fileCount }),
+    );
+    await pending;
+    expect(useScan.getState().session).toBe(next);
+    expect(useScan.getState().result).toBeNull();
+  });
+
+  it("refuses a rescan and preview dismissal while native cleanup is pending", async () => {
+    const execution = deferred<ReturnType<typeof factory.cleanupResult>>();
+    mocked.cleanerExecute.mockReturnValueOnce(execution.promise);
+    const { safe, session } = threeTargets();
+    const plan = factory.plan([safe]);
+    useScan.setState({ scanId: session.id, session, plan });
+    const pending = useScan.getState().execute();
+    await useScan.getState().startScan();
+    useScan.getState().closePreview();
+    expect(mocked.cleanerStartScan).not.toHaveBeenCalled();
+    expect(useScan.getState()).toMatchObject({ executing: true, plan });
+    execution.resolve(
+      factory.cleanupResult({ removedBytes: safe.sizeBytes, removedFiles: safe.fileCount }),
+    );
+    await pending;
+    expect(useScan.getState().executing).toBe(false);
+    expect(useScan.getState().result?.operationId).toBe("op1");
+  });
+
+  it.each([
+    null,
+    { planId: "plan1", status: "success", removedTargets: 1, failed: [] },
+    factory.cleanupResult({ mode: "permanent", removedBytes: 1_000 }),
+    factory.cleanupResult({ status: "partial", failed: [], removedBytes: 1_000 }),
+    factory.cleanupResult({ removedFiles: -1, removedBytes: 1_000 }),
+    factory.cleanupResult({ removedBytes: Number.NaN }),
+    factory.cleanupResult({ operationId: "", removedBytes: 1_000 }),
+    factory.cleanupResult({ startedAt: "invalid", removedBytes: 1_000 }),
+    factory.cleanupResult({
+      failed: [
+        { targetId: "safe", path: "/p", error: "failure" },
+        { targetId: "safe", path: "/p", error: "duplicate" },
+      ],
+      removedTargets: 0,
+    }),
+    factory.cleanupResult({ removedTargets: 0 }),
+  ])(
+    "rejects incomplete or contradictory results without displaying success: %j",
+    async (reply) => {
+      const { safe, session } = threeTargets();
+      useScan.setState({ scanId: session.id, session, plan: factory.plan([safe]) });
+      mocked.cleanerExecute.mockResolvedValueOnce(reply);
+      await useScan.getState().execute();
+      expect(useScan.getState().session).toBe(session);
+      expect(useScan.getState().result).toBeNull();
+      expect(useScan.getState().executing).toBe(false);
+      expect(useScan.getState().plan).toBeNull();
+      expect(useScan.getState().error).toMatch(/could not be verified/);
+    },
+  );
+});
+
+describe("logical result consistency", () => {
+  it("keeps valid all-failed details without removing rows", async () => {
+    const { safe, session } = threeTargets();
+    const result = factory.cleanupResult({
+      status: "failed",
+      removedTargets: 0,
+      removedFiles: 0,
+      removedBytes: 0,
+      failed: [{ targetId: safe.id, path: safe.path, error: "permission denied" }],
+    });
+    useScan.setState({ scanId: session.id, session, plan: factory.plan([safe]) });
+    mocked.cleanerExecute.mockResolvedValueOnce(result);
+    await useScan.getState().execute();
+    expect(useScan.getState().session).toBe(session);
+    expect(useScan.getState().result).toBe(result);
+    expect(useScan.getState().executing).toBe(false);
+  });
+  it("does not accept zero processed bytes/files for a nonempty successful target", async () => {
+    const { safe, session } = threeTargets();
+    useScan.setState({ scanId: session.id, session, plan: factory.plan([safe]) });
+    mocked.cleanerExecute.mockResolvedValueOnce(
+      factory.cleanupResult({ removedBytes: 0, removedFiles: 0 }),
+    );
+    await useScan.getState().execute();
+    expect(useScan.getState().session).toBe(session);
+    expect(useScan.getState().result).toBeNull();
+    expect(useScan.getState().error).toMatch(/could not be verified/);
+  });
+
+  it("rejects a failure path belonging to another planned target", async () => {
+    const { safe, low, session } = threeTargets();
+    useScan.setState({ scanId: session.id, session, plan: factory.plan([safe, low]) });
+    mocked.cleanerExecute.mockResolvedValueOnce(
+      factory.cleanupResult({
+        status: "partial",
+        removedBytes: safe.sizeBytes,
+        removedFiles: safe.fileCount,
+        failed: [{ targetId: low.id, path: safe.path, error: "permission denied" }],
+      }),
+    );
+    await useScan.getState().execute();
+    expect(useScan.getState().session).toBe(session);
+    expect(useScan.getState().result).toBeNull();
+    expect(useScan.getState().error).toMatch(/could not be verified/);
+  });
 });
 
 describe("selection", () => {
@@ -155,7 +494,7 @@ describe("scan lifecycle", () => {
   });
 
   it("records progress per provider for the current scan", () => {
-    useScan.setState({ scanId: "current" });
+    useScan.setState({ scanId: "current", scanning: true });
     useScan.getState().onScanProgress({
       scanId: "current",
       providerId: "npm_cache",
@@ -223,11 +562,34 @@ describe("preview", () => {
 });
 
 describe("execute", () => {
+  it("executes an external preview without altering an unrelated Cleaner session", async () => {
+    const { session } = threeTargets();
+    const file = factory.target({ id: "safe", providerId: "large_files", kind: "file" });
+    const forget = vi.fn();
+    useDisk.setState({ scanId: "disk1", forgetRemoved: forget });
+    useScan.setState({
+      scanId: session.id,
+      session,
+      selected: new Set(["safe"]),
+      plan: factory.plan([file], { scanId: "disk1" }),
+    });
+    mocked.cleanerExecute.mockResolvedValueOnce(factory.cleanupResult());
+    await useScan.getState().execute();
+    expect(useScan.getState().result?.planId).toBe("plan1");
+    expect(forget).toHaveBeenCalledExactlyOnceWith(["safe"]);
+    expect(useScan.getState().session).toBe(session);
+    expect([...useScan.getState().selected]).toEqual(["safe"]);
+  });
+
   it("removes cleaned targets from the session and recomputes totals", async () => {
     const { safe, low, locked, session } = threeTargets();
     const p = factory.plan([safe, low]);
     mocked.cleanerExecute.mockResolvedValueOnce(
-      factory.cleanupResult({ removedBytes: 3_000, removedTargets: 2 }),
+      factory.cleanupResult({
+        removedBytes: 3_000,
+        removedTargets: 2,
+        removedFiles: safe.fileCount + low.fileCount,
+      }),
     );
     useScan.setState({
       session,
@@ -255,6 +617,8 @@ describe("execute", () => {
     mocked.cleanerExecute.mockResolvedValueOnce(
       factory.cleanupResult({
         status: "partial",
+        removedBytes: safe.sizeBytes,
+        removedFiles: safe.fileCount,
         failed: [{ targetId: "low", path: low.path, error: "in use" }],
       }),
     );

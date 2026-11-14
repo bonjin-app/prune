@@ -13,6 +13,7 @@ export type Category =
   | "temporary_files"
   | "trash"
   | "developer_files"
+  | "ai_data"
   | "old_installers"
   | "large_files"
   | "applications";
@@ -54,8 +55,11 @@ export interface ScanResult {
   providerName: string;
   category: Category;
   targets: CleanupTarget[];
+  /** Everything found, protected targets included. */
   totalBytes: number;
   totalFiles: number;
+  /** The part of `totalBytes` held by protected targets, which can never be removed. */
+  protectedBytes?: number;
   durationMs: number;
   issues: ScanIssue[];
 }
@@ -78,8 +82,10 @@ export interface ScanSession {
   startedAt: string;
   finishedAt?: string;
   results: ScanResult[];
+  /** Everything found, protected targets included. */
   totalBytes: number;
   totalFiles: number;
+  protectedBytes?: number;
 }
 
 export interface ProviderInfo {
@@ -248,6 +254,7 @@ export const CATEGORY_LABEL: Record<Category, string> = {
   temporary_files: "Temporary Files",
   trash: "Trash",
   developer_files: "Developer Files",
+  ai_data: "AI Models & Data",
   old_installers: "Old Installers",
   large_files: "Large Files",
   applications: "Applications",
@@ -272,7 +279,8 @@ export const CLEANER_CATEGORIES: Category[] = [
   "old_installers",
 ];
 
-export const DEVELOPER_CATEGORIES: Category[] = ["developer_files"];
+/** The Developer view: toolchain caches and project artifacts, and what AI tools keep. */
+export const DEVELOPER_CATEGORIES: Category[] = ["developer_files", "ai_data"];
 
 // ---- Disk analyzer (crates/prune-core/src/analyzer) ----
 
@@ -290,6 +298,12 @@ export interface DiskNodeView {
   node: DiskNode;
   children: DiskNode[];
   breadcrumbs: DiskNode[];
+  /** Full count under this node, including pathless global issues. Defaults to 0. */
+  issueCount?: number;
+  /** Up to 50 matching path/message pairs. Defaults to an empty array. */
+  issues?: ScanIssue[];
+  /** Cancelled scan or matching issues. Defaults to false. */
+  partial?: boolean;
 }
 
 export interface LargeFile {

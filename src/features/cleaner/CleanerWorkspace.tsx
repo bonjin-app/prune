@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { cn } from "@/lib/cn";
 import { PermissionBanner } from "@/components/ui/PermissionBanner";
 import { formatBytes, plural } from "@/lib/format";
+import { reclaimableBytes } from "@/lib/reclaimable";
 import { filterResults, selectedTargets, sumBytes, useScan } from "@/stores/scan";
 import type { Category, ProviderInfo } from "@/types/models";
 import { ProviderGroup } from "./ProviderGroup";
@@ -30,6 +31,7 @@ export function CleanerWorkspace({
   const session = useScan((s) => s.session);
   const cancelled = session?.status === "cancelled";
   const scanning = useScan((s) => s.scanning);
+  const cancelling = useScan((s) => s.cancelling);
   const selected = useScan((s) => s.selected);
   const startScan = useScan((s) => s.startScan);
   const cancelScan = useScan((s) => s.cancelScan);
@@ -82,7 +84,12 @@ export function CleanerWorkspace({
     return all.filter((t) => scopedIds.includes(t.providerId));
   }, [session, selected, scopedIds]);
   const selectedBytes = sumBytes(scopedSelected);
-  const scopedTotal = results.reduce((a, r) => a + r.totalBytes, 0);
+  // What can be chosen, apart from what is only listed: the two are never one number.
+  const scopedReviewable = results.reduce((a, r) => a + reclaimableBytes(r), 0);
+  const scopedProtected = shownTargets.reduce(
+    (a, t) => (t.risk === "protected" ? a + t.sizeBytes : a),
+    0,
+  );
   const hasResults = scopedResults.some((r) => r.targets.length > 0);
   const totalTargets = scopedResults.reduce((a, r) => a + r.targets.length, 0);
 
@@ -90,8 +97,8 @@ export function CleanerWorkspace({
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2 px-7 pb-4">
         {scanning ? (
-          <Button variant="secondary" onClick={() => void cancelScan()}>
-            <Ban size={14} /> Cancel
+          <Button variant="secondary" disabled={cancelling} onClick={() => void cancelScan()}>
+            <Ban size={14} /> {cancelling ? "Cancelling…" : "Cancel"}
           </Button>
         ) : (
           <Button
@@ -146,7 +153,10 @@ export function CleanerWorkspace({
         )}
         <div className="flex-1" />
         {hasResults && scopedSelected.length === 0 && (
-          <span className="text-[12.5px] text-fg-muted tnum">{formatBytes(scopedTotal)} found</span>
+          <span className="text-[12.5px] text-fg-muted tnum">
+            {formatBytes(scopedReviewable)} to review
+            {scopedProtected > 0 && `, ${formatBytes(scopedProtected)} protected`}
+          </span>
         )}
         {hasResults && (
           <Button
@@ -230,7 +240,9 @@ export function CleanerWorkspace({
           ? ""
           : session
             ? hasResults
-              ? `Scan finished. ${formatBytes(scopedTotal)} in ${plural(totalTargets, "item")}.`
+              ? `Scan finished. ${formatBytes(scopedReviewable)} to review in ${plural(totalTargets, "item")}${
+                  scopedProtected > 0 ? `, and ${formatBytes(scopedProtected)} protected` : ""
+                }.`
               : "Scan finished. Nothing to remove here."
             : ""}
       </span>

@@ -123,6 +123,13 @@ Windows code signing is not wired up yet.
 
 ### What an unsigned build looks like
 
+For a locally installed development/review build on macOS, run `pnpm build:mac:local`.
+This explicitly applies an ad-hoc signature to the **whole app bundle**, including its
+resources, rather than leaving only the linker's executable signature. Check the result with
+`codesign --verify --deep --strict target/release/bundle/macos/Prune.app`. The resulting DMG is
+for local verification: ad-hoc signing is not Developer ID signing, notarization, or evidence
+that Gatekeeper will accept an Internet download. Do not publish it as a notarized release.
+
 Worth knowing before publishing one. macOS marks a downloaded unsigned app as quarantined and
 Gatekeeper refuses to open it on a double-click; the user has to allow it in System Settings →
 Privacy & Security. Windows SmartScreen shows a similar warning. Neither is a failure of the
@@ -147,6 +154,7 @@ build, but both are a reason to sign before a release anyone else is expected to
   [bonjin-app/homebrew-tap](https://github.com/bonjin-app/homebrew-tap), which is what `brew`
   reads. Leave `--publish` off and the tap keeps serving the previous version, so
   `brew install --cask prune` installs something older than the release you just cut.
+
 - Point the WinGet manifests at the same release:
 
   ```bash
@@ -203,4 +211,5 @@ build, but both are a reason to sign before a release anyone else is expected to
     file containing any non-ASCII character must also carry a UTF-8 byte order mark.
   - The pull request template asks for 1.12; these are 1.10. Say why in the pull request rather
     than ticking the box — see the schema note above.
+
 - Scoop manifests are not written yet.

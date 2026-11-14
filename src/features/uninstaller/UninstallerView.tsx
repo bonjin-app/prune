@@ -51,9 +51,7 @@ export function UninstallerView() {
     // while measuring; biggest first takes over once there is nothing left to arrive.
     const byName = (a: ApplicationInfo, b: ApplicationInfo) => a.name.localeCompare(b.name);
     return [...list].sort(
-      measuring
-        ? byName
-        : (a, b) => (b.sizeBytes ?? -1) - (a.sizeBytes ?? -1) || byName(a, b),
+      measuring ? byName : (a, b) => (b.sizeBytes ?? -1) - (a.sizeBytes ?? -1) || byName(a, b),
     );
   }, [apps, query, measuring]);
 
@@ -180,6 +178,7 @@ function AppDetailPane() {
   const platform = useSystem((s) => s.meta?.platform);
   const deleteMode = useScan((s) => s.deleteMode);
   const previewing = useScan((s) => s.previewing);
+  const preview = useScan((s) => s.preview);
 
   if (!selectedId) {
     return (
@@ -208,18 +207,10 @@ function AppDetailPane() {
 
   const review = async () => {
     if (chosen.length === 0) return;
-    useScan.setState({ previewing: true });
-    try {
-      const plan = await backend.cleanerPreview(
-        `app:${detail.app.id}`,
-        chosen.map((i) => i.target.id),
-        deleteMode,
-      );
-      useScan.setState({ plan, previewing: false, cleanupProgress: null });
-    } catch (e) {
-      useScan.setState({ previewing: false });
-      useApps.setState({ error: errorMessage(e) });
-    }
+    await preview(
+      chosen.map((i) => i.target.id),
+      `app:${detail.app.id}`,
+    );
   };
 
   return (
@@ -272,8 +263,8 @@ function AppDetailPane() {
               ))}
             </ul>
             <p className="mt-1 text-fg-muted">
-              So the data below is left alone: removing it here would take that copy's settings
-              with it. Remove the other copy first, then scan again.
+              So the data below is left alone: removing it here would take that copy's settings with
+              it. Remove the other copy first, then scan again.
             </p>
           </div>
         </div>

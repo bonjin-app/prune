@@ -94,6 +94,7 @@ pub async fn apps_get_detail(
         results: vec![apps::as_scan_result(&detail)],
         total_bytes: 0,
         total_files: 0,
+        protected_bytes: 0,
     };
     session.recompute_totals();
     state.scans.lock_recover().insert(

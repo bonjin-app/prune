@@ -200,6 +200,7 @@ pub fn as_scan_result(detail: &AppDetail) -> ScanResult {
         targets: detail.items.iter().map(|i| i.target.clone()).collect(),
         total_bytes: 0,
         total_files: 0,
+        protected_bytes: 0,
         duration_ms: 0,
         issues: Vec::new(),
     };

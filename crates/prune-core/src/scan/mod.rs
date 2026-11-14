@@ -90,6 +90,7 @@ impl<'a> Scanner<'a> {
                 targets: output.targets,
                 total_bytes: 0,
                 total_files: 0,
+                protected_bytes: 0,
                 duration_ms: start.elapsed().as_millis() as u64,
                 issues: output.issues,
             };
@@ -131,6 +132,7 @@ impl<'a> Scanner<'a> {
             results,
             total_bytes: 0,
             total_files: 0,
+            protected_bytes: 0,
         };
         session.recompute_totals();
         session
@@ -245,6 +247,7 @@ mod tests {
             targets,
             total_bytes: 0,
             total_files: 0,
+            protected_bytes: 0,
             duration_ms: 0,
             issues: vec![],
         };

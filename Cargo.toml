@@ -23,3 +23,10 @@ lto = true
 opt-level = "s"
 panic = "abort"
 strip = true
+
+# Build scripts and procedural macros run on the build machine and never ship. Stripping a
+# procedural macro's library can leave rustc unable to load it ("can't find crate for
+# `ctor_proc_macro`"), which the strip in recent macOS toolchains does; the shipped binaries
+# above are still stripped.
+[profile.release.build-override]
+strip = false

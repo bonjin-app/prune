@@ -208,9 +208,42 @@ const RULES: &[Rule] = &[
     },
 ];
 
+const UNITY_LIBRARY_RULE: Rule = Rule {
+    dir: "Library",
+    markers: &[], // Unity requires both directory markers, checked separately below.
+    kind: "Unity Library cache",
+    risk: RiskLevel::Low,
+};
+
+fn is_unity_project(dir: &Path) -> bool {
+    ["Assets", "ProjectSettings"].iter().all(|name| {
+        std::fs::symlink_metadata(dir.join(name))
+            .map(|meta| meta.is_dir())
+            .unwrap_or(false)
+    })
+}
+
+/// Unity source/configuration stays protected even when a scan starts inside it.
+/// Only a source-named ancestor with both real sibling markers establishes this boundary.
+fn is_unity_source_path(path: &Path) -> bool {
+    path.ancestors().any(|dir| {
+        dir.file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| ["Assets", "Packages", "ProjectSettings"].contains(&name))
+            && dir.parent().is_some_and(is_unity_project)
+    })
+}
+
 fn matching_rule(dir: &Path) -> Option<&'static Rule> {
+    // Keep the candidate boundary independent of where discovery began or which rule matches.
+    if is_unity_source_path(dir) {
+        return None;
+    }
     let name = dir.file_name()?.to_str()?;
     let parent = dir.parent()?;
+    if name == UNITY_LIBRARY_RULE.dir {
+        return is_unity_project(parent).then_some(&UNITY_LIBRARY_RULE);
+    }
     RULES.iter().find(|r| {
         r.dir == name
             && (r.markers.is_empty()
@@ -391,6 +424,14 @@ impl ProjectArtifacts {
         let mut candidates = Vec::new();
         let mut visited: u64 = 0;
         for root in Self::roots(ctx.known) {
+            // WalkDir follows root symlinks even with follow_links(false). Check both the
+            // supplied root and its resolved ancestry before walking any source directory.
+            if is_unity_source_path(&root)
+                || std::fs::canonicalize(&root)
+                    .is_ok_and(|resolved| is_unity_source_path(&resolved))
+            {
+                continue;
+            }
             let mut projects = ProjectLookup::new(&root);
             let mut walker = WalkDir::new(&root)
                 .follow_links(false)
@@ -418,6 +459,13 @@ impl ProjectArtifacts {
                     (ctx.progress)(visited, 0, entry.path());
                 }
                 let path = entry.path();
+                let name = entry.file_name().to_string_lossy();
+                // Source assets and project configuration must remain intact, including
+                // nested directories whose names happen to match another artifact rule.
+                if is_unity_source_path(path) {
+                    walker.skip_current_dir();
+                    continue;
+                }
                 if let Some(rule) = matching_rule(path) {
                     candidates.push(Candidate {
                         label: label_for(&root, path),
@@ -429,7 +477,6 @@ impl ProjectArtifacts {
                     walker.skip_current_dir();
                     continue;
                 }
-                let name = entry.file_name().to_string_lossy();
                 if SKIP_DIRS.contains(&name.as_ref()) || (name.starts_with('.') && name != ".") {
                     walker.skip_current_dir();
                 }
@@ -454,6 +501,80 @@ mod tests {
             matching_rule(&project.join("node_modules")).unwrap().kind,
             "node_modules"
         );
+    }
+
+    #[test]
+    fn unity_library_requires_both_sibling_directory_markers() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path();
+        let library = project.join("Library");
+        std::fs::create_dir(&library).unwrap();
+        assert!(matching_rule(&library).is_none());
+        std::fs::create_dir(project.join("Assets")).unwrap();
+        assert!(matching_rule(&library).is_none());
+        std::fs::write(project.join("ProjectSettings"), "not a directory").unwrap();
+        assert!(matching_rule(&library).is_none());
+        std::fs::remove_file(project.join("ProjectSettings")).unwrap();
+        std::fs::create_dir(project.join("ProjectSettings")).unwrap();
+        let rule = matching_rule(&library).unwrap();
+        assert_eq!(rule.kind, "Unity Library cache");
+        assert_eq!(rule.risk, RiskLevel::Low);
+        std::fs::remove_dir(project.join("Assets")).unwrap();
+        assert!(matching_rule(&library).is_none());
+        std::fs::write(project.join("Assets"), "not a directory").unwrap();
+        assert!(matching_rule(&library).is_none());
+        let nested = library.join("Library");
+        std::fs::create_dir(&nested).unwrap();
+        assert!(matching_rule(&nested).is_none());
+    }
+
+    #[test]
+    fn unity_source_candidates_are_refused_directly_at_any_depth() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path();
+        std::fs::create_dir(project.join("Assets")).unwrap();
+        std::fs::create_dir(project.join("ProjectSettings")).unwrap();
+        for source in ["Assets", "Packages", "ProjectSettings"] {
+            let parent = project.join(source).join("tools/nested");
+            std::fs::create_dir_all(&parent).unwrap();
+            std::fs::write(parent.join("package.json"), "{}").unwrap();
+            for artifact in [
+                "dist",
+                "node_modules",
+                "build",
+                "__pycache__",
+                ".pytest_cache",
+            ] {
+                let candidate = parent.join(artifact);
+                std::fs::create_dir(&candidate).unwrap();
+                assert!(
+                    matching_rule(&candidate).is_none(),
+                    "{}",
+                    candidate.display()
+                );
+            }
+        }
+        let embedded = project.join("Assets/EmbeddedProject");
+        for directory in ["Assets", "ProjectSettings", "Library"] {
+            std::fs::create_dir_all(embedded.join(directory)).unwrap();
+        }
+        assert!(matching_rule(&embedded.join("Library")).is_none());
+        let library = project.join("Library");
+        std::fs::create_dir(&library).unwrap();
+        assert_eq!(matching_rule(&library).unwrap().kind, "Unity Library cache");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unity_directory_markers_must_not_be_symlinks() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path().join("project");
+        std::fs::create_dir_all(project.join("Library")).unwrap();
+        std::fs::create_dir(project.join("ProjectSettings")).unwrap();
+        let assets = dir.path().join("external-assets");
+        std::fs::create_dir(&assets).unwrap();
+        std::os::unix::fs::symlink(assets, project.join("Assets")).unwrap();
+        assert!(matching_rule(&project.join("Library")).is_none());
     }
 
     #[test]

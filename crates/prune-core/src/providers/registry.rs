@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use super::{browser, developer, system, CleanupProvider};
+use super::{ai, browser, developer, system, CleanupProvider};
 use crate::models::ProviderInfo;
 use crate::platform::KnownPaths;
 
@@ -20,6 +20,9 @@ pub fn default_providers() -> Vec<Arc<dyn CleanupProvider>> {
         v.push(Arc::new(clone_simple(p)));
     }
     v.push(Arc::new(developer::ProjectArtifacts));
+    for p in ai::ALL {
+        v.push(Arc::new(clone_simple(p)));
+    }
     v
 }
 

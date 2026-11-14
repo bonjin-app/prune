@@ -43,6 +43,7 @@ interface ScanState {
   providers: ProviderInfo[];
   scanId: string | null;
   scanning: boolean;
+  cancelling: boolean;
   /** Per provider progress while scanning. */
   progress: Record<string, ScanProgress>;
   session: ScanSession | null;
@@ -88,161 +89,332 @@ interface ScanState {
    * Views pass their own ids: the Cleaner and Developer sections share one selection, and a
    * plan must never contain items the button the user pressed did not count.
    */
-  preview: (targetIds?: string[]) => Promise<void>;
+  preview: (targetIds?: string[], sourceScanId?: string) => Promise<void>;
   closePreview: () => void;
   execute: () => Promise<void>;
   dismissResult: () => void;
   clearError: () => void;
 }
 
-export const useScan = create<ScanState>((set, get) => ({
-  providers: [],
-  scanId: null,
-  scanning: false,
-  progress: {},
-  session: null,
-  selected: new Set(),
-  deleteMode: "trash",
-  filter: "",
-  riskFilter: "all",
-  filterScope: null,
-  plan: null,
-  previewing: false,
-  executing: false,
-  cleanupProgress: null,
-  result: null,
-  error: null,
-
-  loadProviders: async () => {
-    try {
-      set({ providers: await backend.cleanerListProviders() });
-    } catch (e) {
-      set({ error: errorMessage(e) });
-    }
-  },
-
-  startScan: async (providerIds) => {
-    if (get().scanning) return;
-    set({ scanning: true, progress: {}, error: null, result: null, plan: null });
-    try {
-      const scanId = await backend.cleanerStartScan(providerIds);
-      set({ scanId });
-    } catch (e) {
-      set({ scanning: false, error: errorMessage(e) });
-    }
-  },
-
-  cancelScan: async () => {
-    const { scanId } = get();
-    if (!scanId) return;
+export const useScan = create<ScanState>((set, get) => {
+  let scanRequest = 0;
+  let previewRequest = 0;
+  const earlyCompletions = new Map<string, ScanSession>();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const stopPolling = () => {
+    clearTimeout(timer);
+    timer = undefined;
+  };
+  const cancel = async (scanId: string, request: number) => {
     try {
       await backend.cleanerCancelScan(scanId);
     } catch (e) {
-      set({ error: errorMessage(e) });
+      if (request === scanRequest && get().scanId === scanId && get().scanning)
+        set({ cancelling: false, error: errorMessage(e) });
     }
-  },
+  };
+  const reconcile = (scanId: string, request: number) => {
+    const current = () => request === scanRequest && get().scanId === scanId && get().scanning;
+    timer = setTimeout(async () => {
+      if (!current()) return;
+      try {
+        const session = await backend.cleanerGetScan(scanId);
+        if (!current()) return;
+        get().onScanCompleted(session);
+        if (current()) reconcile(scanId, request);
+      } catch (e) {
+        if (!current()) return;
+        if (e && typeof e === "object" && "code" in e && e.code === "scan_running")
+          reconcile(scanId, request);
+        else set({ scanning: false, cancelling: false, error: errorMessage(e) });
+      }
+    }, 1_000);
+  };
+  return {
+    providers: [],
+    scanId: null,
+    scanning: false,
+    cancelling: false,
+    progress: {},
+    session: null,
+    selected: new Set(),
+    deleteMode: "trash",
+    filter: "",
+    riskFilter: "all",
+    filterScope: null,
+    plan: null,
+    previewing: false,
+    executing: false,
+    cleanupProgress: null,
+    result: null,
+    error: null,
 
-  onScanProgress: (p) => {
-    if (p.scanId !== get().scanId) return;
-    set((s) => ({ progress: { ...s.progress, [p.providerId]: p } }));
-  },
+    loadProviders: async () => {
+      try {
+        set({ providers: await backend.cleanerListProviders() });
+      } catch (e) {
+        set({ error: errorMessage(e) });
+      }
+    },
 
-  onScanCompleted: (session) => {
-    if (session.id !== get().scanId) return;
-    // Keep selection for targets that still exist.
-    const ids = new Set(session.results.flatMap((r) => r.targets.map((t) => t.id)));
-    const selected = new Set([...get().selected].filter((id) => ids.has(id)));
-    set({ session, scanning: false, selected });
-  },
-
-  onCleanupProgress: (p) => {
-    if (p.planId !== get().plan?.id) return;
-    set({ cleanupProgress: p });
-  },
-
-  toggleTarget: (id) =>
-    set((s) => {
-      const selected = new Set(s.selected);
-      if (selected.has(id)) selected.delete(id);
-      else selected.add(id);
-      return { selected };
-    }),
-
-  setTargets: (ids, on) =>
-    set((s) => {
-      const selected = new Set(s.selected);
-      ids.forEach((id) => (on ? selected.add(id) : selected.delete(id)));
-      return { selected };
-    }),
-
-  selectRecommended: (categories) =>
-    set((s) => {
-      const selected = new Set(s.selected);
-      // Some targets can only be deleted outright — items already in the Trash, for instance —
-      // and are removed permanently whatever mode is chosen. Ticking those for someone who
-      // asked to move things to the Trash puts one irreversible item among a list that reads as
-      // recoverable. They are still offered; they are just not chosen on the user's behalf
-      // unless permanent removal is what was asked for. `prune clean` applies the same rule.
-      const permanent = s.deleteMode === "permanent";
-      s.session?.results
-        .filter((r) => !categories || categories.includes(r.category))
-        .flatMap((r) => r.targets)
-        .filter((t) => t.risk === "safe")
-        .filter((t) => permanent || !t.permanentOnly)
-        .forEach((t) => selected.add(t.id));
-      return { selected };
-    }),
-
-  clearSelection: () => set({ selected: new Set() }),
-
-  setDeleteMode: (deleteMode) => set({ deleteMode }),
-
-  setFilter: (filter, scope) => set((s) => ({ filter, filterScope: scope ?? s.filterScope })),
-  setRiskFilter: (riskFilter) => set({ riskFilter }),
-
-  preview: async (targetIds) => {
-    const { scanId, selected, deleteMode } = get();
-    const ids = targetIds ?? [...selected];
-    if (!scanId || ids.length === 0) return;
-    set({ previewing: true, error: null });
-    try {
-      const plan = await backend.cleanerPreview(scanId, ids, deleteMode);
-      set({ plan, previewing: false, cleanupProgress: null });
-    } catch (e) {
-      set({ previewing: false, error: errorMessage(e) });
-    }
-  },
-
-  closePreview: () => set({ plan: null, cleanupProgress: null }),
-
-  execute: async () => {
-    const { plan, scanId } = get();
-    if (!plan) return;
-    set({ executing: true, error: null });
-    try {
-      const result = await backend.cleanerExecute(plan.id);
-      // Remove cleaned targets from the local session so the list reflects reality.
-      const removed = new Set(plan.targets.map((t) => t.id));
-      result.failed.forEach((f) => removed.delete(f.targetId));
-      set((s) => {
-        const session = s.session ? pruneSession(s.session, removed) : null;
-        const selected = new Set([...s.selected].filter((id) => !removed.has(id)));
-        return { result, executing: false, plan: null, cleanupProgress: null, session, selected };
+    startScan: async (providerIds) => {
+      if (get().scanning || get().executing) return;
+      const request = ++scanRequest;
+      ++previewRequest;
+      stopPolling();
+      earlyCompletions.clear();
+      set({
+        scanId: null,
+        scanning: true,
+        cancelling: false,
+        progress: {},
+        error: null,
+        result: null,
+        plan: null,
+        previewing: false,
+        executing: false,
+        cleanupProgress: null,
       });
-      if (scanId === useDisk.getState().scanId || plan.scanId === useDisk.getState().scanId) {
-        void useDisk.getState().forgetRemoved([...removed]);
+      try {
+        const scanId = await backend.cleanerStartScan(providerIds);
+        if (request !== scanRequest || !get().scanning) return;
+        set({ scanId });
+        const early = earlyCompletions.get(scanId);
+        earlyCompletions.clear();
+        if (early) get().onScanCompleted(early);
+        if (get().scanning) {
+          reconcile(scanId, request);
+          if (get().cancelling) await cancel(scanId, request);
+        }
+      } catch (e) {
+        if (request !== scanRequest) return;
+        earlyCompletions.clear();
+        set({ scanning: false, cancelling: false, error: errorMessage(e) });
       }
-      if (plan.scanId.startsWith("app:")) {
-        void useApps.getState().forgetRemoved([...removed]);
-      }
-    } catch (e) {
-      set({ executing: false, error: errorMessage(e) });
-    }
-  },
+    },
 
-  dismissResult: () => set({ result: null }),
-  clearError: () => set({ error: null }),
-}));
+    cancelScan: async () => {
+      const { scanId, scanning, cancelling } = get();
+      if (!scanning || cancelling) return;
+      set({ cancelling: true });
+      if (scanId) await cancel(scanId, scanRequest);
+    },
+
+    onScanProgress: (p) => {
+      if (!get().scanning || p.scanId !== get().scanId) return;
+      set((s) => ({ progress: { ...s.progress, [p.providerId]: p } }));
+    },
+
+    onScanCompleted: (session) => {
+      if (session.status === "running") return;
+      if (get().scanning && get().scanId === null) {
+        if (earlyCompletions.size >= 8)
+          earlyCompletions.delete(earlyCompletions.keys().next().value ?? "");
+        earlyCompletions.set(session.id, session);
+        return;
+      }
+      if (session.id !== get().scanId) return;
+      if (!get().scanning) return;
+      stopPolling();
+      // Keep selection for targets that still exist.
+      const ids = new Set(session.results.flatMap((r) => r.targets.map((t) => t.id)));
+      const selected = new Set([...get().selected].filter((id) => ids.has(id)));
+      set({ session, scanning: false, cancelling: false, selected });
+    },
+
+    onCleanupProgress: (p) => {
+      if (!get().executing || p.planId !== get().plan?.id) return;
+      set({ cleanupProgress: p });
+    },
+
+    toggleTarget: (id) =>
+      set((s) => {
+        const selected = new Set(s.selected);
+        if (selected.has(id)) selected.delete(id);
+        else selected.add(id);
+        return { selected };
+      }),
+
+    setTargets: (ids, on) =>
+      set((s) => {
+        const selected = new Set(s.selected);
+        ids.forEach((id) => (on ? selected.add(id) : selected.delete(id)));
+        return { selected };
+      }),
+
+    selectRecommended: (categories) =>
+      set((s) => {
+        const selected = new Set(s.selected);
+        // Some targets can only be deleted outright — items already in the Trash, for instance —
+        // and are removed permanently whatever mode is chosen. Ticking those for someone who
+        // asked to move things to the Trash puts one irreversible item among a list that reads as
+        // recoverable. They are still offered; they are just not chosen on the user's behalf
+        // unless permanent removal is what was asked for. `prune clean` applies the same rule.
+        const permanent = s.deleteMode === "permanent";
+        s.session?.results
+          .filter((r) => !categories || categories.includes(r.category))
+          .flatMap((r) => r.targets)
+          .filter((t) => t.risk === "safe")
+          .filter((t) => permanent || !t.permanentOnly)
+          .forEach((t) => selected.add(t.id));
+        return { selected };
+      }),
+
+    clearSelection: () => set({ selected: new Set() }),
+
+    setDeleteMode: (deleteMode) => set({ deleteMode }),
+
+    setFilter: (filter, scope) => set((s) => ({ filter, filterScope: scope ?? s.filterScope })),
+    setRiskFilter: (riskFilter) => set({ riskFilter }),
+
+    preview: async (targetIds, sourceScanId) => {
+      const { scanId: activeScanId, selected, deleteMode, scanning, executing } = get();
+      const scanId = sourceScanId ?? activeScanId;
+      const ids = targetIds ?? [...selected];
+      if (!scanId || ids.length === 0 || scanning || executing) return;
+      const request = ++previewRequest;
+      const scan = scanRequest;
+      const current = () =>
+        request === previewRequest &&
+        scan === scanRequest &&
+        get().scanId === activeScanId &&
+        !get().executing;
+      const sourceCurrent = () =>
+        !sourceScanId ||
+        (sourceScanId.startsWith("app:")
+          ? useApps.getState().selectedId === sourceScanId.slice(4)
+          : useDisk.getState().scanId === sourceScanId && !useDisk.getState().scanning);
+      set({ previewing: true, plan: null, error: null });
+      try {
+        const plan = await backend.cleanerPreview(scanId, ids, deleteMode);
+        if (!current() || !sourceCurrent()) return;
+        if (plan.scanId !== scanId)
+          throw new Error("Preview belongs to another scan. Review again.");
+        set({ plan, previewing: false, cleanupProgress: null });
+      } catch (e) {
+        if (!current() || !sourceCurrent()) return;
+        set({ previewing: false, error: errorMessage(e) });
+      } finally {
+        if (current()) set({ previewing: false });
+      }
+    },
+
+    closePreview: () => {
+      if (get().executing) return;
+      ++previewRequest;
+      set({ plan: null, previewing: false, cleanupProgress: null });
+    },
+
+    execute: async () => {
+      const { plan, scanId, executing, scanning, previewing } = get();
+      if (!plan || plan.targets.length === 0 || executing || scanning || previewing) return;
+      ++previewRequest;
+      const scan = scanRequest;
+      const current = () => scan === scanRequest && get().scanId === scanId && get().plan === plan;
+      set({ executing: true, error: null });
+      try {
+        const result = await backend.cleanerExecute(plan.id);
+        if (!current()) return;
+        // Remove cleaned targets from the local session so the list reflects reality.
+        const verified = resultForPlan(result, plan);
+        if (!verified || result.status === "failed") {
+          set({
+            executing: false,
+            plan: null,
+            cleanupProgress: null,
+            result: verified ? result : null,
+            error:
+              "Cleanup could not be verified. Items have been kept in the list; rescan before trying again.",
+          });
+          return;
+        }
+        const removed = new Set(plan.targets.map((t) => t.id));
+        result.failed.forEach((f) => removed.delete(f.targetId));
+        set((s) => {
+          const ownsSession = s.session?.id === plan.scanId;
+          const session = ownsSession && s.session ? pruneSession(s.session, removed) : s.session;
+          const selected = ownsSession
+            ? new Set([...s.selected].filter((id) => !removed.has(id)))
+            : s.selected;
+          return { result, executing: false, plan: null, cleanupProgress: null, session, selected };
+        });
+        if (plan.scanId === useDisk.getState().scanId) {
+          void useDisk.getState().forgetRemoved([...removed]);
+        }
+        if (plan.scanId.startsWith("app:")) {
+          void useApps.getState().forgetRemoved([...removed]);
+        }
+      } catch (e) {
+        if (!current()) return;
+        set({ executing: false, error: errorMessage(e) });
+      }
+    },
+
+    dismissResult: () => set({ result: null }),
+    clearError: () => set({ error: null }),
+  };
+});
+
+/** IPC types are compile-time promises; validate the actual reply before changing rows or tone. */
+function resultForPlan(value: unknown, plan: CleanupPlan): value is CleanupResult {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Partial<CleanupResult>;
+  const text = (value: unknown): value is string => typeof value === "string" && value.length > 0;
+  const count = (value: unknown): value is number =>
+    typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+  if (
+    !text(result.operationId) ||
+    result.planId !== plan.id ||
+    result.mode !== plan.mode ||
+    !text(result.startedAt) ||
+    !text(result.finishedAt) ||
+    !Number.isFinite(Date.parse(result.startedAt)) ||
+    !Number.isFinite(Date.parse(result.finishedAt)) ||
+    Date.parse(result.finishedAt) < Date.parse(result.startedAt) ||
+    !count(result.removedTargets) ||
+    !count(result.removedFiles) ||
+    !count(result.removedBytes) ||
+    !Array.isArray(result.failed) ||
+    (result.logError !== undefined && typeof result.logError !== "string")
+  )
+    return false;
+  const known = new Set(plan.targets.map((target) => target.id));
+  const targets = new Map(plan.targets.map((target) => [target.id, target]));
+  const failed = new Set<string>();
+  for (const failure of result.failed) {
+    if (
+      !failure ||
+      typeof failure !== "object" ||
+      !text(failure.targetId) ||
+      typeof failure.path !== "string" ||
+      !text(failure.error) ||
+      !known.has(failure.targetId) ||
+      targets.get(failure.targetId)?.path !== failure.path ||
+      failed.has(failure.targetId)
+    )
+      return false;
+    failed.add(failure.targetId);
+  }
+  if (result.removedTargets !== known.size - failed.size) return false;
+  const successful = plan.targets.filter((target) => !failed.has(target.id));
+  const logicalBytes = successful.reduce((total, target) => total + target.sizeBytes, 0);
+  const logicalFiles = successful.reduce((total, target) => total + target.fileCount, 0);
+  if (
+    !count(logicalBytes) ||
+    !count(logicalFiles) ||
+    result.removedBytes !== logicalBytes ||
+    result.removedFiles !== logicalFiles
+  )
+    return false;
+  if (result.status === "success") return result.removedTargets > 0 && failed.size === 0;
+  if (result.status === "partial") return result.removedTargets > 0 && failed.size > 0;
+  return (
+    result.status === "failed" &&
+    result.removedTargets === 0 &&
+    result.removedFiles === 0 &&
+    result.removedBytes === 0
+  );
+}
 
 function pruneSession(session: ScanSession, removed: Set<string>): ScanSession {
   const results = session.results.map((r) => {
