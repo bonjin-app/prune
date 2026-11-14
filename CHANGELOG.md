@@ -6,6 +6,19 @@ All notable changes to Prune are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-14
+
+The same Prune as 0.2.0, packaged so that macOS will open it.
+
+### Fixed
+
+- A downloaded copy of the macOS app could be reported as damaged, with no way to allow it.
+  Without a Developer ID certificate only the executable was signed, by the linker, while the
+  bundle claimed sealed resources, which macOS reads as tampering. The whole bundle is now
+  signed ad hoc, so macOS treats it as an app from an unidentified developer, which can be
+  allowed once in System Settings → Privacy & Security. The release workflow now checks the
+  signature and fails rather than publish the broken form. 0.1.6 and 0.2.0 were affected.
+
 ## [0.2.0] - 2026-11-14
 
 Storage you can see, and totals you can believe. A disk view to find where the space went, AI
