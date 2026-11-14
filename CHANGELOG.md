@@ -4,7 +4,13 @@ All notable changes to Prune are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.2.0] - 2026-11-14
+
+Storage you can see, and totals you can believe. A disk view to find where the space went, AI
+models and data accounted for without ever offering what cannot come back, protected space
+reported apart from what can be removed, and sizes that agree with `du`. Nothing Prune removes
+changed in kind: the safety rules are the same or stricter, and the operation log and settings
+file are read as before.
 
 ### Added
 
@@ -71,10 +77,13 @@ All notable changes to Prune are documented here. The format follows
 
 ### Notes
 
-- Folder bytes describe logical file sizes, not unique allocated APFS blocks. Clones, sparse
-  files and Trash can make the change in available disk space different from the preview total.
-- This version is a local build until a release is published. Apple Developer ID signing and
-  notarization remain required for a verified public macOS distribution.
+- Sizes count the space a file occupies, but each APFS clone is counted as if it were its own
+  copy, and a file a running program still has open keeps its space until that program closes
+  it. Moving to the Trash frees nothing until it is emptied. For all three reasons the gain in
+  available space can be smaller than the total Prune removed; on one machine, emptying 232 GB
+  from the Trash gave back 43 GB, most of the rest held by a running virtual machine.
+- The macOS and Windows installers are not signed, as with earlier releases: macOS asks for
+  the app to be allowed in Privacy & Security, and Windows SmartScreen warns, the first time.
 
 ## [0.1.6] - 2026-10-07
 
