@@ -221,12 +221,18 @@ who built it — see below.
 
 ### These builds are not signed yet
 
-macOS will say the app "cannot be opened because the developer cannot be verified", and Windows
+The first time you open it, macOS will refuse because it cannot verify the developer, and Windows
 SmartScreen will warn about an unrecognised app. Neither is a claim about what the app does —
 both mean nobody has paid for a certificate that vouches for it.
 
-- **macOS** — right-click `Prune.app` and choose **Open**, then **Open** again.
+- **macOS 15 and later** — open Prune once and dismiss the warning, then go to System Settings →
+  Privacy & Security, scroll to the message about Prune and click **Open Anyway**. macOS asks
+  once more; after that it opens normally.
+- **macOS 12 to 14** — right-click `Prune.app` and choose **Open**, then **Open** again.
 - **Windows** — click **More info**, then **Run anyway**.
+
+If macOS says Prune is **damaged** and offers only to move it to the Trash, you have 0.2.0 or
+earlier, whose signature was incomplete. Download the current release instead.
 
 If you would rather not, [build it from source](#development). That is the same code.
 

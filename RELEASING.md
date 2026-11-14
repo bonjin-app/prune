@@ -79,11 +79,23 @@ The `Release` workflow then builds:
 | `Prune_0.2.0_aarch64.dmg`               | macOS, Apple Silicon |
 | `Prune_0.2.0_x64.dmg`                   | macOS, Intel         |
 | `Prune_0.2.0_x64-setup.exe`, `.msi`     | Windows x64          |
+| `Prune_0.2.0_<arch>.app.tar.gz`         | macOS app, zipped    |
 | `prune-v0.2.0-<target>.tar.gz` / `.zip` | the CLI, per target  |
 | `SHA256SUMS`                            | every file above     |
 
-It opens the release as a **draft**. Read the notes, check the artifacts are all there, then
-publish.
+It opens the release as a **draft**, with "See CHANGELOG.md for details." as its notes. Before
+publishing, on a Mac:
+
+```bash
+scripts/verify-release.sh 0.2.0
+```
+
+It downloads the draft and checks it the way a person who downloads it will meet it: every file
+against `SHA256SUMS`, the CLI's version, and for each disk image the app's version,
+architecture, signature and what Gatekeeper makes of it. A green workflow is not enough — 0.1.6
+and 0.2.0 passed CI and still shipped a macOS app that a download reports as damaged. Publish
+only when it says the release is ready, and write real notes first: what changed for the
+person installing it, with the CHANGELOG entry as the source.
 
 `SHA256SUMS` is written last, by the `Checksums` job, from the files as the release serves them.
 If a job is re-run and replaces a file, re-run `Checksums` too, or regenerate it by hand:
