@@ -3,7 +3,10 @@ use std::time::{Duration, SystemTime};
 
 use super::{CleanupProvider, ScanContext, ScanOutput};
 use crate::models::{Category, RiskLevel};
-use crate::platform::KnownPaths;
+use crate::platform::{InUse, KnownPaths};
+
+/// Shown on an item a running program is using, when the OS does not say which program.
+pub const IN_USE: &str = "In use by a running program";
 
 /// How a root directory is turned into targets.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -62,10 +65,16 @@ pub struct SimpleProvider {
     pub roots: fn(&KnownPaths) -> Vec<Root>,
     /// Child names (case-sensitive) to skip in `Children` mode.
     pub exclude_names: &'static [&'static str],
+    /// Child name prefixes (case-sensitive) to skip in `Children` mode.
+    pub exclude_prefixes: &'static [&'static str],
     /// Only include entries not modified for at least this many days.
     pub min_age_days: Option<u32>,
     /// Targets that can only be deleted permanently (e.g. items already in the trash).
     pub permanent_only: bool,
+    /// Ask the OS which candidates running programs are using, and report those as
+    /// [`RiskLevel::Protected`] instead of offering them. For places where age alone does not
+    /// say whether something is finished with, such as the temporary folder.
+    pub protect_in_use: bool,
 }
 
 impl SimpleProvider {
@@ -86,8 +95,10 @@ impl SimpleProvider {
             priority: 60,
             roots,
             exclude_names: &[],
+            exclude_prefixes: &[],
             min_age_days: None,
             permanent_only: false,
+            protect_in_use: false,
         }
     }
 
@@ -101,6 +112,16 @@ impl SimpleProvider {
         self
     }
 
+    pub const fn exclude_prefixed(mut self, prefixes: &'static [&'static str]) -> Self {
+        self.exclude_prefixes = prefixes;
+        self
+    }
+
+    pub const fn protect_in_use(mut self) -> Self {
+        self.protect_in_use = true;
+        self
+    }
+
     pub const fn min_age_days(mut self, days: u32) -> Self {
         self.min_age_days = Some(days);
         self
@@ -109,6 +130,12 @@ impl SimpleProvider {
     pub const fn permanent_only(mut self) -> Self {
         self.permanent_only = true;
         self
+    }
+
+    fn excluded(&self, name: &str) -> bool {
+        name == ".DS_Store"
+            || self.exclude_names.contains(&name)
+            || self.exclude_prefixes.iter().any(|p| name.starts_with(p))
     }
 
     fn old_enough(&self, path: &Path) -> bool {
@@ -167,21 +194,13 @@ impl CleanupProvider for SimpleProvider {
             if !root.path.exists() {
                 continue;
             }
-            match root.mode {
+            let candidates: Vec<(PathBuf, String)> = match root.mode {
                 RootMode::Whole => {
                     if !self.old_enough(&root.path) {
                         continue;
                     }
                     let label = root.label.clone().unwrap_or_else(|| file_name(&root.path));
-                    out.push_measured(
-                        ctx,
-                        self.id,
-                        &root.path,
-                        label,
-                        self.risk,
-                        None,
-                        self.permanent_only,
-                    );
+                    vec![(root.path.clone(), label)]
                 }
                 RootMode::Children => {
                     let entries = match std::fs::read_dir(&root.path) {
@@ -194,29 +213,76 @@ impl CleanupProvider for SimpleProvider {
                     let mut children: Vec<PathBuf> =
                         entries.filter_map(|e| e.ok()).map(|e| e.path()).collect();
                     children.sort();
-                    for child in children {
-                        if ctx.is_cancelled() {
-                            break;
+                    children
+                        .into_iter()
+                        .map(|child| {
+                            let name = file_name(&child);
+                            (child, name)
+                        })
+                        .filter(|(child, name)| !self.excluded(name) && self.old_enough(child))
+                        .collect()
+                }
+            };
+            if candidates.is_empty() || ctx.is_cancelled() {
+                continue;
+            }
+
+            // Asking the OS can take a second; it runs while the candidates are measured
+            // rather than before, and its answer is applied to what was measured.
+            let (in_use, mut measured) = std::thread::scope(|scope| {
+                let asking = self.protect_in_use.then(|| {
+                    let paths: Vec<PathBuf> = candidates.iter().map(|(p, _)| p.clone()).collect();
+                    scope.spawn(move || ctx.platform.in_use(&paths))
+                });
+                let mut measured = ScanOutput::default();
+                for (path, label) in &candidates {
+                    if ctx.is_cancelled() {
+                        break;
+                    }
+                    measured.push_measured(
+                        ctx,
+                        self.id,
+                        path,
+                        label.clone(),
+                        self.risk,
+                        None,
+                        self.permanent_only,
+                    );
+                }
+                let in_use = asking.map(|handle| {
+                    handle.join().unwrap_or_else(|_| {
+                        InUse::Unknown("the check for files in use stopped unexpectedly".into())
+                    })
+                });
+                (in_use, measured)
+            });
+
+            match in_use {
+                None => {}
+                Some(InUse::Known(found)) => {
+                    for target in &mut measured.targets {
+                        if let Some(program) = found.get(Path::new(&target.path)) {
+                            target.risk = RiskLevel::Protected;
+                            target.description = Some(match program {
+                                Some(program) => format!("{IN_USE} ({program})"),
+                                None => IN_USE.to_string(),
+                            });
                         }
-                        let name = file_name(&child);
-                        if name == ".DS_Store" || self.exclude_names.contains(&name.as_str()) {
-                            continue;
-                        }
-                        if !self.old_enough(&child) {
-                            continue;
-                        }
-                        out.push_measured(
-                            ctx,
-                            self.id,
-                            &child,
-                            name,
-                            self.risk,
-                            None,
-                            self.permanent_only,
-                        );
                     }
                 }
+                Some(InUse::Unknown(reason)) => {
+                    // Failing open is only acceptable out loud: everything here is still
+                    // offered, and the scan says why it could not check.
+                    out.issue(
+                        &root.path,
+                        format!(
+                            "Could not check which items running programs are using \
+                             ({reason}), so none of them is marked as in use."
+                        ),
+                    );
+                }
             }
+            out.merge(measured);
         }
         out
     }

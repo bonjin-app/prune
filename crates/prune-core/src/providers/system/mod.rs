@@ -83,13 +83,20 @@ pub const TEMP_FILES: SimpleProvider = SimpleProvider::new(
     "temp_files",
     "Temporary Files",
     Category::TemporaryFiles,
-    "Temporary files older than a day. Running programs may still use newer ones.",
+    "Temporary files older than a day. Anything a running program still has open is shown but kept.",
     RiskLevel::Low,
     |known| vec![Root::children(known.temp.clone())],
 )
 .priority(20)
 .min_age_days(1)
-.exclude(&["com.apple.launchd", "powerlog", ".X11-unix", ".ICE-unix"]);
+.exclude(&["powerlog", ".X11-unix", ".ICE-unix"])
+// macOS keeps per-service folders here (`com.apple.launchd.*`, `com.apple.ap.promotedcontentd`,
+// …). Several are protected by System Integrity Protection, so moving them fails, and none of
+// them is the user's to clear.
+.exclude_prefixed(&["com.apple."])
+// Age is no proof a temporary item is finished with: a browser's singleton socket, an editor's
+// session folder or a lock file can sit untouched for days while the program that made it runs.
+.protect_in_use();
 
 /// Installer images / packages sitting in Downloads.
 pub struct OldInstallers;

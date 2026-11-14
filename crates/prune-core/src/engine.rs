@@ -166,6 +166,7 @@ impl PruneEngine {
     ) -> ScanSession {
         Scanner {
             known: &self.known,
+            platform: self.platform.as_ref(),
             policy: &self.policy,
             registry: &self.registry,
         }

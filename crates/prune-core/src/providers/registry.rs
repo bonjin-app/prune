@@ -37,8 +37,10 @@ fn clone_simple(p: &super::SimpleProvider) -> super::SimpleProvider {
         priority: p.priority,
         roots: p.roots,
         exclude_names: p.exclude_names,
+        exclude_prefixes: p.exclude_prefixes,
         min_age_days: p.min_age_days,
         permanent_only: p.permanent_only,
+        protect_in_use: p.protect_in_use,
     }
 }
 

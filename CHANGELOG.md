@@ -23,6 +23,21 @@ All notable changes to Prune are documented here. The format follows
   Node type definitions. `baseUrl` is gone from `tsconfig.json`, which TypeScript 6 deprecates;
   the `@/` import alias now resolves relative to `tsconfig.json` itself. Nothing Prune ships changes.
 
+### Fixed
+
+- Temporary Files no longer offers what a running program is still using. A day without
+  changes is no proof that something is finished with: a browser's singleton socket, an
+  editor's session folder or an app's lock file sits untouched for days while the program runs.
+  Items a program holds open — a file, a socket, a working directory, anything inside a folder —
+  are now Protected, shown with their size and the program using them, and never selected. On
+  macOS this asks `lsof` once per scan, scoped to the current user, while sizes are measured; on
+  Windows, which refuses to move an open file by itself, files directly in the temporary folder
+  are checked. When the check cannot run, the scan says so instead of treating everything as
+  unused.
+- Temporary Files no longer offers macOS's own `com.apple.*` service folders. Several are
+  protected by System Integrity Protection, so moving them failed and `prune clean` exited
+  with an error.
+
 ## [0.2.2] - 2026-11-14
 
 Up-to-date foundations, no change in what Prune does. Tauri, the system readings, the Windows

@@ -123,6 +123,7 @@ fn detail_knowing_siblings(
     let noop = |_: u64, _: u64, _: &std::path::Path| {};
     let ctx = ScanContext {
         known,
+        platform,
         policy,
         cancel,
         progress: &noop,

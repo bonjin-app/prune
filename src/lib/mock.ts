@@ -306,7 +306,12 @@ function fakeResults(providerIds?: string[]): ScanResult[] {
         kind: "directory",
       }),
     ],
-    temp_files: [target("temp_files", `/var/folders/ab/T/TemporaryItems`, 88e6, "low")],
+    temp_files: [
+      target("temp_files", `/var/folders/ab/T/TemporaryItems`, 88e6, "low"),
+      target("temp_files", `/var/folders/ab/T/com.google.Chrome.zB9vtG`, 2.1e6, "protected", {
+        description: "In use by a running program (Google Chrome)",
+      }),
+    ],
     trash: [
       target("trash", `${HOME}/.Trash/old-project.zip`, 2.4 * gb, "safe", {
         kind: "file",

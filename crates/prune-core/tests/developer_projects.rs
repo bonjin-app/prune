@@ -31,6 +31,7 @@ fn scan_project_roots(platform: &SandboxPlatform, roots: Vec<PathBuf>) -> ScanOu
     let policy = SafetyPolicy::for_platform(platform, &known);
     ProjectArtifacts.scan(&ScanContext {
         known: &known,
+        platform,
         policy: &policy,
         cancel: &AtomicBool::new(false),
         progress: &|_, _, _| {},

@@ -3,7 +3,8 @@
 //! Everything above this module (providers, safety, UI) must be OS agnostic and ask the
 //! platform for well-known directories instead of hard-coding them.
 
-use std::path::PathBuf;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
@@ -259,6 +260,24 @@ pub struct StartupItem {
     pub reason: Option<String>,
 }
 
+/// Which candidate paths running programs are using, as far as the OS can say.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InUse {
+    /// The candidates that are open, or hold something open, each with the name of a program
+    /// using it when the OS reports one. A candidate that is not listed is not in use.
+    Known(HashMap<PathBuf, Option<String>>),
+    /// The question could not be answered: the reason, in words fit to show. Callers must say
+    /// so rather than quietly treat every candidate as unused.
+    Unknown(String),
+}
+
+impl InUse {
+    /// Nothing is in use.
+    pub fn none() -> Self {
+        InUse::Known(HashMap::new())
+    }
+}
+
 /// The contract every supported OS implements.
 pub trait PlatformService: Send + Sync {
     fn platform(&self) -> Platform;
@@ -282,6 +301,13 @@ pub trait PlatformService: Send + Sync {
     /// Opens the OS settings pane where the missing permission is granted.
     fn open_privacy_settings(&self) -> Result<()> {
         Err(crate::PruneError::NotImplemented("open_privacy_settings"))
+    }
+    /// Which of `candidates` a running program of this user is using: the path itself, or for
+    /// a directory anything inside it (an open file, a socket, a working directory). Read-only.
+    /// Default: unknown, so a platform that cannot tell never claims that nothing is in use.
+    fn in_use(&self, candidates: &[PathBuf]) -> InUse {
+        let _ = candidates;
+        InUse::Unknown("this system cannot tell which files running programs have open".into())
     }
     /// Programs that start by themselves. Default: not implemented.
     fn startup_items(&self, known: &KnownPaths) -> Result<Vec<StartupItem>> {
@@ -348,5 +374,96 @@ pub(crate) fn existing(path: PathBuf) -> Option<PathBuf> {
         Some(path)
     } else {
         None
+    }
+}
+
+/// Maps open paths reported by the OS onto the candidates they fall inside.
+///
+/// A path can be reported in a different spelling from the one a candidate was found under:
+/// macOS reports `/private/var/folders/…` for files opened through `/var/folders/…`, but a
+/// Unix socket under the name it was bound with. Each candidate is therefore matched as given
+/// and with its parent resolved (the name kept, so a link is matched by where it sits, not by
+/// what it points at). Resolving one parent per directory, rather than every candidate, keeps
+/// this cheap for a temporary folder with tens of thousands of entries.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+pub(crate) fn match_open_paths(
+    candidates: &[PathBuf],
+    open: impl IntoIterator<Item = (PathBuf, Option<String>)>,
+) -> HashMap<PathBuf, Option<String>> {
+    let mut resolved_parents: HashMap<&Path, Option<PathBuf>> = HashMap::new();
+    let mut spellings: HashMap<PathBuf, &PathBuf> = HashMap::new();
+    for candidate in candidates {
+        spellings.insert(candidate.clone(), candidate);
+        let (Some(parent), Some(name)) = (candidate.parent(), candidate.file_name()) else {
+            continue;
+        };
+        let real_parent = resolved_parents
+            .entry(parent)
+            .or_insert_with(|| parent.canonicalize().ok());
+        if let Some(real_parent) = real_parent {
+            spellings.insert(real_parent.join(name), candidate);
+        }
+    }
+    // Only paths under one of the candidates' directories can fall inside a candidate; checking
+    // that first avoids walking the ancestors of every file open anywhere on the machine.
+    let mut parents: Vec<PathBuf> = resolved_parents
+        .iter()
+        .flat_map(|(given, real)| std::iter::once(given.to_path_buf()).chain(real.clone()))
+        .collect();
+    parents.sort();
+    parents.dedup();
+
+    let mut found: HashMap<PathBuf, Option<String>> = HashMap::new();
+    for (path, program) in open {
+        if !parents.iter().any(|p| path.starts_with(p)) {
+            continue;
+        }
+        let hit = path.ancestors().find_map(|a| spellings.get(a).copied());
+        if let Some(candidate) = hit {
+            let slot = found.entry(candidate.clone()).or_insert(None);
+            if slot.is_none() {
+                *slot = program;
+            }
+        }
+    }
+    found
+}
+
+#[cfg(test)]
+mod in_use_tests {
+    use super::*;
+
+    #[test]
+    fn an_open_file_marks_the_candidate_it_is_inside() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("T");
+        std::fs::create_dir_all(root.join("busy/deep")).unwrap();
+        std::fs::create_dir_all(root.join("idle")).unwrap();
+        std::fs::write(root.join("lone.lock"), b"x").unwrap();
+        let candidates = vec![root.join("busy"), root.join("idle"), root.join("lone.lock")];
+
+        let real = root.canonicalize().unwrap();
+        let open = vec![
+            // Reported resolved, the way macOS reports an open file.
+            (real.join("busy/deep/file"), Some("Editor".to_string())),
+            // Reported as given, the way macOS reports a socket.
+            (root.join("lone.lock"), None),
+            // Elsewhere entirely.
+            (dir.path().join("elsewhere/idle"), Some("Other".to_string())),
+            // The directory itself, not inside a candidate.
+            (real.clone(), Some("Shell".to_string())),
+        ];
+        let found = match_open_paths(&candidates, open);
+        assert_eq!(found.len(), 2, "{found:?}");
+        assert_eq!(found[&root.join("busy")].as_deref(), Some("Editor"));
+        assert_eq!(found[&root.join("lone.lock")], None);
+    }
+
+    #[test]
+    fn a_name_that_only_starts_like_a_candidate_is_not_inside_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let candidates = vec![dir.path().join("cache")];
+        let open = vec![(dir.path().join("cache-2/file"), None)];
+        assert!(match_open_paths(&candidates, open).is_empty());
     }
 }

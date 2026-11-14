@@ -1,13 +1,14 @@
 use std::path::PathBuf;
 
 use super::{
-    existing, existing_project_roots, AppDataKind, ApplicationInfo, KnownPaths, PermissionState,
-    Permissions, PlatformService, ProtectedPaths, RelatedPath, StartupItem,
+    existing, existing_project_roots, AppDataKind, ApplicationInfo, InUse, KnownPaths,
+    PermissionState, Permissions, PlatformService, ProtectedPaths, RelatedPath, StartupItem,
 };
 use crate::models::Platform;
 use crate::Result;
 
 mod apps;
+mod open_files;
 mod startup;
 
 pub struct MacosPlatform;
@@ -78,6 +79,10 @@ impl PlatformService for MacosPlatform {
 
     fn set_startup_enabled(&self, item: &StartupItem, enabled: bool) -> Result<()> {
         startup::set_enabled(item, enabled)
+    }
+
+    fn in_use(&self, candidates: &[PathBuf]) -> InUse {
+        open_files::in_use(candidates)
     }
 
     fn known_paths(&self) -> KnownPaths {

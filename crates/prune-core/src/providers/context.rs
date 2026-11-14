@@ -5,12 +5,14 @@ use chrono::{DateTime, Utc};
 
 use crate::fs::{entry_stats, SizeContext};
 use crate::models::{CleanupTarget, RiskLevel, ScanIssue, TargetKind};
-use crate::platform::KnownPaths;
+use crate::platform::{KnownPaths, PlatformService};
 use crate::safety::SafetyPolicy;
 
 /// Everything a provider needs while scanning.
 pub struct ScanContext<'a> {
     pub known: &'a KnownPaths,
+    /// For what only the OS can answer while scanning, such as which files are in use.
+    pub platform: &'a dyn PlatformService,
     pub policy: &'a SafetyPolicy,
     pub cancel: &'a AtomicBool,
     /// `(files_visited, bytes_found, current_path)` — call freely, the engine throttles.

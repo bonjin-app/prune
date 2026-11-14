@@ -1,13 +1,14 @@
 use std::path::PathBuf;
 
 use super::{
-    existing, existing_project_roots, ApplicationInfo, KnownPaths, PlatformService, ProtectedPaths,
-    RelatedPath, StartupItem,
+    existing, existing_project_roots, ApplicationInfo, InUse, KnownPaths, PlatformService,
+    ProtectedPaths, RelatedPath, StartupItem,
 };
 use crate::models::Platform;
 use crate::Result;
 
 mod apps;
+mod open_files;
 mod rules;
 mod startup;
 pub mod uninstaller;
@@ -31,6 +32,10 @@ impl PlatformService for WindowsPlatform {
 
     fn app_related_paths(&self, app: &ApplicationInfo, known: &KnownPaths) -> Vec<RelatedPath> {
         rules::related_paths(app, known)
+    }
+
+    fn in_use(&self, candidates: &[PathBuf]) -> InUse {
+        open_files::in_use(candidates)
     }
 
     fn startup_items(&self, known: &KnownPaths) -> Result<Vec<StartupItem>> {

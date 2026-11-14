@@ -95,12 +95,18 @@ pub fn scan_table(
             let mut targets: Vec<_> = result.targets.iter().collect();
             targets.sort_by_key(|t| std::cmp::Reverse(t.size_bytes));
             for target in targets.iter().take(3) {
+                // Why something is protected, such as the program using it, belongs next to it.
+                let why = match (target.risk, target.description.as_deref()) {
+                    (RiskLevel::Protected, Some(why)) => format!("  — {why}"),
+                    _ => String::new(),
+                };
                 writeln!(
                     out,
-                    "    {:>10}  {:<10} {}",
+                    "    {:>10}  {:<10} {}{}",
                     human_bytes(target.size_bytes),
                     risk(target.risk),
-                    target.path
+                    target.path,
+                    why
                 )?;
             }
             if targets.len() > 3 {

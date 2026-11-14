@@ -9,7 +9,7 @@ use chrono::Utc;
 use rayon::prelude::*;
 
 use crate::models::{CleanupTarget, ScanProgress, ScanResult, ScanSession, ScanStatus};
-use crate::platform::KnownPaths;
+use crate::platform::{KnownPaths, PlatformService};
 use crate::providers::{CleanupProvider, ProviderRegistry, ScanContext};
 use crate::safety::SafetyPolicy;
 use crate::sync::LockExt;
@@ -23,6 +23,7 @@ pub struct ScanRequest {
 /// Runs a scan. Cheap to construct; holds only references.
 pub struct Scanner<'a> {
     pub known: &'a KnownPaths,
+    pub platform: &'a dyn PlatformService,
     pub policy: &'a SafetyPolicy,
     pub registry: &'a ProviderRegistry,
 }
@@ -78,6 +79,7 @@ impl<'a> Scanner<'a> {
             };
             let ctx = ScanContext {
                 known: self.known,
+                platform: self.platform,
                 policy: self.policy,
                 cancel: &cancel,
                 progress: &progress,

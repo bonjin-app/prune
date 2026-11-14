@@ -130,6 +130,16 @@ a mode (`Whole` root = one target, or every `Child` = one target), an optional a
 exclusions. Custom providers exist for Chromium profiles, Firefox profiles, installers, and the
 project artifact walker.
 
+**Items in use.** Age is no proof that something in the temporary folder is finished with: a
+browser's singleton socket or an app's lock file sits unmodified for days while the program
+runs. A `SimpleProvider` marked `protect_in_use` asks `PlatformService::in_use` which of its
+candidates a running program of this user holds open — the item itself, or anything inside it —
+and reports those as Protected with the program's name, so they are visible with their size but
+never selectable. macOS answers with one `lsof -n -P -u <uid>` per scan, run while the sizes are
+measured; Windows checks only candidates that are files (it refuses to move an open file or a
+folder holding one by itself). A platform that cannot answer returns `InUse::Unknown`, and the
+scan carries that as an issue instead of quietly treating everything as unused.
+
 **User-defined providers.** `providers.json` in the application data directory is parsed at
 start-up into `CustomProvider`s that join the registry. They sit at priority 90, above the
 generic built-ins, so a location someone named by hand is reported under that name rather than

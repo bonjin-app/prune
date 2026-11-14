@@ -10,7 +10,7 @@
 
 use std::path::{Path, PathBuf};
 
-use super::{KnownPaths, PlatformService, ProtectedPaths};
+use super::{InUse, KnownPaths, PlatformService, ProtectedPaths};
 use crate::models::Platform;
 
 /// Platform rooted at a directory of the caller's choosing.
@@ -63,6 +63,12 @@ impl SandboxPlatform {
 impl PlatformService for SandboxPlatform {
     fn platform(&self) -> Platform {
         Platform::current()
+    }
+
+    /// Running programs are not part of what the sandbox fakes: this asks the real system,
+    /// which is how a test can hold a file open and see the scan notice.
+    fn in_use(&self, candidates: &[PathBuf]) -> InUse {
+        super::current().in_use(candidates)
     }
 
     fn known_paths(&self) -> KnownPaths {
