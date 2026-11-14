@@ -29,6 +29,15 @@ function view(count = 2): DiskNodeView {
     breadcrumbs: [],
   };
 }
+/**
+ * Controls found by their label, and folder rows found inside the folder list only. With a few
+ * hundred rows and map tiles on screen, `getByRole("button", { name })` computes an accessible
+ * name (and visibility) for every one of them on each call, which is what pushed these tests
+ * past CI's time limit. These tests are about names and enabled state, not visibility.
+ */
+const button = (label: string | RegExp) => screen.getByLabelText(label);
+const row = (name: RegExp) =>
+  within(screen.getByLabelText("Folders")).getByRole("button", { name, hidden: true });
 beforeEach(() => {
   resetStores();
   vi.clearAllMocks();
@@ -140,13 +149,13 @@ describe("FolderExplorer", () => {
     const user = userEvent.setup();
     useDisk.setState({ node: view(301) });
     render(<FolderExplorer />);
-    const next = screen.getByRole("button", { name: "Next page of folders" });
+    const next = button("Next page of folders");
     await user.click(next);
     await user.click(next);
     await user.click(next);
     act(() => useDisk.setState({ node: view(101) }));
     expect(screen.getByText(/Page 2 of 2/)).toHaveTextContent("101–101 of 101 folders");
-    expect(screen.getByRole("button", { name: /^folder100 / })).toBeInTheDocument();
+    expect(row(/^folder100 /)).toBeInTheDocument();
     act(() => useDisk.setState({ node: view(301) }));
     expect(screen.getByText(/Page 2 of 4/)).toBeInTheDocument();
     await user.type(screen.getByRole("textbox", { name: "Filter folders" }), "folder");
@@ -165,7 +174,7 @@ describe("FolderExplorer", () => {
     expect(screen.getByRole("navigation", { name: "Folder breadcrumbs" })).toHaveTextContent(
       "root",
     );
-    expect(screen.getByRole("button", { name: "Go to parent folder" })).toBeEnabled();
+    expect(button("Go to parent folder")).toBeEnabled();
   });
   it("disables navigation during a pending request without hiding the current folder", () => {
     useDisk.setState({
@@ -176,18 +185,23 @@ describe("FolderExplorer", () => {
       },
     });
     render(<FolderExplorer />);
-    act(() => screen.getByRole("button", { name: "Next page of folders" }).click());
+    act(() => button("Next page of folders").click());
     act(() => useDisk.setState({ nodeLoading: true }));
     expect(screen.getByRole("region", { name: "Folder explorer" })).toHaveAttribute(
       "aria-busy",
       "true",
     );
-    expect(screen.getByRole("button", { name: /^Explore folder0,/ })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Next page of folders" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Previous page of folders" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Go to parent folder" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "parent" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /^folder100 / })).toBeDisabled();
+    expect(button(/^Explore folder0,/)).toBeDisabled();
+    expect(button("Next page of folders")).toBeDisabled();
+    expect(button("Previous page of folders")).toBeDisabled();
+    expect(button("Go to parent folder")).toBeDisabled();
+    expect(
+      within(screen.getByLabelText("Folder breadcrumbs")).getByRole("button", {
+        name: "parent",
+        hidden: true,
+      }),
+    ).toBeDisabled();
+    expect(row(/^folder100 /)).toBeDisabled();
   });
   it("reports file-manager errors without deleting anything", async () => {
     useDisk.setState({ node: view() });
