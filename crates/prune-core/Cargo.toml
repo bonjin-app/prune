@@ -16,7 +16,7 @@ tracing.workspace = true
 chrono.workspace = true
 dirs = "6"
 walkdir = "2"
-sysinfo = "0.39"
+sysinfo = "0.40"
 trash = "5"
 rayon = "1"
 uuid = { version = "1", features = ["v4"] }
