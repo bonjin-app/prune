@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.10.0.schema.json
 
 PackageIdentifier: PruneContributors.Prune
-PackageVersion: 0.2.0
+PackageVersion: 0.2.1
 Platform:
 - Windows.Desktop
 # The compatibility table in the README says Windows 10, and nothing narrower has been tested,
@@ -21,8 +21,8 @@ Installers:
   InstallerType: wix
   Scope: machine
   InstallerLocale: en-US
-  InstallerUrl: https://github.com/bonjin-app/prune/releases/download/v0.2.0/Prune_0.2.0_x64_en-US.msi
-  InstallerSha256: 2AA976982D1A2747F30C3FE24C7D4D0843D8D13B397D7CF3966F24B903ECD09D
-  ProductCode: '{FC00F0DF-6E0D-40E8-81C2-F6DBF727ECA0}'
+  InstallerUrl: https://github.com/bonjin-app/prune/releases/download/v0.2.1/Prune_0.2.1_x64_en-US.msi
+  InstallerSha256: 912F8899DDCE8D0DE9D18FDEC437A152D76D1A602B057A1D55B85C3F895FB402
+  ProductCode: '{989B6EA9-4777-458A-B480-75FD05601A0E}'
 ManifestType: installer
 ManifestVersion: 1.10.0
