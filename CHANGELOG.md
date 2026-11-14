@@ -25,6 +25,10 @@ All notable changes to Prune are documented here. The format follows
   transcripts and the Claude desktop virtual machine are Protected: listed with their size so
   the space is accounted for, never removable through Prune. None of it is ever selected
   automatically, by the interface or by `prune clean --yes`.
+- Every release carries `SHA256SUMS`, taken from the release's own files after they are
+  attached; README explains how to check a download.
+- CodeQL analysis of the engine, the interface and the workflows, grouped Dependabot updates,
+  CODEOWNERS, and a private route for security reports.
 - Protected space is reported apart from what can be reclaimed, in the dashboard headline, the
   category list, and `prune scan`'s summary; a scan that finds only protected data exits as
   having found nothing to clean.
