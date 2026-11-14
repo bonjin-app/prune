@@ -6,6 +6,12 @@ All notable changes to Prune are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-11-14
+
+Up-to-date foundations, no change in what Prune does. Tauri, the system readings, the Windows
+registry access and the build tools move to their current releases; what Prune finds, offers and
+removes is the same, and the operation log and settings file are read as before.
+
 ### Changed
 
 - Dependencies brought up to date: Tauri 2.12, sysinfo 0.40, winreg 0.56, dirs 7, Vite 8,
