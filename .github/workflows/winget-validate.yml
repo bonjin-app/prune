@@ -20,7 +20,7 @@ jobs:
     # into a very slow way of finding out.
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # The runner image may or may not carry winget. Installing it unconditionally fails on
       # the images that do: the installer action ships an older Microsoft.UI.Xaml than the one
@@ -75,7 +75,7 @@ jobs:
       # that failed or hung.
       - name: Keep winget's logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: winget-logs
           path: ~/AppData/Local/Packages/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe/LocalState/DiagOutputDir
