@@ -4,6 +4,8 @@ All notable changes to Prune are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
 ## [0.2.0] - 2026-11-14
 
 Storage you can see, and totals you can believe. A disk view to find where the space went, AI
