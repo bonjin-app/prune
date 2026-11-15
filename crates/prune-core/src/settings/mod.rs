@@ -96,7 +96,26 @@ pub fn validate_protected(path: &Path) -> std::result::Result<PathBuf, RootRejec
     Ok(parent.join(name))
 }
 
+/// What identifies one version of the settings file: when it was written and how long it is.
+/// `None` when there is no file. The file is always replaced whole (written aside, then
+/// renamed), so a change of either means another program saved it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Fingerprint {
+    modified: Option<std::time::SystemTime>,
+    len: u64,
+}
+
 impl Settings {
+    /// The settings file's current [`Fingerprint`], for noticing that the command line, or a
+    /// second copy of the app, saved it.
+    pub fn fingerprint(dir: &Path) -> Option<Fingerprint> {
+        let meta = std::fs::metadata(dir.join(FILE_NAME)).ok()?;
+        Some(Fingerprint {
+            modified: meta.modified().ok(),
+            len: meta.len(),
+        })
+    }
+
     /// Reads the settings file. The app must start without one, so problems never fail this:
     /// a missing file yields the defaults, and an unreadable one yields the defaults with the
     /// problem described, for the caller to act on.

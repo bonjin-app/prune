@@ -23,6 +23,9 @@ All notable changes to Prune are documented here. The format follows
     saved.
   - **An unreadable settings file is left alone.** Nothing is changed until it is fixed or saved
     again from the app, which keeps a copy of it.
+  - **The open app follows along.** A change made here is honoured by the app's next preview and
+    removal, without a restart. A later save from the app starts from it rather than overwriting
+    it.
 - **Storage remembers its last analyses.** Until a new analysis finishes, the Storage view shows
   what earlier ones found, so it is not blank for the minutes a home folder takes.
   - **What is kept.** The last finished analysis of up to 8 folders: the total and the 12

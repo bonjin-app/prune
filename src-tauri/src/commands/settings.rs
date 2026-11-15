@@ -24,7 +24,7 @@ pub struct SettingsView {
 
 fn view(state: &AppState) -> SettingsView {
     let engine = state.engine();
-    let settings = state.settings.lock_recover().clone();
+    let settings = state.current_settings();
     SettingsView {
         project_roots_configured: engine.project_roots_are_configured(&settings),
         effective_project_roots: engine
@@ -71,7 +71,7 @@ pub fn settings_set_project_roots(
         }
     }
     // Only the project folders change; everything else, protections included, is kept.
-    let mut settings = state.settings.lock_recover().clone();
+    let mut settings = state.current_settings();
     settings.project_roots = validated;
     state.apply_settings(settings).map_err(CommandError::from)?;
     Ok(view(&state))
@@ -87,7 +87,7 @@ pub fn settings_set_protected_paths(
     state: State<'_, AppState>,
     paths: Vec<String>,
 ) -> CommandResult<SettingsView> {
-    let mut settings = state.settings.lock_recover().clone();
+    let mut settings = state.current_settings();
     let mut validated: Vec<PathBuf> = Vec::new();
     for raw in &paths {
         let trimmed = raw.trim();
