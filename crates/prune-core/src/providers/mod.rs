@@ -10,6 +10,7 @@ pub(crate) mod simple;
 pub mod ai;
 pub mod browser;
 pub mod developer;
+pub mod ollama;
 pub mod system;
 
 pub use context::{measure, Measured, ScanContext, ScanOutput};

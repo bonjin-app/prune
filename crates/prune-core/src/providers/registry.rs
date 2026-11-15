@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use super::{ai, browser, developer, system, CleanupProvider};
+use super::{ai, browser, developer, ollama, system, CleanupProvider};
 use crate::models::ProviderInfo;
 use crate::platform::KnownPaths;
 
@@ -23,6 +23,12 @@ pub fn default_providers() -> Vec<Arc<dyn CleanupProvider>> {
     for p in ai::ALL {
         v.push(Arc::new(clone_simple(p)));
     }
+    // After the models that can be downloaded again, beside the other history-like rows.
+    let ollama_at = v
+        .iter()
+        .position(|p| p.id() == "ai_codex_history")
+        .unwrap_or(v.len());
+    v.insert(ollama_at, Arc::new(ollama::OllamaModels));
     v
 }
 

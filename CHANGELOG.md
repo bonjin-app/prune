@@ -24,6 +24,18 @@ All notable changes to Prune are documented here. The format follows
   - **An unreadable settings file is left alone.** Nothing is changed until it is fixed or saved
     again from the app, which keeps a copy of it.
 
+### Changed
+
+- **Ollama is shown model by model.** It used to be one row for the whole folder. Now each model
+  has a row, under the name `ollama list` shows, with the space only it uses and the
+  `ollama rm` command that frees it.
+  - **Shared files.** Files several models share get one row per set of models.
+  - **Files no model uses.** Files no model names get one row of their own. On the machine this
+    was checked on, that was 442 files and 2.4 GB.
+  - **No double counting.** The rows add up to the folder, so nothing is counted twice.
+  - **Still read-only.** Nothing changes about removal: all of it remains protected and is shown
+    only.
+
 ## [0.2.6] - 2026-11-15
 
 You can now protect folders and files yourself. Anything listed in Settings → Protected folders

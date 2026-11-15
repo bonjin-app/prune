@@ -134,17 +134,6 @@ pub const WHISPER_MODELS: SimpleProvider = SimpleProvider::new(
     |k| whole_if(k.home.join(".cache/whisper")),
 );
 
-pub const OLLAMA_MODELS: SimpleProvider = SimpleProvider::new(
-    "ai_ollama",
-    "Ollama models",
-    AI,
-    "Models Ollama has pulled. Shown for their size only: remove them with `ollama rm <name>`. \
-     Several models can share the same files, and deleting the folder directly leaves Ollama's \
-     index pointing at data that is gone.",
-    RiskLevel::Protected,
-    |k| whole_if(k.home.join(".ollama/models")),
-);
-
 pub const CODEX_HISTORY: SimpleProvider = SimpleProvider::new(
     "ai_codex_history",
     "Codex history and work",
@@ -231,7 +220,6 @@ pub const ALL: &[&SimpleProvider] = &[
     &WHISPER_MODELS,
     &CODEX_SCRATCH,
     &DOT_CACHE,
-    &OLLAMA_MODELS,
     &CODEX_HISTORY,
     &CLAUDE_CODE_HISTORY,
     &CLAUDE_DESKTOP_VM,

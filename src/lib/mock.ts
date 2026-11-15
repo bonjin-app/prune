@@ -179,7 +179,8 @@ const PROVIDERS: ProviderInfo[] = [
     id: "ai_ollama",
     name: "Ollama models",
     category: "ai_data",
-    description: "Models Ollama has pulled. Shown for their size only: remove with `ollama rm`.",
+    description:
+      "Models Ollama has pulled, each with the space only it uses. Shown for their size only: remove one with `ollama rm <name>`.",
     defaultRisk: "protected",
     available: true,
     custom: false,
@@ -421,7 +422,55 @@ function fakeResults(providerIds?: string[]): ScanResult[] {
       ),
     ],
     ai_dot_cache: [target("ai_dot_cache", `${HOME}/.cache/node-gyp`, 210e6, "high")],
-    ai_ollama: [target("ai_ollama", `${HOME}/.ollama/models`, 18.4 * gb, "protected")],
+    ai_ollama: [
+      target(
+        "ai_ollama",
+        `${HOME}/.ollama/models/manifests/registry.ollama.ai/library/llama3.1/8b`,
+        4.9 * gb,
+        "protected",
+        {
+          kind: "file",
+          label: "llama3.1:8b",
+          description: "Remove it with `ollama rm llama3.1:8b`.",
+        },
+      ),
+      target(
+        "ai_ollama",
+        `${HOME}/.ollama/models/manifests/registry.ollama.ai/library/qwen2.5-coder/14b`,
+        0.2 * gb,
+        "protected",
+        {
+          kind: "file",
+          label: "qwen2.5-coder:14b",
+          description:
+            "Remove it with `ollama rm qwen2.5-coder:14b`. It also uses 9.0 GB it shares with other models, freed only when the last of them is removed.",
+        },
+      ),
+      target(
+        "ai_ollama",
+        `${HOME}/.ollama/models/blobs/sha256-ac3d1ba8aa77`,
+        9.0 * gb,
+        "protected",
+        {
+          kind: "file",
+          label: "Shared by qwen2.5-coder:14b and qwen2.5-coder:14b-instruct",
+          description:
+            "Model files these models have in common. They are freed only when every one of them has been removed with `ollama rm`.",
+        },
+      ),
+      target(
+        "ai_ollama",
+        `${HOME}/.ollama/models/blobs/sha256-5f1e0c2b9d44`,
+        1.3 * gb,
+        "protected",
+        {
+          kind: "file",
+          label: "37 files no model uses",
+          description:
+            "No model Ollama lists names these files. An interrupted or replaced download usually leaves them. Prune does not remove them, because during a pull Ollama writes files before the model that names them exists.",
+        },
+      ),
+    ],
     ai_codex_history: [
       target("ai_codex_history", `${HOME}/.codex/sessions`, 1.2 * gb, "protected", {
         label: "Conversations",

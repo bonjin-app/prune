@@ -159,7 +159,8 @@ fn finds_each_tool_where_it_keeps_its_data() {
     expect("ai_pytorch_hub", &[".cache/torch"]);
     expect("ai_whisper", &[".cache/whisper"]);
     expect("ai_dot_cache", &[".cache/some-tool"]);
-    expect("ai_ollama", &[".ollama/models"]);
+    // A blob no manifest names: listed on its own, so nothing is hidden.
+    expect("ai_ollama", &[".ollama/models/blobs/sha256-abc"]);
     expect(
         "ai_codex_history",
         &[
@@ -280,4 +281,95 @@ fn nothing_is_reported_where_no_ai_tool_has_been() {
     assert!(targets(&session).is_empty());
     assert!(session.results.iter().all(|r| r.issues.is_empty()));
     assert_eq!(session.protected_bytes, 0);
+}
+
+/// Writes an Ollama manifest naming `blobs`, as `ollama pull` lays it out.
+fn ollama_model(home: &Path, namespace: &str, model: &str, tag: &str, blobs: &[(&str, usize)]) {
+    let layers: Vec<String> = blobs
+        .iter()
+        .map(|(hex, size)| {
+            write(
+                &home.join(format!(".ollama/models/blobs/sha256-{hex}")),
+                *size,
+            );
+            format!(r#"{{"digest":"sha256:{hex}","size":{size}}}"#)
+        })
+        .collect();
+    let manifest = format!(r#"{{"schemaVersion":2,"layers":[{}]}}"#, layers.join(","));
+    let path = home.join(format!(
+        ".ollama/models/manifests/registry.ollama.ai/{namespace}/{model}/{tag}"
+    ));
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(path, manifest).unwrap();
+}
+
+#[test]
+fn ollama_is_broken_down_by_model_without_counting_shared_files_twice() {
+    let dir = tempfile::tempdir().unwrap();
+    let platform = SandboxPlatform::new(dir.path());
+    platform.prepare().unwrap();
+    let home = platform.home().to_path_buf();
+    // Two tags of one model share their weights; a third model has its own.
+    ollama_model(&home, "library", "qwen", "7b", &[("w", 1000), ("t1", 10)]);
+    ollama_model(
+        &home,
+        "library",
+        "qwen",
+        "7b-chat",
+        &[("w", 1000), ("t2", 20)],
+    );
+    ollama_model(&home, "someone", "coder", "q4", &[("c", 500)]);
+    write(&home.join(".ollama/models/blobs/sha256-partial"), 7);
+    write(&home.join(".ollama/models/blobs/sha256-replaced"), 3);
+
+    let engine = engine(platform);
+    let session = scan(&engine);
+    let ollama: Vec<&CleanupTarget> = targets(&session)
+        .into_iter()
+        .filter(|t| t.provider_id == "ai_ollama")
+        .collect();
+    let row = |label: &str| {
+        *ollama
+            .iter()
+            .find(|t| t.label == label)
+            .unwrap_or_else(|| panic!("no row {label}: {ollama:?}"))
+    };
+
+    assert_eq!(row("qwen:7b").size_bytes, 10);
+    assert_eq!(row("qwen:7b-chat").size_bytes, 20);
+    assert_eq!(row("someone/coder:q4").size_bytes, 500);
+    assert_eq!(row("Shared by qwen:7b and qwen:7b-chat").size_bytes, 1000);
+    // Files no manifest names, as one row however many there are.
+    assert_eq!(row("2 files no model uses").size_bytes, 10);
+    assert!(row("qwen:7b")
+        .description
+        .as_deref()
+        .unwrap()
+        .contains("ollama rm qwen:7b"));
+    assert!(row("qwen:7b")
+        .description
+        .as_deref()
+        .unwrap()
+        .contains("shares"));
+
+    // Every byte once: the rows add up to the blobs on disk.
+    let total: u64 = ollama.iter().map(|t| t.size_bytes).sum();
+    assert_eq!(total, 1000 + 10 + 20 + 500 + 7 + 3);
+    assert!(ollama.iter().all(|t| t.risk == RiskLevel::Protected));
+
+    // None of it can be planned, and nothing is touched.
+    let all: Vec<String> = ollama.iter().map(|t| t.id.clone()).collect();
+    let plan = engine.plan(&session, &all, DeleteMode::Permanent);
+    assert!(plan.targets.is_empty());
+    assert_eq!(plan.blocked.len(), ollama.len());
+    let files_before = std::fs::read_dir(home.join(".ollama/models/blobs"))
+        .unwrap()
+        .count();
+    engine.execute(&plan, None, &|_| {}).unwrap();
+    assert_eq!(
+        std::fs::read_dir(home.join(".ollama/models/blobs"))
+            .unwrap()
+            .count(),
+        files_before
+    );
 }
