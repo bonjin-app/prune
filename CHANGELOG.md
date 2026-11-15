@@ -6,6 +6,13 @@ All notable changes to Prune are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-11-15
+
+You can now protect folders and files yourself. Anything listed in Settings → Protected folders
+and files is never removed, by any route, and neither is anything that contains it. An
+unreadable settings file no longer silently drops those choices: until it is fixed, nothing is
+removed at all.
+
 ### Added
 
 - **Protect folders and files yourself.** Settings → Protected folders and files lists paths
@@ -21,6 +28,7 @@ All notable changes to Prune are documented here. The format follows
   back to defaults. Now that settings hold protections, it refuses every removal instead and
   says why, in the app and on the command line. Saving settings again keeps the unreadable
   file beside the new one rather than overwriting it.
+
 ## [0.2.5] - 2026-11-15
 
 0.2.4 kept build folders that hold committed files, but decided that only while scanning. A
@@ -440,7 +448,8 @@ rather than regressions anyone shipped.
 - IPC integration tests on Tauri's mock runtime covering the real command surface, including a full disk scan → preview → execute → operation log cycle.
 - A `prune` command line built on the same engine: `status`, `providers`, `scan`, `clean`, `disk`, `apps`, `startup` and `log`, each with `--json` for scripting and meaningful exit codes. `clean` is a dry run unless `--yes` is passed and never selects anything riskier than low on its own. The read-only example prototypes it replaces have been removed.
 
-[unreleased]: https://github.com/bonjin-app/prune/compare/v0.2.5...HEAD
+[unreleased]: https://github.com/bonjin-app/prune/compare/v0.2.6...HEAD
+[0.2.6]: https://github.com/bonjin-app/prune/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/bonjin-app/prune/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/bonjin-app/prune/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/bonjin-app/prune/compare/v0.2.2...v0.2.3
