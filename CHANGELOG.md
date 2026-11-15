@@ -21,6 +21,20 @@ All notable changes to Prune are documented here. The format follows
   starts. A program signed with a certificate from a public authority is not held, so signing
   with one is what brings it back.
 
+### Fixed
+
+- **Build folders that hold committed files are no longer offered.** A `dist/`, `build/` or
+  `out/` next to a project marker was taken to be rebuildable output, and `prune clean
+  --include-low` selected it. But every JavaScript GitHub Action commits its `dist/`, and
+  Electron apps keep their icons in `build/`. Inside a Git repository each such folder is now
+  checked with `git ls-files`. One that holds any tracked file, or that is a repository of its
+  own, is shown as **Protected**, for example "build (committed to Git)", and never selected.
+  If Git is missing or the check fails, the folder is kept and the scan says so. On the machine
+  this was found on, 5 of 1,643 folders were kept this way, among them an app's icons and a
+  build plugin's source.
+- **Paging through a large folder with the keyboard no longer loses focus** at the first or last
+  page, where the button just pressed becomes disabled. Focus moves to the other page button.
+
 ## [0.2.3] - 2026-11-15
 
 Temporary files a running program is still using are no longer offered. A day without changes

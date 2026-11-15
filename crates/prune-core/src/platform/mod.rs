@@ -309,6 +309,12 @@ pub trait PlatformService: Send + Sync {
         let _ = candidates;
         InUse::Unknown("this system cannot tell which files running programs have open".into())
     }
+    /// A `git` that can be run without side effects, for asking a repository which files it
+    /// tracks. Default: the first `git` on `PATH`. `None` when there is none, in which case
+    /// build folders inside repositories are kept rather than guessed about.
+    fn git(&self) -> Option<PathBuf> {
+        find_on_path("git")
+    }
     /// Programs that start by themselves. Default: not implemented.
     fn startup_items(&self, known: &KnownPaths) -> Result<Vec<StartupItem>> {
         let _ = known;
@@ -319,6 +325,19 @@ pub trait PlatformService: Send + Sync {
         let _ = (item, enabled);
         Err(crate::PruneError::NotImplemented("set_startup_enabled"))
     }
+}
+
+/// The first executable called `name` (plus `.exe` on Windows) in a directory on `PATH`.
+pub(crate) fn find_on_path(name: &str) -> Option<PathBuf> {
+    let file = if cfg!(windows) {
+        format!("{name}.exe")
+    } else {
+        name.to_string()
+    };
+    std::env::split_paths(&std::env::var_os("PATH")?)
+        .filter(|dir| dir.is_absolute())
+        .map(|dir| dir.join(&file))
+        .find(|path| path.is_file())
 }
 
 /// The platform service for the OS this binary was compiled for.

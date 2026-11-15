@@ -8,6 +8,7 @@ use crate::models::Platform;
 use crate::Result;
 
 mod apps;
+mod git;
 mod open_files;
 mod startup;
 
@@ -83,6 +84,10 @@ impl PlatformService for MacosPlatform {
 
     fn in_use(&self, candidates: &[PathBuf]) -> InUse {
         open_files::in_use(candidates)
+    }
+
+    fn git(&self) -> Option<PathBuf> {
+        git::locate()
     }
 
     fn known_paths(&self) -> KnownPaths {

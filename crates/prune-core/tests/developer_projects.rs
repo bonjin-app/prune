@@ -308,3 +308,145 @@ fn unity_library_symlinks_are_not_followed_or_reported() {
         b"keep"
     );
 }
+
+/// Runs `git` in `dir` with nothing from the user's identity or signing setup involved:
+/// `init` and `add` only, never a commit.
+fn git(platform: &SandboxPlatform, dir: &Path, args: &[&str]) {
+    let git = platform.git().expect("these tests need git installed");
+    let status = std::process::Command::new(git)
+        .args(args)
+        .current_dir(dir)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .unwrap();
+    assert!(status.success(), "git {args:?} failed");
+}
+
+/// A repository with a JavaScript action that commits `dist/`, beside a web app whose `dist/`
+/// and `node_modules/` are ignored output, and a `build/` that is a clone of something else.
+struct Repo {
+    _dir: tempfile::TempDir,
+    platform: SandboxPlatform,
+    committed_dist: PathBuf,
+    ignored_dist: PathBuf,
+    node_modules: PathBuf,
+    nested_repo: PathBuf,
+}
+
+fn repo() -> Repo {
+    let dir = tempfile::tempdir().unwrap();
+    let platform = SandboxPlatform::new(dir.path());
+    platform.prepare().unwrap();
+    let root = platform.home().join("Projects/monorepo");
+    std::fs::create_dir_all(&root).unwrap();
+    git(&platform, &root, &["init", "-q"]);
+
+    write(&root.join("action/package.json"), b"{}");
+    write(&root.join("action/dist/index.js"), &[b'x'; 2048]);
+    git(
+        &platform,
+        &root,
+        &["add", "action/package.json", "action/dist/index.js"],
+    );
+
+    write(&root.join("web/package.json"), b"{}");
+    write(&root.join("web/dist/bundle.js"), &[b'x'; 4096]);
+    write(
+        &root.join("web/node_modules/left-pad/index.js"),
+        &[b'x'; 1024],
+    );
+    write(&root.join("web/.gitignore"), b"dist\nnode_modules\n");
+    git(
+        &platform,
+        &root,
+        &["add", "web/package.json", "web/.gitignore"],
+    );
+
+    write(&root.join("native/CMakeLists.txt"), b"");
+    write(&root.join("native/build/README"), b"x");
+    git(&platform, &root.join("native/build"), &["init", "-q"]);
+
+    Repo {
+        committed_dist: root.join("action/dist"),
+        ignored_dist: root.join("web/dist"),
+        node_modules: root.join("web/node_modules"),
+        nested_repo: root.join("native/build"),
+        _dir: dir,
+        platform,
+    }
+}
+
+#[test]
+fn build_folders_git_tracks_are_kept_and_never_planned() {
+    let r = repo();
+    let engine = engine(r.platform.clone());
+    let session = engine.scan(
+        "projects",
+        &ScanRequest::default(),
+        Arc::new(AtomicBool::new(false)),
+        &|_| {},
+    );
+    let targets: Vec<_> = session
+        .results
+        .iter()
+        .flat_map(|res| &res.targets)
+        .collect();
+    let find = |path: &Path| {
+        targets
+            .iter()
+            .find(|t| Path::new(&t.path) == path)
+            .unwrap_or_else(|| panic!("{} was not reported", path.display()))
+    };
+
+    let committed = find(&r.committed_dist);
+    assert_eq!(committed.risk, RiskLevel::Protected);
+    assert_eq!(
+        committed.description.as_deref(),
+        Some("dist (committed to Git)")
+    );
+    assert_eq!(committed.size_bytes, 2048, "still shown with its size");
+
+    let nested = find(&r.nested_repo);
+    assert_eq!(nested.risk, RiskLevel::Protected);
+    assert_eq!(
+        nested.description.as_deref(),
+        Some("build (its own Git repository)")
+    );
+
+    for ignored in [&r.ignored_dist, &r.node_modules] {
+        let t = find(ignored);
+        assert_eq!(
+            t.risk,
+            RiskLevel::Low,
+            "{} is ignored output",
+            ignored.display()
+        );
+    }
+    assert!(
+        session.results.iter().all(|res| res.issues.is_empty()),
+        "{:?}",
+        session
+            .results
+            .iter()
+            .map(|res| &res.issues)
+            .collect::<Vec<_>>()
+    );
+
+    // Asked for by id anyway, the kept ones are blocked rather than planned.
+    let ids: Vec<String> = targets.iter().map(|t| t.id.clone()).collect();
+    let plan = engine.plan(&session, &ids, DeleteMode::Trash);
+    let planned: Vec<&str> = plan.targets.iter().map(|t| t.path.as_str()).collect();
+    assert_eq!(plan.targets.len(), 2, "{planned:?}");
+    for kept in [&r.committed_dist, &r.nested_repo] {
+        assert!(
+            !planned.contains(&kept.to_str().unwrap()),
+            "{} was planned",
+            kept.display()
+        );
+        assert!(plan
+            .blocked
+            .iter()
+            .any(|b| Path::new(&b.path) == kept.as_path()));
+    }
+}

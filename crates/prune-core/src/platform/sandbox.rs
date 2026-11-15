@@ -71,6 +71,12 @@ impl PlatformService for SandboxPlatform {
         super::current().in_use(candidates)
     }
 
+    /// Git is a tool, not data, so the sandbox uses the real one: a test can make a repository
+    /// in its own directory and see the scan ask it.
+    fn git(&self) -> Option<PathBuf> {
+        super::current().git()
+    }
+
     fn known_paths(&self) -> KnownPaths {
         let home = self.home();
         KnownPaths {

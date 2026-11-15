@@ -5,6 +5,7 @@
 //! (the user's home directory and the temp directory), and even there a set of exact paths and
 //! whole trees are off limits.
 
+pub mod git_tracked;
 mod policy;
 
 pub use policy::{SafetyPolicy, ValidatedPath};

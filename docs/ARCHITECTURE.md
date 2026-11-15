@@ -173,6 +173,17 @@ artifact (`node_modules` next to `package.json`, `target` next to `Cargo.toml`, 
 containing `pyvenv.cfg`, …) and never descends into a reported directory, `.git`, or hidden
 folders.
 
+**Committed build folders.** A marker proves a folder is usually build output, not that it is
+here: every JavaScript GitHub Action commits its `dist/`, Electron apps keep their icons in
+`build/`. So a candidate inside a repository is checked with `safety::git_tracked`, which runs
+`git ls-files` from its parent for its name. That reads the index only, with no lock and no
+file-system monitor, and stops at the first byte of output. A folder Git tracks anything in, or
+one that is a repository of its own, becomes **Protected** with the reason in its description,
+and `engine.plan` refuses it like any other protected target. When the check cannot be made
+(Git not found, a timeout, an error), the folder is kept too and the scan says why: unknown is
+not eligible. `PlatformService::git` finds the binary. On macOS it never runs the
+`/usr/bin/git` stub, which offers to install the Command Line Tools instead of running.
+
 ## 5. Scan engine
 
 - Providers run in parallel with `rayon`; each gets its own throttled progress callback

@@ -16,6 +16,7 @@ use chrono::{DateTime, Utc};
 use crate::models::{Category, RiskLevel, TargetGroup};
 use crate::platform::KnownPaths;
 use crate::providers::{CleanupProvider, ScanContext, ScanOutput};
+use crate::safety::git_tracked::{self, GitEvidence};
 
 /// Maximum depth below a project root to look for artifacts.
 const MAX_DEPTH: usize = 8;
@@ -301,11 +302,12 @@ impl CleanupProvider for ProjectArtifacts {
 
     fn scan(&self, ctx: &ScanContext<'_>) -> ScanOutput {
         let (candidates, mut out) = self.discover(ctx);
+        let git = ctx.platform.git();
 
         // Hundreds of artifacts, most of them small: measuring them one after another leaves
         // most cores idle even though each measurement is itself parallel. Measuring across
         // artifacts as well keeps the machine busy for the whole scan.
-        let measured: Vec<crate::providers::Measured> = candidates
+        let measured: Vec<(crate::providers::Measured, GitEvidence)> = candidates
             .par_iter()
             .map(|c| {
                 let mut measured = crate::providers::measure(
@@ -317,22 +319,58 @@ impl CleanupProvider for ProjectArtifacts {
                     Some(c.kind.to_string()),
                     false,
                 );
+                let mut evidence = GitEvidence::NotInRepository;
                 if let Some(target) = measured.target.as_mut() {
                     target.group = c.group.clone();
+                    evidence = git_tracked::inspect(git.as_deref(), &c.path, ctx.cancel);
+                    if let Some(reason) = kept_because(&evidence) {
+                        target.risk = RiskLevel::Protected;
+                        // In parentheses, because the kinds of a project are listed with commas.
+                        target.description = Some(format!("{} ({reason})", c.kind));
+                    }
                 }
-                measured
+                (measured, evidence)
             })
             .collect();
-        for m in measured {
+        let mut without_git = None;
+        for (m, evidence) in measured {
             out.issues.extend(m.issues);
             if let Some(target) = m.target {
+                match evidence {
+                    GitEvidence::Unknown(_) if git.is_none() => {
+                        without_git.get_or_insert_with(|| target.path_buf());
+                    }
+                    GitEvidence::Unknown(reason) => out.issue(
+                        &target.path_buf(),
+                        format!("Kept: could not check it for files committed to Git. {reason}"),
+                    ),
+                    _ => {}
+                }
                 out.targets.push(target);
             }
+        }
+        // Once, not once per folder: every folder inside a repository is affected alike.
+        if let Some(first) = without_git {
+            out.issue(
+                &first,
+                "Git was not found, so build folders inside Git repositories could not be checked \
+                 for committed files and are kept. Install Git to have them offered.",
+            );
         }
         // Parallel measurement finishes in arbitrary order; sort so the same machine always
         // produces the same list.
         out.targets.sort_by(|a, b| a.path.cmp(&b.path));
         out
+    }
+}
+
+/// Why a build folder is kept instead of offered, or `None` when Git has no objection.
+fn kept_because(evidence: &GitEvidence) -> Option<&'static str> {
+    match evidence {
+        GitEvidence::NotInRepository | GitEvidence::Untracked => None,
+        GitEvidence::Tracked => Some("committed to Git"),
+        GitEvidence::Repository => Some("its own Git repository"),
+        GitEvidence::Unknown(_) => Some("not checked with Git"),
     }
 }
 
