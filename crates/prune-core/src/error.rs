@@ -24,6 +24,10 @@ pub enum PruneError {
     #[error("scan was cancelled")]
     Cancelled,
 
+    /// A target that was removable when planned, and no longer is.
+    #[error("kept: {0}")]
+    Kept(String),
+
     #[error("feature not available yet on this platform: {0}")]
     NotImplemented(&'static str),
 
@@ -67,6 +71,7 @@ impl PruneError {
             Self::UnknownPlan(_) => "unknown_plan",
             Self::UnknownTarget(_) => "unknown_target",
             Self::Cancelled => "cancelled",
+            Self::Kept(_) => "kept",
             Self::NotImplemented(_) => "not_implemented",
             Self::Io { .. } => "io",
             Self::Trash { .. } => "trash",

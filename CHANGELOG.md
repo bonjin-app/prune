@@ -6,6 +6,14 @@ All notable changes to Prune are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **A build folder committed after the scan is not removed.** The check that keeps folders Git
+  tracks anything in ran only while scanning. It now runs again when a preview is made, and
+  once more immediately before each folder is removed. A folder committed in between is shown
+  as blocked ("Git now tracks files in it") or, in a cleanup already under way, reported as
+  kept, and left where it is.
+
 ## [0.2.4] - 2026-11-15
 
 Build folders that hold committed files are no longer offered. A `dist/` or `build/` next to a

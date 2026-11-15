@@ -299,6 +299,9 @@ impl CleanupProvider for ProjectArtifacts {
     fn is_available(&self, known: &KnownPaths) -> bool {
         !known.project_roots.is_empty()
     }
+    fn guarded_by_git(&self) -> bool {
+        true
+    }
 
     fn scan(&self, ctx: &ScanContext<'_>) -> ScanOutput {
         let (candidates, mut out) = self.discover(ctx);

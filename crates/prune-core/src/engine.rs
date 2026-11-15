@@ -2,10 +2,13 @@
 //! It is stateless with respect to sessions; the caller (desktop app, CLI) stores
 //! [`ScanSession`]s and [`CleanupPlan`]s and passes them back in.
 
+use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use chrono::Utc;
+use rayon::prelude::*;
 
 use crate::fs;
 use crate::models::{
@@ -16,6 +19,7 @@ use crate::models::{
 use crate::ops::OperationLog;
 use crate::platform::{self, KnownPaths, PlatformService};
 use crate::providers::ProviderRegistry;
+use crate::safety::git_tracked::{self, GitEvidence};
 use crate::safety::SafetyPolicy;
 use crate::scan::{ScanRequest, Scanner};
 use crate::Result;
@@ -173,6 +177,31 @@ impl PruneEngine {
         .run(scan_id, request, cancel, on_progress)
     }
 
+    /// Why `target` must be kept after all, if its provider asks for Git to be consulted and Git
+    /// now tracks something in it, or cannot say. `git` is looked up at most once per call site.
+    fn git_objection(
+        &self,
+        target: &CleanupTarget,
+        git: &OnceLock<Option<PathBuf>>,
+    ) -> Option<String> {
+        let guarded = self
+            .registry
+            .get(&target.provider_id)
+            .is_some_and(|provider| provider.guarded_by_git());
+        if !guarded {
+            return None;
+        }
+        let git = git.get_or_init(|| self.platform.git());
+        let evidence =
+            git_tracked::inspect(git.as_deref(), &target.path_buf(), &AtomicBool::new(false));
+        match evidence {
+            GitEvidence::NotInRepository | GitEvidence::Untracked => None,
+            GitEvidence::Tracked => Some("Git now tracks files in it".into()),
+            GitEvidence::Repository => Some("it is now a Git repository".into()),
+            GitEvidence::Unknown(reason) => Some(format!("could not check it with Git: {reason}")),
+        }
+    }
+
     /// Dry run. Resolves target ids against the session, validates every path, and reports what
     /// would be removed. Touches nothing.
     pub fn plan(
@@ -184,6 +213,19 @@ impl PruneEngine {
         let mut targets: Vec<CleanupTarget> = Vec::new();
         let mut blocked: Vec<BlockedTarget> = Vec::new();
         let mut seen = std::collections::HashSet::new();
+
+        // Asked once per guarded target, in parallel: a preview of a thousand build folders
+        // should not wait for a thousand `git` runs one after another.
+        let git = OnceLock::new();
+        let objections: HashMap<&str, String> = target_ids
+            .par_iter()
+            .filter_map(|id| session.find_target(id))
+            .filter(|target| target.risk != RiskLevel::Protected)
+            .filter_map(|target| {
+                self.git_objection(target, &git)
+                    .map(|reason| (target.id.as_str(), reason))
+            })
+            .collect();
 
         for id in target_ids {
             if !seen.insert(id.as_str()) {
@@ -202,6 +244,14 @@ impl PruneEngine {
                     target_id: id.clone(),
                     path: target.path.clone(),
                     reason: "protected".into(),
+                });
+                continue;
+            }
+            if let Some(reason) = objections.get(id.as_str()) {
+                blocked.push(BlockedTarget {
+                    target_id: id.clone(),
+                    path: target.path.clone(),
+                    reason: reason.clone(),
                 });
                 continue;
             }
@@ -249,6 +299,7 @@ impl PruneEngine {
         let mut removed_files = 0u64;
         let mut removed_bytes = 0u64;
         let mut failed: Vec<FailedTarget> = Vec::new();
+        let git = OnceLock::new();
 
         for (i, target) in plan.targets.iter().enumerate() {
             let path = target.path_buf();
@@ -257,10 +308,15 @@ impl PruneEngine {
             } else {
                 plan.mode
             };
-            let outcome = self
-                .policy
-                .validate(&path)
-                .and_then(|validated| fs::remove(&validated, mode));
+            // Asked again immediately before removal: a plan can be minutes old, and a build
+            // folder committed since then is no longer a build folder.
+            let outcome = match self.git_objection(target, &git) {
+                Some(reason) => Err(crate::PruneError::Kept(reason)),
+                None => self
+                    .policy
+                    .validate(&path)
+                    .and_then(|validated| fs::remove(&validated, mode)),
+            };
             match outcome {
                 Ok(_) => {
                     removed_targets += 1;

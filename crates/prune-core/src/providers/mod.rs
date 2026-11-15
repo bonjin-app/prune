@@ -39,6 +39,12 @@ pub trait CleanupProvider: Send + Sync {
     fn is_custom(&self) -> bool {
         false
     }
+    /// Whether its targets must be asked about again, right before they are planned and right
+    /// before they are removed, for files a Git repository tracks in them. A build folder can
+    /// be committed between a scan and a cleanup; a cache cannot.
+    fn guarded_by_git(&self) -> bool {
+        false
+    }
     /// Whether there is anything to look at on this machine (cheap, no traversal).
     fn is_available(&self, known: &KnownPaths) -> bool;
     /// Discover targets. Must honour `ctx.cancel` and report progress through `ctx`.

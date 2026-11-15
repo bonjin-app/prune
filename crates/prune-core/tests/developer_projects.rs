@@ -450,3 +450,84 @@ fn build_folders_git_tracks_are_kept_and_never_planned() {
             .any(|b| Path::new(&b.path) == kept.as_path()));
     }
 }
+
+#[test]
+fn a_build_folder_committed_after_the_scan_is_kept_at_preview_and_at_removal() {
+    let r = repo();
+    let engine = engine(r.platform.clone());
+    let session = engine.scan(
+        "projects",
+        &ScanRequest::default(),
+        Arc::new(AtomicBool::new(false)),
+        &|_| {},
+    );
+    let ignored = session
+        .results
+        .iter()
+        .flat_map(|res| &res.targets)
+        .find(|t| Path::new(&t.path) == r.ignored_dist)
+        .expect("the ignored dist is offered")
+        .clone();
+    assert_eq!(ignored.risk, RiskLevel::Low);
+
+    // Planned while it was still ignored output.
+    let early_plan = engine.plan(
+        &session,
+        std::slice::from_ref(&ignored.id),
+        DeleteMode::Trash,
+    );
+    assert_eq!(early_plan.targets.len(), 1);
+
+    // Then someone commits it.
+    let root = r
+        .ignored_dist
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .to_path_buf();
+    git(&r.platform, &root, &["add", "-f", "web/dist/bundle.js"]);
+
+    // A preview made now refuses it, with the reason.
+    let plan = engine.plan(
+        &session,
+        std::slice::from_ref(&ignored.id),
+        DeleteMode::Trash,
+    );
+    assert!(plan.targets.is_empty());
+    assert_eq!(plan.blocked.len(), 1);
+    assert_eq!(plan.blocked[0].reason, "Git now tracks files in it");
+
+    // And the plan made before the commit removes nothing when it runs.
+    let result = engine.execute(&early_plan, None, &|_| {}).unwrap();
+    assert_eq!(result.removed_targets, 0);
+    assert_eq!(result.failed.len(), 1);
+    assert_eq!(result.failed[0].error, "kept: Git now tracks files in it");
+    assert!(
+        r.ignored_dist.join("bundle.js").exists(),
+        "the folder is still there"
+    );
+}
+
+#[test]
+fn ignored_output_is_still_removed_after_the_second_check() {
+    let r = repo();
+    let engine = engine(r.platform.clone());
+    let session = engine.scan(
+        "projects",
+        &ScanRequest::default(),
+        Arc::new(AtomicBool::new(false)),
+        &|_| {},
+    );
+    let node_modules = session
+        .results
+        .iter()
+        .flat_map(|res| &res.targets)
+        .find(|t| Path::new(&t.path) == r.node_modules)
+        .unwrap()
+        .clone();
+    let plan = engine.plan(&session, &[node_modules.id], DeleteMode::Permanent);
+    let result = engine.execute(&plan, None, &|_| {}).unwrap();
+    assert_eq!(result.removed_targets, 1, "{:?}", result.failed);
+    assert!(!r.node_modules.exists());
+}

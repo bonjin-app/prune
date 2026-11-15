@@ -179,7 +179,11 @@ here: every JavaScript GitHub Action commits its `dist/`, Electron apps keep the
 `git ls-files` from its parent for its name. That reads the index only, with no lock and no
 file-system monitor, and stops at the first byte of output. A folder Git tracks anything in, or
 one that is a repository of its own, becomes **Protected** with the reason in its description,
-and `engine.plan` refuses it like any other protected target. When the check cannot be made
+and `engine.plan` refuses it like any other protected target. A folder can be committed after
+the scan, so a provider that sets `guarded_by_git` has its targets asked again: in parallel when
+a preview is planned, and one by one immediately before each is removed, where an objection
+becomes a failed target (`kept: …`) and nothing is touched. That costs about 9 ms per folder
+inside a repository, and nothing outside one. When the check cannot be made
 (Git not found, a timeout, an error), the folder is kept too and the scan says why: unknown is
 not eligible. `PlatformService::git` finds the binary. On macOS it never runs the
 `/usr/bin/git` stub, which offers to install the Command Line Tools instead of running.
