@@ -2938,7 +2938,7 @@ dependencies = [
 
 [[package]]
 name = "prune"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "chrono",
  "prune-core",
@@ -2957,7 +2957,7 @@ dependencies = [
 
 [[package]]
 name = "prune-cli"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "chrono",
  "clap",
@@ -2970,7 +2970,7 @@ dependencies = [
 
 [[package]]
 name = "prune-core"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "chrono",
  "dirs",

@@ -6,6 +6,13 @@ All notable changes to Prune are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-11-15
+
+Temporary files a running program is still using are no longer offered. A day without changes
+used to be enough; now anything a program holds open is shown with the program's name and kept,
+and macOS's own service folders are left alone. The operation log and settings file are read as
+before.
+
 ### Added
 
 - `scripts/verify-release.sh` checks a release, draft or published, the way a download meets it:
@@ -18,7 +25,6 @@ All notable changes to Prune are documented here. The format follows
 - README's first-run steps for macOS 15 and later, which no longer accept right-click → Open
   for an unverified app: Privacy & Security → Open Anyway instead. It also says what a
   "damaged" warning means.
-
 - Development tools brought up to date: TypeScript 6, ESLint 10, Vitest 5, jest-dom 7 and the
   Node type definitions. `baseUrl` is gone from `tsconfig.json`, which TypeScript 6 deprecates;
   the `@/` import alias now resolves relative to `tsconfig.json` itself. Nothing Prune ships changes.
