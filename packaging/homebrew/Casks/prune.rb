@@ -3,9 +3,9 @@
 cask "prune" do
   arch arm: "aarch64", intel: "x64"
 
-  version "0.2.5"
-  sha256 arm:   "e8cf3d1078285bb8940ee65d3f78fead55d84bcc2fb20a755e569f20b89e0c51",
-         intel: "03f3400a0e7c0c8ee3df07b3b55efd76dca0a784c023260ac7ee23430427d614"
+  version "0.2.6"
+  sha256 arm:   "e2e1d0326afc069de8d1ff23e4588472386b1acd258c932dc3ca9da32dfefe13",
+         intel: "49e878bc79945cfca810d3214b2d15ed1d9254c20202e8a7493ef65a103f3d03"
 
   url "https://github.com/bonjin-app/prune/releases/download/v#{version}/Prune_#{version}_#{arch}.dmg"
   name "Prune"
