@@ -89,10 +89,22 @@ impl SafetyPolicy {
     /// and a path that does not exist right now is kept as written so it is protected again
     /// when it comes back.
     pub fn with_user_protected(mut self, paths: &[PathBuf]) -> Self {
+        // Two forms each: the path as it is spelled, with only the folders above it resolved,
+        // so a protected link is itself protected; and fully resolved, so whatever a protected
+        // link points to is protected as well.
         self.user = paths
             .iter()
             .filter(|p| p.is_absolute())
-            .map(|p| canonical_through_nearest_existing(p))
+            .flat_map(|p| {
+                let mut forms = vec![canonical_through_nearest_existing(p)];
+                if let (Some(parent), Some(name)) = (p.parent(), p.file_name()) {
+                    let spelled = canonical_through_nearest_existing(parent).join(name);
+                    if !forms.contains(&spelled) {
+                        forms.push(spelled);
+                    }
+                }
+                forms
+            })
             .collect();
         self
     }

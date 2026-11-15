@@ -93,9 +93,9 @@ impl AppState {
 
     /// Persists new settings and rebuilds the engine around them.
     ///
-    /// If the file on disk could not be read, it is moved aside first rather than overwritten:
-    /// the user may still want what was in it, and the settings they save now become the ones
-    /// that count.
+    /// If the file on disk could not be read, a copy of it is kept aside first: the user may
+    /// still want what was in it, and the settings they save now become the ones that count.
+    /// The original stays until the save replaces it, so a failed save cannot leave no file.
     pub fn apply_settings(&self, settings: Settings) -> prune_core::Result<()> {
         let mut problem = self.settings_problem.lock_recover();
         if problem.is_some() {

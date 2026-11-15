@@ -521,6 +521,25 @@ function mockDockerUsage(scale: number) {
 
 let mockProjectRoots: string[] = [];
 let mockProtectedPaths: string[] = [];
+
+/** The backend's rule: a path is kept if it is, is inside, or contains a protected path. */
+function mockProtection(path: string): string | null {
+  for (const kept of mockProtectedPaths) {
+    if (path === kept || path.startsWith(`${kept}/`)) return "you protected this";
+    if (kept.startsWith(`${path}/`)) return "contains something you protected";
+  }
+  return null;
+}
+
+function withMockProtections(results: ScanResult[]): ScanResult[] {
+  return results.map((r) => ({
+    ...r,
+    targets: r.targets.map((t) => {
+      const reason = mockProtection(t.path);
+      return reason ? { ...t, risk: "protected" as const, description: reason } : t;
+    }),
+  }));
+}
 function mockSettings() {
   return {
     settings: { projectRoots: mockProjectRoots, protectedPaths: mockProtectedPaths },
@@ -1029,7 +1048,7 @@ export const mockBackend: Backend = {
   },
   async cleanerStartScan(providerIds) {
     const id = `scan-${Date.now()}`;
-    const results = fakeResults(providerIds);
+    const results = withMockProtections(fakeResults(providerIds));
     sessions.set(id, {
       id,
       status: "running",
@@ -1102,10 +1121,14 @@ export const mockBackend: Backend = {
     const s = sessions.get(scanId);
     if (!s) throw { code: "unknown_scan", message: scanId };
     const all = s.results.flatMap((r) => r.targets);
-    const targets = all.filter((t) => targetIds.includes(t.id) && t.risk !== "protected");
-    const blocked = all
-      .filter((t) => targetIds.includes(t.id) && t.risk === "protected")
-      .map((t) => ({ targetId: t.id, path: t.path, reason: "protected" }));
+    // Asked again here, as the backend's policy is: a protection added after the scan counts.
+    const keptBecause = (t: CleanupTarget) =>
+      t.risk === "protected" ? "protected" : mockProtection(t.path);
+    const chosen = all.filter((t) => targetIds.includes(t.id));
+    const targets = chosen.filter((t) => !keptBecause(t));
+    const blocked = chosen
+      .filter((t) => keptBecause(t))
+      .map((t) => ({ targetId: t.id, path: t.path, reason: keptBecause(t) ?? "protected" }));
     const plan: CleanupPlan = {
       id: `plan-${Date.now()}`,
       scanId,
@@ -1124,21 +1147,24 @@ export const mockBackend: Backend = {
     const plan = plans.get(planId);
     if (!plan) throw { code: "unknown_plan", message: planId };
     plans.delete(planId);
+    // Asked again immediately before removal, as the backend's policy is.
+    const kept = plan.targets.filter((t) => mockProtection(t.path));
+    const going = plan.targets.filter((t) => !mockProtection(t.path));
     let removed = 0;
-    for (let i = 0; i < plan.targets.length; i++) {
+    for (let i = 0; i < going.length; i++) {
       await new Promise((r) => setTimeout(r, 120));
-      removed += plan.targets[i]?.sizeBytes ?? 0;
+      removed += going[i]?.sizeBytes ?? 0;
       emit("prune://cleanup-progress", {
         planId,
         done: i + 1,
-        total: plan.targets.length,
-        currentPath: plan.targets[i]?.path ?? "",
+        total: going.length,
+        currentPath: going[i]?.path ?? "",
         removedBytes: removed,
       });
     }
     const session = sessions.get(plan.scanId);
     if (session) {
-      const ids = new Set(plan.targets.map((t) => t.id));
+      const ids = new Set(going.map((t) => t.id));
       session.results = session.results
         .map((r) => ({ ...r, targets: r.targets.filter((t) => !ids.has(t.id)) }))
         .map((r) => ({
@@ -1153,28 +1179,32 @@ export const mockBackend: Backend = {
       operationId: `op-${Date.now()}`,
       planId,
       mode: plan.mode,
-      status: "success",
+      status: kept.length === 0 ? "success" : going.length === 0 ? "failed" : "partial",
       startedAt: plan.createdAt,
       finishedAt: new Date().toISOString(),
-      removedTargets: plan.targets.length,
-      removedFiles: plan.fileCount,
-      removedBytes: plan.totalBytes,
-      failed: [],
+      removedTargets: going.length,
+      removedFiles: going.reduce((a, t) => a + t.fileCount, 0),
+      removedBytes: removed,
+      failed: kept.map((t) => ({
+        targetId: t.id,
+        path: t.path,
+        error: `kept: ${mockProtection(t.path)}`,
+      })),
     };
     ops.unshift({
       id: result.operationId,
       at: result.finishedAt,
       title:
-        plan.targets.length === 1
-          ? `Clean ${plan.targets[0]?.label}`
-          : `Clean ${new Set(plan.targets.map((t) => t.providerId)).size} categories`,
+        going.length === 1
+          ? `Clean ${going[0]?.label}`
+          : `Clean ${new Set(going.map((t) => t.providerId)).size} categories`,
       mode: plan.mode,
-      status: "success",
+      status: result.status,
       removedTargets: result.removedTargets,
       removedFiles: result.removedFiles,
       removedBytes: result.removedBytes,
-      failedCount: 0,
-      providers: [...new Set(plan.targets.map((t) => t.providerId))],
+      failedCount: kept.length,
+      providers: [...new Set(going.map((t) => t.providerId))],
     });
     return result;
   },

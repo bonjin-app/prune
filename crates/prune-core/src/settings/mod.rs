@@ -78,13 +78,22 @@ pub fn validate_root(path: &Path, home: &Path) -> std::result::Result<PathBuf, R
     Ok(canonical)
 }
 
-/// Checks a path the user wants protected, returning it in canonical form. It must exist when
-/// it is added, so a typo cannot pass for a protection.
+/// Checks a path the user wants protected, returning it with the folders above it in canonical
+/// form. It must exist when it is added, so a typo cannot pass for a protection.
+///
+/// The last component is kept as given rather than resolved: protecting a link protects the
+/// link. The safety policy covers what it points to as well.
 pub fn validate_protected(path: &Path) -> std::result::Result<PathBuf, RootRejection> {
     if !path.is_absolute() {
         return Err(RootRejection::NotAbsolute);
     }
-    std::fs::canonicalize(path).map_err(|_| RootRejection::Missing)
+    std::fs::symlink_metadata(path).map_err(|_| RootRejection::Missing)?;
+    let (Some(parent), Some(name)) = (path.parent(), path.file_name()) else {
+        // A filesystem root: nothing above it to resolve.
+        return std::fs::canonicalize(path).map_err(|_| RootRejection::Missing);
+    };
+    let parent = std::fs::canonicalize(parent).map_err(|_| RootRejection::Missing)?;
+    Ok(parent.join(name))
 }
 
 impl Settings {
@@ -112,8 +121,12 @@ impl Settings {
         Self::load_checked(dir).settings
     }
 
-    /// Moves an unreadable settings file aside, so that saving new settings does not destroy
-    /// what the user had. Returns where it went.
+    /// Copies an unreadable settings file aside, so that saving new settings does not destroy
+    /// what the user had. Returns where the copy went.
+    ///
+    /// A copy, not a move: the original stays until [`save`](Self::save) replaces it. Moved
+    /// away first, a save that then failed would leave no settings file at all, and the next
+    /// start would read that as a fresh install with nothing protected.
     pub fn set_aside_unreadable(dir: &Path) -> Result<Option<PathBuf>> {
         let path = dir.join(FILE_NAME);
         if !path.exists() {
@@ -121,7 +134,7 @@ impl Settings {
         }
         let stamp = chrono::Utc::now().format("%Y%m%d-%H%M%S");
         let aside = dir.join(format!("settings.unreadable-{stamp}.json"));
-        std::fs::rename(&path, &aside).map_err(|e| PruneError::io(&path, e))?;
+        std::fs::copy(&path, &aside).map_err(|e| PruneError::io(&path, e))?;
         Ok(Some(aside))
     }
 
@@ -232,7 +245,11 @@ mod tests {
             .unwrap()
             .expect("there was a file to set aside");
         assert_eq!(std::fs::read(&aside).unwrap(), b"{ broken");
-        assert!(!dir.path().join(FILE_NAME).exists());
+        // Still there until a save replaces it, so a failed save cannot leave no file at all.
+        assert!(Settings::load_checked(dir.path()).problem.is_some());
+        Settings::default().save(dir.path()).unwrap();
+        assert!(Settings::load_checked(dir.path()).problem.is_none());
+        assert_eq!(std::fs::read(&aside).unwrap(), b"{ broken");
     }
 
     #[test]

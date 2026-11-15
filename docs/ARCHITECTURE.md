@@ -94,7 +94,9 @@ Two more checks come from the user, not the platform:
 - **Paths the user protected** (`settings.protectedPaths`) are checked right after rule 2, and
   before the `.app` exception, so protecting an application keeps it from the uninstaller too.
   A target is refused if it is, is inside, or *contains* one of them, because removing a folder
-  removes everything in it. A protected path that does not exist yet is canonicalized through
+  removes everything in it. Each is held in two forms: as spelled, with only the folders above
+  it resolved, so a protected link is itself protected, and fully resolved, so what the link
+  points to is protected too. A protected path that does not exist yet is canonicalized through
   its nearest existing ancestor, so it still matches once it appears even where an ancestor is
   a link (`/var` → `/private/var` on macOS). The scan labels such targets "you protected this"
   or "contains something you protected" instead of only greying them out.
@@ -340,8 +342,9 @@ searched for project artifacts and the list of paths the user protected.
 Protections change how a broken file is treated. Project folders can safely fall back to the
 guesses, but a protection list cannot fall back to empty: `Settings::load_checked` reports an
 unreadable file, and the app and the command line then refuse every removal and say why. Saving
-settings from the app moves the unreadable file aside (`settings.unreadable-<time>.json`) instead
-of overwriting it. Each command that changes one list keeps the other as it was. A protected path
+settings from the app first copies the unreadable file aside (`settings.unreadable-<time>.json`);
+the original stays until the new file replaces it, so a failed save leaves it in place and the
+next start still refuses. Each command that changes one list keeps the other as it was. A protected path
 must exist when it is added, so a typo cannot pass for a protection, but one already in the list
 is kept even if it has gone missing.
 

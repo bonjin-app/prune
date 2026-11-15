@@ -186,3 +186,27 @@ fn while_protections_are_unknown_nothing_is_removed() {
         .contains("the settings file could not be read"));
     assert!(f.kept.exists() && f.holding.exists() && f.free.exists());
 }
+
+#[cfg(unix)]
+#[test]
+fn protecting_a_link_protects_the_link_and_what_it_points_to() {
+    let f = fixture();
+    let real = f.platform.home().join("Archive/photos");
+    write(&real.join("2019/beach.jpg"));
+    let link = f.platform.home().join("Desktop-photos");
+    std::os::unix::fs::symlink(&real, &link).unwrap();
+
+    // What the settings command stores: the link itself, with the folders above it resolved.
+    let stored = prune_core::settings::validate_protected(&link).unwrap();
+    assert!(stored.ends_with("Desktop-photos"), "{}", stored.display());
+
+    let mut engine = engine(&f);
+    engine.protect(&[stored]);
+    let policy = engine.policy();
+    assert!(policy.validate(&link).is_err(), "the link itself");
+    assert!(
+        policy.validate(&real.join("2019")).is_err(),
+        "what it points to"
+    );
+    assert!(policy.validate(&f.free).is_ok(), "and nothing else");
+}
