@@ -55,54 +55,29 @@ jobs:
       # DIAGNOSTIC (issue #1). Already established: winget marks the download as from the internet
       # (zone 3); the same file marked the same way hangs without winget too; the setup process
       # never starts; and with no --scope winget picks this installer over the MSI.
-      # A: let zone-3 programs launch without the Attachment Manager's "Open File - Security
-      # Warning" prompt, leaving SmartScreen alone.
-      - name: "Diagnose A: no Attachment Manager prompt"
+      # C: is a signed installer stopped the same way? Microsoft's own WebView2 bootstrapper,
+      # marked zone 3 and started through ShellExecute, next to Prune's unsigned setup.exe.
+      - name: "Diagnose C: signed and unsigned, both marked zone 3"
         continue-on-error: true
-        timeout-minutes: 4
+        timeout-minutes: 5
         shell: pwsh
         run: |
-          $z = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings\Zones\3'
-          Set-ItemProperty -Path $z -Name 1806 -Value 0 -Type DWord
-          $a = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Policies\Associations'
-          New-Item -Path $a -Force | Out-Null
-          Set-ItemProperty -Path $a -Name LowRiskFileTypes -Value '.exe'
-          $a = 'install','--manifest','packaging/winget','--scope','user','--silent','--verbose-logs',
-               '--accept-package-agreements','--accept-source-agreements','--disable-interactivity'
-          $p = Start-Process winget -ArgumentList $a -PassThru -NoNewWindow
-          $done = $p.WaitForExit(120000)
-          Get-CimInstance Win32_Process | Where-Object { $_.Name -match 'setup|SmartScreen|Prune' } |
-            Format-Table ProcessId, ParentProcessId, Name -AutoSize | Out-String | Write-Host
-          Write-Host "RESULT returned: $done; exit: $(if ($done) { $p.ExitCode }); installed: $(Test-Path "$env:LOCALAPPDATA\Prune\prune-desktop.exe")"
-          if (-not $done) {
-            Stop-Process -Id $p.Id -Force
-            Get-Process smartscreen, CHXSmartScreen, Prune_0.2.3_x64-setup -ErrorAction SilentlyContinue | Stop-Process -Force
-            throw "still hangs"
+          Invoke-WebRequest 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile $env:RUNNER_TEMP\signed.exe
+          Invoke-WebRequest https://github.com/bonjin-app/prune/releases/download/v0.2.3/Prune_0.2.3_x64-setup.exe -OutFile $env:RUNNER_TEMP\unsigned.exe
+          foreach ($t in @(@{ f = 'signed.exe'; a = '/silent /install' }, @{ f = 'unsigned.exe'; a = '/S' })) {
+            $f = "$env:RUNNER_TEMP\$($t.f)"
+            $sig = Get-AuthenticodeSignature $f
+            Set-Content -Path $f -Stream Zone.Identifier -Value "[ZoneTransfer]`r`nZoneId=3"
+            $j = Start-Job -ArgumentList $f, $t.a { param($f, $a) Start-Process $f -ArgumentList $a -Wait }
+            $done = [bool](Wait-Job $j -Timeout 60)
+            Write-Host "RESULT $($t.f): signature $($sig.Status) ($($sig.SignerCertificate.Subject)); returned within 60s: $done"
+            Stop-Job $j; Remove-Job $j -Force
+            Get-Process signed, unsigned -ErrorAction SilentlyContinue | Stop-Process -Force
           }
-          winget uninstall --name Prune --scope user --silent --disable-interactivity
-
-      # B: also turn SmartScreen's app-reputation check off.
-      - name: "Diagnose B: and SmartScreen off"
-        continue-on-error: true
-        timeout-minutes: 4
-        shell: pwsh
-        run: |
-          Set-ItemProperty -Path HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer -Name SmartScreenEnabled -Value Off
-          New-Item -Path HKLM:\SOFTWARE\Policies\Microsoft\Windows\System -Force | Out-Null
-          Set-ItemProperty -Path HKLM:\SOFTWARE\Policies\Microsoft\Windows\System -Name EnableSmartScreen -Value 0 -Type DWord
-          $a = 'install','--manifest','packaging/winget','--scope','user','--silent','--verbose-logs',
-               '--accept-package-agreements','--accept-source-agreements','--disable-interactivity'
-          $p = Start-Process winget -ArgumentList $a -PassThru -NoNewWindow
-          $done = $p.WaitForExit(120000)
-          Get-CimInstance Win32_Process | Where-Object { $_.Name -match 'setup|SmartScreen|Prune' } |
-            Format-Table ProcessId, ParentProcessId, Name -AutoSize | Out-String | Write-Host
-          Write-Host "RESULT returned: $done; exit: $(if ($done) { $p.ExitCode }); installed: $(Test-Path "$env:LOCALAPPDATA\Prune\prune-desktop.exe")"
-          if (-not $done) {
-            Stop-Process -Id $p.Id -Force
-            Get-Process smartscreen, CHXSmartScreen, Prune_0.2.3_x64-setup -ErrorAction SilentlyContinue | Stop-Process -Force
-            throw "still hangs"
-          }
-          winget uninstall --name Prune --scope user --silent --disable-interactivity
+          $z = Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings\Zones\3' -Name 1806 -ErrorAction SilentlyContinue
+          Write-Host "RESULT zone 3 setting 1806 (launch programs): $($z.1806)"
+          Write-Host "RESULT OS: $((Get-CimInstance Win32_OperatingSystem).Caption)"
+          if (Test-Path "$env:LOCALAPPDATA\Prune\uninstall.exe") { Start-Process "$env:LOCALAPPDATA\Prune\uninstall.exe" '/S' -Wait }
 
       # Installing proves the manifest points at something that actually installs, which is the
       # half of the pull request checklist that validation alone does not cover.
