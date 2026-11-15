@@ -26,10 +26,10 @@ jobs:
         shell: pwsh
         run: |
           $d = $env:RUNNER_TEMP
-          function Try-Launch($name, $args) {
+          function Try-Launch($name, $arguments) {
             $f = "$d\$name.exe"
             Set-Content -Path $f -Stream Zone.Identifier -Value "[ZoneTransfer]`r`nZoneId=3"
-            $j = Start-Job -ArgumentList $f, $args { param($f, $a) (Start-Process $f -ArgumentList $a -Wait -PassThru).ExitCode }
+            $j = Start-Job -ArgumentList $f, $arguments { param($f, $a) (Start-Process $f -ArgumentList $a -Wait -PassThru).ExitCode }
             $done = [bool](Wait-Job $j -Timeout 45)
             Write-Host "RESULT $name : returned within 45s: $done"
             Stop-Job $j; Remove-Job $j -Force
