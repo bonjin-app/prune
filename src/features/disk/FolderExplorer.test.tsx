@@ -115,13 +115,15 @@ describe("FolderExplorer", () => {
     for (let page = 2; page <= 11; page++) {
       await user.keyboard("{Enter}");
       expect(rows()).toHaveLength(page === 11 ? 1 : 100);
-      expect(next).toHaveFocus();
+      // On the last page Next is disabled, which would drop focus to the page body; it moves to
+      // Previous instead, so a keyboard user keeps their place.
+      expect(page === 11 ? previous : next).toHaveFocus();
       expect(screen.getByText(new RegExp(`Page ${page} of 11`))).toBeInTheDocument();
     }
     expect(folder(1000)).toBeInTheDocument();
     expect(next).toBeDisabled();
     expect(screen.getByText(/Page 11 of 11/)).toHaveTextContent("1001–1001 of 1,001 folders");
-    await user.click(previous);
+    await user.keyboard("{Enter}");
     expect(previous).toHaveFocus();
     expect(rows()).toHaveLength(100);
     expect(folder(900)).toBeInTheDocument();
@@ -145,6 +147,24 @@ describe("FolderExplorer", () => {
     await user.click(screen.getByRole("button", { name: "Show map" }));
     expect(screen.getByLabelText("Folder sizes map")).toBeInTheDocument();
   }, 15000);
+  it("moves focus to the other page button when the one pressed becomes disabled", async () => {
+    const user = userEvent.setup();
+    useDisk.setState({ node: view(201) });
+    render(<FolderExplorer />);
+    const next = button("Next page of folders");
+    const previous = button("Previous page of folders");
+    next.focus();
+    await user.keyboard("{Enter}");
+    expect(next).toHaveFocus();
+    await user.keyboard("{Enter}");
+    expect(next).toBeDisabled();
+    expect(previous).toHaveFocus();
+    await user.keyboard("{Enter}");
+    expect(previous).toHaveFocus();
+    await user.keyboard("{Enter}");
+    expect(previous).toBeDisabled();
+    expect(next).toHaveFocus();
+  });
   it("clamps a shrinking folder page and resets search and page at a new path", async () => {
     const user = userEvent.setup();
     useDisk.setState({ node: view(301) });

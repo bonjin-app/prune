@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { ArrowUp, ChevronRight, FileBox, FolderOpen, Search } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { Button } from "@/components/ui/Button";
@@ -65,6 +65,22 @@ function Explorer({ view, loading }: { view: DiskNodeView; loading: boolean }) {
   const currentPage = Math.min(page, pageCount - 1);
   // Persist the clamp so growing results cannot restore a stale page.
   if (page !== currentPage) setPage(currentPage);
+  // Reaching the first or last page disables the button that got there, and a browser drops
+  // focus from a disabled button to the page body: a keyboard user paging through would lose
+  // their place. Hand focus to the other page button instead, once it is enabled.
+  const previousButton = useRef<HTMLButtonElement>(null);
+  const nextButton = useRef<HTMLButtonElement>(null);
+  const focusAfterPaging = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    focusAfterPaging.current?.focus();
+    focusAfterPaging.current = null;
+  }, [currentPage]);
+  const turnPage = (to: number, event: MouseEvent<HTMLButtonElement>) => {
+    const hadFocus = event.currentTarget === document.activeElement;
+    if (hadFocus && to === 0) focusAfterPaging.current = nextButton.current;
+    if (hadFocus && to === pageCount - 1) focusAfterPaging.current = previousButton.current;
+    setPage(to);
+  };
   const start = currentPage * PAGE_SIZE;
   const end = Math.min(start + PAGE_SIZE, filtered.length);
   const max = Math.max(
@@ -336,18 +352,20 @@ function Explorer({ view, loading }: { view: DiskNodeView; loading: boolean }) {
           <Button
             size="sm"
             variant="secondary"
+            ref={previousButton}
             aria-label="Previous page of folders"
             disabled={loading || currentPage === 0}
-            onClick={() => setPage(currentPage - 1)}
+            onClick={(event) => turnPage(currentPage - 1, event)}
           >
             Previous
           </Button>
           <Button
             size="sm"
             variant="secondary"
+            ref={nextButton}
             aria-label="Next page of folders"
             disabled={loading || currentPage === pageCount - 1}
-            onClick={() => setPage(currentPage + 1)}
+            onClick={(event) => turnPage(currentPage + 1, event)}
           >
             Next
           </Button>
