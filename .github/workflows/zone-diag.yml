@@ -1,0 +1,45 @@
+# DIAGNOSTIC for issue #1, not for merging: which signed programs does ShellExecute let through
+# from zone 3 without a prompt?
+name: Zone prompt diagnosis
+on: pull_request
+jobs:
+  diag:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Prepare
+        shell: pwsh
+        run: |
+          $d = $env:RUNNER_TEMP
+          Invoke-WebRequest https://github.com/bonjin-app/prune/releases/download/v0.2.3/Prune_0.2.3_x64-setup.exe -OutFile $d\unsigned.exe
+          Invoke-WebRequest https://the.earth.li/~sgtatham/putty/latest/w64/plink.exe -OutFile $d\plink.exe
+          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject 'CN=Prune zone test' -CertStoreLocation Cert:\CurrentUser\My
+          Export-Certificate -Cert $cert -FilePath $d\t.cer | Out-Null
+          Import-Certificate -FilePath $d\t.cer -CertStoreLocation Cert:\LocalMachine\Root | Out-Null
+          Copy-Item $d\unsigned.exe $d\selfsigned.exe
+          Set-AuthenticodeSignature -FilePath $d\selfsigned.exe -Certificate $cert -TimestampServer http://timestamp.digicert.com -HashAlgorithm SHA256 | Format-List Status, StatusMessage
+          Copy-Item $d\selfsigned.exe $d\published.exe
+          foreach ($f in 'unsigned', 'selfsigned', 'plink') {
+            $s = Get-AuthenticodeSignature "$d\$f.exe"; Write-Host "SIG $f $($s.Status) $($s.SignerCertificate.Subject)"
+          }
+      - name: Launch each, marked zone 3
+        shell: pwsh
+        run: |
+          $d = $env:RUNNER_TEMP
+          function Try-Launch($name, $args) {
+            $f = "$d\$name.exe"
+            Set-Content -Path $f -Stream Zone.Identifier -Value "[ZoneTransfer]`r`nZoneId=3"
+            $j = Start-Job -ArgumentList $f, $args { param($f, $a) (Start-Process $f -ArgumentList $a -Wait -PassThru).ExitCode }
+            $done = [bool](Wait-Job $j -Timeout 45)
+            Write-Host "RESULT $name : returned within 45s: $done"
+            Stop-Job $j; Remove-Job $j -Force
+            Get-Process $name, smartscreen, CHXSmartScreen -ErrorAction SilentlyContinue | Stop-Process -Force
+            if (Test-Path "$env:LOCALAPPDATA\Prune\uninstall.exe") { Start-Process "$env:LOCALAPPDATA\Prune\uninstall.exe" '/S' -Wait; Start-Sleep 3 }
+          }
+          Try-Launch 'unsigned' '/S'
+          Try-Launch 'plink' '-V'
+          Try-Launch 'selfsigned' '/S'
+          $cer = "$d\t.cer"
+          Import-Certificate -FilePath $cer -CertStoreLocation Cert:\LocalMachine\TrustedPublisher | Out-Null
+          Write-Host 'test certificate added to Trusted Publishers'
+          Try-Launch 'published' '/S'
