@@ -138,7 +138,31 @@ shows nothing. That file asks for the two exceptions a WebView needs and nothing
 confined to its own container would have nothing to clean. Reading the user's files stays
 governed by the macOS privacy prompts at runtime, not by an entitlement.
 
-Windows code signing is not wired up yet.
+### Windows
+
+Windows signing is off unless `WINDOWS_CERTIFICATE` is set, and is decided the same way.
+
+| Secret or variable                      | What it is                                                        |
+| --------------------------------------- | ----------------------------------------------------------------- |
+| `WINDOWS_CERTIFICATE` (secret)          | code-signing certificate, base64 of a `.pfx` with its private key |
+| `WINDOWS_CERTIFICATE_PASSWORD` (secret) | password for that `.pfx`                                          |
+| `WINDOWS_TIMESTAMP_URL` (variable)      | optional RFC 3161 timestamp server; DigiCert's when left unset    |
+
+`scripts/windows-signing.ps1` imports the certificate and points Tauri at it, so the build signs
+the application, the NSIS installer with its uninstaller, and the MSI; then
+`scripts/check-windows-signatures.ps1` fails the job unless all three are signed and timestamped.
+The `Windows signing` workflow runs that whole path with a throwaway certificate, so it is known
+to work before there is a real one.
+
+A certificate whose key cannot leave a hardware token or a cloud service cannot be a `.pfx`.
+Such certificates sign through `bundle.windows.signCommand` instead, which this does not set up.
+
+This is more than a SmartScreen warning. winget marks what it downloads as coming from the
+internet and starts it through ShellExecute, which holds an unsigned program at a security
+prompt. With nobody at the keyboard, nobody answers it and the installer never starts. That is
+[issue #1](https://github.com/bonjin-app/prune/issues/1), and why only the MSI, which Windows
+Installer runs without that prompt, is in the WinGet manifest. Once releases are signed the NSIS
+installer can go back.
 
 ### What an unsigned build looks like
 

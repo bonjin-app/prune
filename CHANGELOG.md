@@ -6,6 +6,20 @@ All notable changes to Prune are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Windows builds are signed when a certificate is configured.** With `WINDOWS_CERTIFICATE`
+  set, the release signs the application, the NSIS installer and the MSI, and fails unless all
+  three are signed and timestamped. A new `Windows signing` workflow proves the path with a
+  throwaway certificate.
+
+### Changed
+
+- **Why the NSIS installer is not in the WinGet manifest is now known** ([#1]). winget marks the
+  download as coming from the internet, and Windows holds an unsigned program started that way
+  at a security prompt. On an unattended install nobody answers it, so the installer never
+  starts. A signed installer is not held, so signing is what brings it back.
+
 ## [0.2.3] - 2026-11-15
 
 Temporary files a running program is still using are no longer offered. A day without changes
@@ -380,3 +394,4 @@ rather than regressions anyone shipped.
 [0.1.3]: https://github.com/bonjin-app/prune/compare/v0.1.1...v0.1.3
 [0.1.1]: https://github.com/bonjin-app/prune/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/bonjin-app/prune/releases/tag/v0.1.0
+[#1]: https://github.com/bonjin-app/prune/issues/1

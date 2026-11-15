@@ -36,6 +36,7 @@ jobs:
       # both macOS jobs, while Windows sailed through. So whether to sign is decided here and
       # the variables are only set when there is something to set.
       HAS_APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE != '' }}
+      HAS_WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE != '' }}
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -72,6 +73,17 @@ jobs:
         if: env.HAS_APPLE_CERTIFICATE != 'true' && runner.os == 'macOS'
         shell: bash
         run: echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
+      # Signs the application and both installers. Unsigned, the NSIS installer is held at a
+      # security prompt when winget starts it, which nobody sees on an unattended install, so it
+      # never runs (issue #1). The secrets reach this one step only, not the job's environment.
+      - name: Sign Windows builds, if there is a certificate
+        if: env.HAS_WINDOWS_CERTIFICATE == 'true' && runner.os == 'Windows'
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          WINDOWS_TIMESTAMP_URL: ${{ vars.WINDOWS_TIMESTAMP_URL }}
+        run: ./scripts/windows-signing.ps1
       - uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -88,6 +100,10 @@ jobs:
         if: runner.os == 'macOS'
         shell: bash
         run: codesign --verify --deep --strict --verbose=2 "target/${{ matrix.target }}/release/bundle/macos/Prune.app"
+      - name: Check the Windows signatures
+        if: env.HAS_WINDOWS_CERTIFICATE == 'true' && runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/check-windows-signatures.ps1 "target/${{ matrix.target }}/release"
 
   # The `prune` command line, attached to the same release. Built after the bundles so the
   # draft release already exists.

@@ -1,8 +1,9 @@
 # Does the Windows installer install with nobody at the keyboard?
 #
-# That is how a fleet deployment installs it, and it is the baseline the winget hang in
-# issue #1 is measured against: this passes, and `winget install` of the same file does not.
-# If this ever starts failing, the two problems are not the same problem.
+# That is how a fleet deployment installs it. It passes where `winget install` of the same file
+# hangs (issue #1) because Invoke-WebRequest does not mark the download as coming from the
+# internet, and winget does: marked, an unsigned installer is held at a prompt before it starts.
+# If this ever starts failing, that is a different problem.
 name: Silent install (Windows)
 
 on:

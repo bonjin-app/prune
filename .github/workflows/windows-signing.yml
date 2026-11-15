@@ -1,0 +1,110 @@
+# Does Windows signing work, before there is a certificate to sign a release with?
+#
+# Runs the release workflow's signing path with a throwaway self-signed certificate: import it,
+# build, check every file is signed, then start the signed installer the way winget does.
+# That last step is issue #1. winget marks what it downloads as coming from the internet (zone
+# 3) and starts it through ShellExecute; for an unsigned program that waits on a security prompt
+# nobody sees, so the installer never runs. Microsoft's signed WebView2 bootstrapper, marked and
+# started the same way on the same runner, did not wait. This checks that Prune's own installer,
+# once signed, does not either.
+#
+# The test certificate is trusted on this runner only, which a real certificate from a public
+# authority is everywhere. A signature that is valid here proves the wiring, not reputation.
+name: Windows signing
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "scripts/windows-signing.ps1"
+      - "scripts/check-windows-signatures.ps1"
+      - ".github/workflows/windows-signing.yml"
+      - "src-tauri/tauri.conf.json"
+
+permissions:
+  contents: read
+
+jobs:
+  sign:
+    name: Sign with a test certificate
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
+          key: windows-signing
+      - run: pnpm install --frozen-lockfile
+
+      # Made here, exported the way a real one is stored as a secret, then taken back out of the
+      # store, so the script under test has to import it itself.
+      - name: Make a test certificate
+        shell: pwsh
+        run: |
+          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject 'CN=Prune signing test' `
+            -CertStoreLocation Cert:\CurrentUser\My -NotAfter (Get-Date).AddDays(2)
+          $password = [guid]::NewGuid().ToString()
+          $pfx = Join-Path $env:RUNNER_TEMP 'test.pfx'
+          $cer = Join-Path $env:RUNNER_TEMP 'test.cer'
+          Export-PfxCertificate -Cert $cert -FilePath $pfx -Password (ConvertTo-SecureString $password -AsPlainText -Force) | Out-Null
+          Export-Certificate -Cert $cert -FilePath $cer | Out-Null
+          # The machine store, because adding to the user's trusted roots asks for confirmation.
+          Import-Certificate -FilePath $cer -CertStoreLocation Cert:\LocalMachine\Root | Out-Null
+          Remove-Item $cert.PSPath
+          "::add-mask::$password"
+          "WINDOWS_CERTIFICATE=$([Convert]::ToBase64String([IO.File]::ReadAllBytes($pfx)))" >> $env:GITHUB_ENV
+          "WINDOWS_CERTIFICATE_PASSWORD=$password" >> $env:GITHUB_ENV
+          Remove-Item $pfx
+
+      - name: Sign Windows builds
+        shell: pwsh
+        run: ./scripts/windows-signing.ps1
+
+      - name: Build
+        run: pnpm tauri build
+
+      - name: Check the signatures
+        shell: pwsh
+        run: ./scripts/check-windows-signatures.ps1 target/release
+
+      - name: Start the installer the way winget does
+        timeout-minutes: 5
+        shell: pwsh
+        run: |
+          $setup = Join-Path $env:RUNNER_TEMP 'Prune-setup.exe'
+          Copy-Item (Get-ChildItem target/release/bundle/nsis/*-setup.exe).FullName $setup
+          Set-Content -Path $setup -Stream Zone.Identifier -Value "[ZoneTransfer]`r`nZoneId=3"
+          # Start-Process is ShellExecute, which is held for as long as the prompt is, so it runs
+          # in a job that can be abandoned.
+          $job = Start-Job -ArgumentList $setup {
+            param($f)
+            (Start-Process $f -ArgumentList '/S' -Wait -PassThru).ExitCode
+          }
+          if (-not (Wait-Job $job -Timeout 120)) {
+            Get-CimInstance Win32_Process | Where-Object { $_.Name -match 'setup|SmartScreen' } |
+              Format-Table ProcessId, ParentProcessId, Name -AutoSize | Out-String | Write-Host
+            Stop-Job $job
+            throw 'The signed installer was held as an unsigned one is (issue #1).'
+          }
+          $code = Receive-Job $job
+          if ($code -ne 0) { throw "The installer exited with $code." }
+          $app = "$env:LOCALAPPDATA\Prune\prune-desktop.exe"
+          if (-not (Test-Path $app)) { throw "Nothing was installed at $app." }
+          $s = Get-AuthenticodeSignature $app
+          if ($s.Status -ne 'Valid') { throw "The installed application is not signed: $($s.Status)." }
+          Write-Host 'Installed without a prompt, and the installed application is signed.'
+
+      - name: Uninstall
+        shell: pwsh
+        run: |
+          $p = Start-Process "$env:LOCALAPPDATA\Prune\uninstall.exe" -ArgumentList '/S' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "The uninstaller exited with $($p.ExitCode)." }
+          Start-Sleep -Seconds 3
+          if (Test-Path "$env:LOCALAPPDATA\Prune\prune-desktop.exe") { throw 'Still installed.' }

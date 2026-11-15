@@ -21,3 +21,6 @@ src-tauri/gen/schemas/
 
 # Playwright MCP writes page snapshots and console logs here while capturing screenshots.
 .playwright-mcp/
+
+# Written by scripts/windows-signing.ps1 for a signed Windows build; holds a thumbprint only.
+src-tauri/tauri.windows.conf.json

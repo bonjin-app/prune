@@ -57,8 +57,9 @@ jobs:
       # --silent, not the default SilentWithProgress: the runner has no interactive desktop for
       # an installer's progress window to appear on, and one that waits for it never returns.
       #
-      # Only the MSI is exercised, because only the MSI is in the manifest. Putting the NSIS
-      # installer back means re-adding it here as well; see issue #1.
+      # Only the MSI is exercised, because only the MSI is in the manifest. The NSIS installer
+      # can go back once releases are signed, and needs a --scope user cycle here when it does;
+      # see issue #1.
       - name: Install the MSI (machine scope)
         timeout-minutes: 8
         run: >
