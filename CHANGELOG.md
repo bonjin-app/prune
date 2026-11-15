@@ -6,6 +6,12 @@ All notable changes to Prune are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-11-15
+
+0.2.4 kept build folders that hold committed files, but decided that only while scanning. A
+folder committed between the scan and the cleanup was still removed. Git is now asked again
+when the preview is made and immediately before each folder is removed.
+
 ### Fixed
 
 - **A build folder committed after the scan is not removed.** The check that keeps folders Git
@@ -419,7 +425,8 @@ rather than regressions anyone shipped.
 - IPC integration tests on Tauri's mock runtime covering the real command surface, including a full disk scan → preview → execute → operation log cycle.
 - A `prune` command line built on the same engine: `status`, `providers`, `scan`, `clean`, `disk`, `apps`, `startup` and `log`, each with `--json` for scripting and meaningful exit codes. `clean` is a dry run unless `--yes` is passed and never selects anything riskier than low on its own. The read-only example prototypes it replaces have been removed.
 
-[unreleased]: https://github.com/bonjin-app/prune/compare/v0.2.4...HEAD
+[unreleased]: https://github.com/bonjin-app/prune/compare/v0.2.5...HEAD
+[0.2.5]: https://github.com/bonjin-app/prune/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/bonjin-app/prune/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/bonjin-app/prune/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/bonjin-app/prune/compare/v0.2.1...v0.2.2
