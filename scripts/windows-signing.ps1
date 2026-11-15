@@ -12,7 +12,8 @@
 # only. That file is generated, holds no secret, and is ignored by git.
 #
 # Unsigned, the NSIS installer cannot be installed by winget with nobody at the keyboard: see
-# issue #1. Signing is what lets it back into the WinGet manifest.
+# issue #1. Signing with a certificate from a public authority is what lets it back into the
+# WinGet manifest; a self-signed one does not get past the prompt that holds it.
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 

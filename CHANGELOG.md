@@ -10,15 +10,16 @@ All notable changes to Prune are documented here. The format follows
 
 - **Windows builds are signed when a certificate is configured.** With `WINDOWS_CERTIFICATE`
   set, the release signs the application, the NSIS installer and the MSI, and fails unless all
-  three are signed and timestamped. A new `Windows signing` workflow proves the path with a
-  throwaway certificate.
+  three, and the application inside each installer, are signed and timestamped. A new
+  `Windows signing` workflow proves the path with a throwaway certificate.
 
 ### Changed
 
 - **Why the NSIS installer is not in the WinGet manifest is now known** ([#1]). winget marks the
   download as coming from the internet, and Windows holds an unsigned program started that way
   at a security prompt. On an unattended install nobody answers it, so the installer never
-  starts. A signed installer is not held, so signing is what brings it back.
+  starts. A program signed with a certificate from a public authority is not held, so signing
+  with one is what brings it back.
 
 ## [0.2.3] - 2026-11-15
 

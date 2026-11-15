@@ -13,8 +13,9 @@ ReleaseDate: 2026-11-15
 # starts it through ShellExecute, which holds an unsigned program at a security prompt; on an
 # unattended install nobody answers it, so the installer never starts and winget waits forever.
 # Given both, winget picks the NSIS installer even without --scope user. The MSI goes through
-# Windows Installer, which does not prompt. Signed, the NSIS installer is not held: see
-# RELEASING.md and https://github.com/bonjin-app/prune/issues/1
+# Windows Installer, which does not prompt. Signed with a certificate from a public authority,
+# the NSIS installer would not be held: see RELEASING.md and
+# https://github.com/bonjin-app/prune/issues/1
 Installers:
 # The MSI sets ALLUSERS=1, so it installs for the machine and elevates. ProductCode is read out
 # of the package itself by scripts/update-winget.sh: WiX generates a new one for every build.

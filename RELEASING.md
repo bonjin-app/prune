@@ -161,8 +161,11 @@ This is more than a SmartScreen warning. winget marks what it downloads as comin
 internet and starts it through ShellExecute, which holds an unsigned program at a security
 prompt. With nobody at the keyboard, nobody answers it and the installer never starts. That is
 [issue #1](https://github.com/bonjin-app/prune/issues/1), and why only the MSI, which Windows
-Installer runs without that prompt, is in the WinGet manifest. Once releases are signed the NSIS
-installer can go back.
+Installer runs without that prompt, is in the WinGet manifest. Only a certificate from a public
+certificate authority gets past it: on a GitHub runner a program signed that way ran at once,
+while Prune's installer signed with a self-signed certificate was held even with that
+certificate trusted as a root and as a publisher. Once releases are signed with such a
+certificate, the NSIS installer can go back.
 
 ### What an unsigned build looks like
 
