@@ -2,7 +2,7 @@ use std::io::Write;
 use std::process::ExitCode;
 
 use clap::Parser;
-use prune_cli::{Cli, EXIT_ERROR};
+use prune_cli::{Cli, Command, EXIT_ERROR};
 use prune_core::ops::OperationLog;
 use prune_core::settings::Settings;
 use prune_core::PruneEngine;
@@ -21,6 +21,26 @@ fn main() -> ExitCode {
     let cli = Cli::parse();
 
     let dir = data_dir();
+
+    // Editing the protected list needs the settings file, not an engine. It also reports an
+    // unreadable file itself, as a refusal rather than a warning.
+    if let Command::Protect { action } = &cli.command {
+        let cwd = std::env::current_dir().unwrap_or_default();
+        let home = dirs::home_dir();
+        let stdout = std::io::stdout();
+        let mut out = std::io::BufWriter::new(stdout.lock());
+        let code = prune_cli::protect::run(
+            dir.as_deref(),
+            home.as_deref(),
+            &cwd,
+            action.as_ref(),
+            cli.json,
+            &mut out,
+        )
+        .unwrap_or(EXIT_ERROR);
+        let _ = out.flush();
+        return ExitCode::from(code as u8);
+    }
     let loaded = dir
         .as_deref()
         .map(Settings::load_checked)

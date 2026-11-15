@@ -25,6 +25,7 @@ use prune_core::scan::ScanRequest;
 use prune_core::system::SystemMonitor;
 use prune_core::PruneEngine;
 
+pub mod protect;
 mod render;
 
 pub use render::human_bytes;
@@ -117,6 +118,11 @@ pub enum Command {
     },
     /// List programs that start by themselves. Read-only.
     Startup,
+    /// List, add or remove the folders and files Prune never removes. Shared with the app.
+    Protect {
+        #[command(subcommand)]
+        action: Option<protect::ProtectAction>,
+    },
     /// Show the local operation log.
     Log {
         /// How many entries to show.
@@ -183,10 +189,19 @@ pub fn run(
         }
         Command::Startup => startup(engine, cli.json, out),
         Command::Log { limit } => operation_log(log, *limit, cli.json, out),
+        // It edits the settings file, which only the binary knows how to find. Without it
+        // there is nothing to edit.
+        Command::Protect { action } => {
+            let cwd = std::env::current_dir().unwrap_or_default();
+            protect::run(None, None, &cwd, action.as_ref(), cli.json, out)
+        }
     }
 }
 
-fn write_json(out: &mut impl Write, value: &impl serde::Serialize) -> std::io::Result<()> {
+pub(crate) fn write_json(
+    out: &mut impl Write,
+    value: &impl serde::Serialize,
+) -> std::io::Result<()> {
     let text = serde_json::to_string_pretty(value)
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
     writeln!(out, "{text}")

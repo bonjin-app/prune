@@ -82,7 +82,7 @@ safety as the primary feature.
 | Uninstaller     | ✅     | Apps with their caches, preferences and containers, matched by bundle identifier                    |
 | Startup manager | ✅     | Login items and launch agents, enable / disable without deleting anything                           |
 | Docker          | ✅     | What Docker is holding, and two conservative prune commands. Volumes are never touched              |
-| CLI             | ✅     | `prune scan`, `clean`, `disk`, `apps`, `startup`, `docker`, `processes`, `log`, `--json`            |
+| CLI             | ✅     | `prune scan`, `clean`, `protect`, `disk`, `apps`, `startup`, `docker`, `processes`, `log`, `--json` |
 
 Every removable item carries a risk level:
 
@@ -303,6 +303,9 @@ prune clean                      # show what would go — a dry run
 prune clean --yes                # move safe items to the trash
 prune clean --include-low --yes  # also node_modules, build directories, …
 prune clean --yes --except ~/Library/Caches/com.example.app   # leave a path out
+prune protect add ~/Projects/site/dist   # never remove this, nor anything containing it
+prune protect                    # list what is protected (shared with the app)
+prune protect remove ~/Projects/site/dist
 prune disk ~/Projects --large 500
 prune docker
 prune docker --prune-cache --yes

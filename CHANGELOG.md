@@ -6,6 +6,16 @@ All notable changes to Prune are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **`prune protect` edits the protected list from the command line.** `prune protect add <PATH>`,
+  `prune protect remove <PATH>`, and `prune protect` to list. It is the same list the app shows
+  in Settings. `~` and relative paths work.
+  - **All or nothing.** If any path given is wrong (missing, or not on the list), nothing is
+    saved.
+  - **An unreadable settings file is left alone.** Nothing is changed until it is fixed or saved
+    again from the app, which keeps a copy of it.
+
 ## [0.2.6] - 2026-11-15
 
 You can now protect folders and files yourself. Anything listed in Settings → Protected folders
