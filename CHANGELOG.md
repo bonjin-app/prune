@@ -6,6 +6,15 @@ All notable changes to Prune are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-11-15
+
+Build folders that hold committed files are no longer offered. A `dist/` or `build/` next to a
+project marker used to be taken for rebuildable output even when Git tracks files in it, as it
+does in every JavaScript GitHub Action and in an Electron app's icons. Such folders are now shown
+as protected and never selected, and so is any folder Git could not be asked about. Windows
+release signing is ready for when there is a certificate, and the reason the NSIS installer
+cannot be installed by winget is now known: it is unsigned.
+
 ### Added
 
 - **Windows builds are signed when a certificate is configured.** With `WINDOWS_CERTIFICATE`
@@ -402,7 +411,12 @@ rather than regressions anyone shipped.
 - IPC integration tests on Tauri's mock runtime covering the real command surface, including a full disk scan → preview → execute → operation log cycle.
 - A `prune` command line built on the same engine: `status`, `providers`, `scan`, `clean`, `disk`, `apps`, `startup` and `log`, each with `--json` for scripting and meaningful exit codes. `clean` is a dry run unless `--yes` is passed and never selects anything riskier than low on its own. The read-only example prototypes it replaces have been removed.
 
-[unreleased]: https://github.com/bonjin-app/prune/compare/v0.1.6...HEAD
+[unreleased]: https://github.com/bonjin-app/prune/compare/v0.2.4...HEAD
+[0.2.4]: https://github.com/bonjin-app/prune/compare/v0.2.3...v0.2.4
+[0.2.3]: https://github.com/bonjin-app/prune/compare/v0.2.2...v0.2.3
+[0.2.2]: https://github.com/bonjin-app/prune/compare/v0.2.1...v0.2.2
+[0.2.1]: https://github.com/bonjin-app/prune/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/bonjin-app/prune/compare/v0.1.6...v0.2.0
 [0.1.6]: https://github.com/bonjin-app/prune/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/bonjin-app/prune/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/bonjin-app/prune/compare/v0.1.3...v0.1.4
