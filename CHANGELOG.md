@@ -6,6 +6,21 @@ All notable changes to Prune are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Protect folders and files yourself.** Settings → Protected folders and files lists paths
+  Prune must never remove, by any route: cleanup, the storage explorer or the uninstaller. Nor
+  will it remove anything containing them. A protected item still appears in scans, labelled
+  "you protected this" or "contains something you protected", and is never selected. A path
+  must exist when you add it, and `~/` works. A path that later goes missing stays protected
+  and is covered again when it comes back. The command line honours the same list.
+
+### Fixed
+
+- **An unreadable settings file no longer silently drops your choices.** Prune used to fall
+  back to defaults. Now that settings hold protections, it refuses every removal instead and
+  says why, in the app and on the command line. Saving settings again keeps the unreadable
+  file beside the new one rather than overwriting it.
 ## [0.2.5] - 2026-11-15
 
 0.2.4 kept build folders that hold committed files, but decided that only while scanning. A

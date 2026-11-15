@@ -520,14 +520,16 @@ function mockDockerUsage(scale: number) {
 }
 
 let mockProjectRoots: string[] = [];
+let mockProtectedPaths: string[] = [];
 function mockSettings() {
   return {
-    settings: { projectRoots: mockProjectRoots },
+    settings: { projectRoots: mockProjectRoots, protectedPaths: mockProtectedPaths },
     effectiveProjectRoots: mockProjectRoots.length
       ? mockProjectRoots
       : [`${HOME}/Projects`, `${HOME}/Desktop`],
     projectRootsConfigured: mockProjectRoots.length > 0,
     homeDir: HOME,
+    problem: null,
   };
 }
 
@@ -1391,6 +1393,12 @@ export const mockBackend: Backend = {
     const bad = roots.find((r) => !r.startsWith(HOME));
     if (bad) throw { code: "invalid_path", message: `${bad}: must be inside your home folder` };
     mockProjectRoots = roots.filter((r) => r.trim().length > 0);
+    return mockSettings();
+  },
+  async settingsSetProtectedPaths(paths) {
+    const added = paths.find((p) => !mockProtectedPaths.includes(p) && !p.startsWith("/"));
+    if (added) throw { code: "invalid_path", message: `${added}: path must be absolute` };
+    mockProtectedPaths = [...new Set(paths.map((p) => p.trim()).filter(Boolean))];
     return mockSettings();
   },
   async startupList() {

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { CustomProviders } from "./CustomProviders";
 import { ProjectRoots } from "./ProjectRoots";
+import { ProtectedPaths } from "./ProtectedPaths";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { cn } from "@/lib/cn";
 import { formatBytes, formatCount, formatDateTime } from "@/lib/format";
@@ -51,6 +52,8 @@ export function SettingsView() {
         </Card>
 
         <ProjectRoots />
+
+        <ProtectedPaths />
 
         <CustomProviders />
 

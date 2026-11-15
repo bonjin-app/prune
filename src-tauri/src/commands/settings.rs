@@ -18,6 +18,8 @@ pub struct SettingsView {
     /// `false` when Prune is guessing because nothing has been configured.
     pub project_roots_configured: bool,
     pub home_dir: String,
+    /// Why the settings file could not be read, while nothing may be removed because of it.
+    pub problem: Option<String>,
 }
 
 fn view(state: &AppState) -> SettingsView {
@@ -32,6 +34,7 @@ fn view(state: &AppState) -> SettingsView {
             .map(|p| p.to_string_lossy().into_owned())
             .collect(),
         home_dir: engine.known_paths().home.to_string_lossy().into_owned(),
+        problem: state.settings_problem.lock_recover().clone(),
         settings,
     }
 }
@@ -67,10 +70,43 @@ pub fn settings_set_project_roots(
             }
         }
     }
-    state
-        .apply_settings(Settings {
-            project_roots: validated,
-        })
-        .map_err(CommandError::from)?;
+    // Only the project folders change; everything else, protections included, is kept.
+    let mut settings = state.settings.lock_recover().clone();
+    settings.project_roots = validated;
+    state.apply_settings(settings).map_err(CommandError::from)?;
+    Ok(view(&state))
+}
+
+/// Replaces the list of paths Prune must never remove, nor remove anything containing.
+///
+/// A path new to the list must exist, so a typo cannot pass for a protection. One already on it
+/// is kept as it is even if it has gone missing, so it can still be removed from the list — and
+/// stays protected until it is.
+#[tauri::command]
+pub fn settings_set_protected_paths(
+    state: State<'_, AppState>,
+    paths: Vec<String>,
+) -> CommandResult<SettingsView> {
+    let mut settings = state.settings.lock_recover().clone();
+    let mut validated: Vec<PathBuf> = Vec::new();
+    for raw in &paths {
+        let trimmed = raw.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let path = PathBuf::from(trimmed);
+        let path = if settings.protected_paths.contains(&path) {
+            path
+        } else {
+            settings::validate_protected(&path).map_err(|reason| {
+                CommandError::new("invalid_path", format!("{trimmed}: {}", reason.message()))
+            })?
+        };
+        if !validated.contains(&path) {
+            validated.push(path);
+        }
+    }
+    settings.protected_paths = validated;
+    state.apply_settings(settings).map_err(CommandError::from)?;
     Ok(view(&state))
 }

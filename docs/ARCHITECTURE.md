@@ -86,6 +86,19 @@ shows it.
 
 The lists live in `platform/{macos,windows}` and are canonicalized at policy creation.
 
+Two more checks come from the user, not the platform:
+
+- **Nothing passes while their protections are unknown.** If `settings.json` exists but cannot be
+  read, `PruneEngine::refuse_all_removal` makes every `validate` fail with the reason, before
+  any other rule. Assuming "nothing is protected" could remove exactly what they meant to keep.
+- **Paths the user protected** (`settings.protectedPaths`) are checked right after rule 2, and
+  before the `.app` exception, so protecting an application keeps it from the uninstaller too.
+  A target is refused if it is, is inside, or *contains* one of them, because removing a folder
+  removes everything in it. A protected path that does not exist yet is canonicalized through
+  its nearest existing ancestor, so it still matches once it appears even where an ancestor is
+  a link (`/var` → `/private/var` on macOS). The scan labels such targets "you protected this"
+  or "contains something you protected" instead of only greying them out.
+
 Validation resolves the directories above the target, so a symlinked ancestor is followed once
 and judged on where it actually points. That answer is recorded in the `ValidatedPath`, and
 `fs::remove` checks it again immediately before removing: `still_resolves_where_it_did`
@@ -322,7 +335,15 @@ others and scanning again offers the data normally, so nothing is permanently un
 
 `settings.json` in the application data directory holds only what the engine needs; the theme
 stays in the frontend because the engine has no use for it. Today that is the list of folders
-searched for project artifacts.
+searched for project artifacts and the list of paths the user protected.
+
+Protections change how a broken file is treated. Project folders can safely fall back to the
+guesses, but a protection list cannot fall back to empty: `Settings::load_checked` reports an
+unreadable file, and the app and the command line then refuse every removal and say why. Saving
+settings from the app moves the unreadable file aside (`settings.unreadable-<time>.json`) instead
+of overwriting it. Each command that changes one list keeps the other as it was. A protected path
+must exist when it is added, so a typo cannot pass for a protection, but one already in the list
+is kept even if it has gone missing.
 
 The delete mode is deliberately in neither place. It is not remembered at all: Prune starts every
 run recoverable, and "delete permanently" lasts only until the app is quit. It used to be kept

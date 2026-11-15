@@ -87,6 +87,7 @@ export interface Backend {
   appsRunUninstaller(appId: string): Promise<void>;
   settingsGet(): Promise<SettingsView>;
   settingsSetProjectRoots(roots: string[]): Promise<SettingsView>;
+  settingsSetProtectedPaths(paths: string[]): Promise<SettingsView>;
   startupList(): Promise<StartupItem[]>;
   startupSetEnabled(itemId: string, enabled: boolean): Promise<StartupItem>;
   opsList(limit?: number): Promise<OperationRecord[]>;
@@ -124,6 +125,8 @@ const tauriBackend: Backend = {
   appsRunUninstaller: (appId) => invoke<void>("apps_run_uninstaller", { appId }),
   settingsGet: () => invoke<SettingsView>("settings_get"),
   settingsSetProjectRoots: (roots) => invoke<SettingsView>("settings_set_project_roots", { roots }),
+  settingsSetProtectedPaths: (paths) =>
+    invoke<SettingsView>("settings_set_protected_paths", { paths }),
   startupList: () => invoke<StartupItem[]>("startup_list"),
   startupSetEnabled: (itemId, enabled) =>
     invoke<StartupItem>("startup_set_enabled", { itemId, enabled }),

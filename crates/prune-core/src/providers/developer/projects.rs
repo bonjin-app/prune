@@ -325,7 +325,10 @@ impl CleanupProvider for ProjectArtifacts {
                 let mut evidence = GitEvidence::NotInRepository;
                 if let Some(target) = measured.target.as_mut() {
                     target.group = c.group.clone();
-                    evidence = git_tracked::inspect(git.as_deref(), &c.path, ctx.cancel);
+                    // Already kept, by the user or the safety policy: Git would add nothing.
+                    if target.risk != RiskLevel::Protected {
+                        evidence = git_tracked::inspect(git.as_deref(), &c.path, ctx.cancel);
+                    }
                     if let Some(reason) = kept_because(&evidence) {
                         target.risk = RiskLevel::Protected;
                         // In parentheses, because the kinds of a project are listed with commas.

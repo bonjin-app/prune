@@ -53,7 +53,18 @@ pub struct SafetyPolicy {
     exact: Vec<PathBuf>,
     trees: Vec<PathBuf>,
     app_bundle_roots: Vec<PathBuf>,
+    /// Paths the user protected: never removed, and nothing containing one is removed either.
+    user: Vec<PathBuf>,
+    /// When set, every removal is refused with this reason: what is protected is not known.
+    refusal: Option<String>,
 }
+
+/// Shown on a target the user protected.
+pub const USER_PROTECTED: &str = "you protected this";
+/// Shown on every target while the user's protections cannot be read.
+pub const SETTINGS_UNREADABLE: &str = "settings could not be read";
+/// Shown on a target that holds something the user protected.
+pub const CONTAINS_USER_PROTECTED: &str = "contains something you protected";
 
 impl SafetyPolicy {
     /// Policy for the running OS.
@@ -69,7 +80,50 @@ impl SafetyPolicy {
             exact: norm(protected.exact),
             trees: norm(protected.trees),
             app_bundle_roots: norm(protected.app_bundle_roots),
+            user: Vec::new(),
+            refusal: None,
         }
+    }
+
+    /// Adds the paths the user protected. They are compared the way targets are, canonically,
+    /// and a path that does not exist right now is kept as written so it is protected again
+    /// when it comes back.
+    pub fn with_user_protected(mut self, paths: &[PathBuf]) -> Self {
+        self.user = paths
+            .iter()
+            .filter(|p| p.is_absolute())
+            .map(|p| canonical_through_nearest_existing(p))
+            .collect();
+        self
+    }
+
+    /// Refuses every removal, with `reason`. For when the user's protections cannot be read.
+    pub fn refusing_all(mut self, reason: impl Into<String>) -> Self {
+        self.refusal = Some(reason.into());
+        self
+    }
+
+    /// Why the user's own protections keep `path`, if they do. Cheap enough to ask while
+    /// scanning, so a protected item is labelled as such rather than merely greyed out.
+    pub fn user_protection(&self, path: &Path) -> Option<&'static str> {
+        if self.refusal.is_some() {
+            return Some(SETTINGS_UNREADABLE);
+        }
+        if self.user.is_empty() {
+            return None;
+        }
+        let normalized = normalize_existing(path).unwrap_or_else(|_| path.to_path_buf());
+        self.user_reason(&normalized)
+    }
+
+    fn user_reason(&self, normalized: &Path) -> Option<&'static str> {
+        if self.user.iter().any(|kept| normalized.starts_with(kept)) {
+            return Some(USER_PROTECTED);
+        }
+        if self.user.iter().any(|kept| kept.starts_with(normalized)) {
+            return Some(CONTAINS_USER_PROTECTED);
+        }
+        None
     }
 
     /// Validate `path` for removal.
@@ -81,9 +135,15 @@ impl SafetyPolicy {
     /// 4. must not be an exact-protected path or an ancestor of one
     /// 5. must not be inside a protected tree
     ///
+    /// Before all of them: nothing passes while the user's protections are unknown, and after
+    /// rule 2 nothing passes that is, is inside or contains a path the user protected.
+    ///
     /// Exception: a `.app` bundle directly inside one of the `app_bundle_roots` passes after
     /// rule 2, so user-installed applications can be uninstalled.
     pub fn validate(&self, path: &Path) -> Result<ValidatedPath> {
+        if let Some(reason) = &self.refusal {
+            return Err(PruneError::safety(path, reason.clone()));
+        }
         if !path.is_absolute() {
             return Err(PruneError::safety(path, "path must be absolute"));
         }
@@ -108,6 +168,12 @@ impl SafetyPolicy {
         let _ = meta;
 
         let normalized = normalize_existing(path)?;
+
+        // Before the application exception below: protecting an app must protect it from the
+        // uninstaller too.
+        if let Some(reason) = self.user_reason(&normalized) {
+            return Err(PruneError::safety(path, reason));
+        }
 
         // Application bundles directly inside an app root (e.g. `/Applications/Foo.app`) are
         // removable even though `/Applications` itself is a protected tree.
@@ -190,6 +256,30 @@ fn normalize_existing(path: &Path) -> Result<PathBuf> {
         .ok_or_else(|| PruneError::safety(path, "no file name"))?;
     let parent = std::fs::canonicalize(parent).map_err(|e| PruneError::io(parent, e))?;
     Ok(strip_verbatim(parent.join(name)))
+}
+
+/// The canonical form of the nearest existing ancestor, with the rest of `path` appended.
+///
+/// A protected path that does not exist yet must still match once it does. Written as-is it
+/// would not wherever an ancestor is a link: on macOS the temporary folder lives under `/var`,
+/// which is `/private/var`, and every target is compared in its canonical form.
+fn canonical_through_nearest_existing(path: &Path) -> PathBuf {
+    let mut missing = Vec::new();
+    let mut current = path;
+    loop {
+        if let Ok(found) = std::fs::canonicalize(current) {
+            let mut resolved = strip_verbatim(found);
+            resolved.extend(missing.iter().rev());
+            return resolved;
+        }
+        match (current.parent(), current.file_name()) {
+            (Some(parent), Some(name)) => {
+                missing.push(name.to_os_string());
+                current = parent;
+            }
+            _ => return path.to_path_buf(),
+        }
+    }
 }
 
 fn canonical_or_lexical(path: &Path) -> PathBuf {

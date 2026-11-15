@@ -27,10 +27,11 @@ beforeEach(() => {
   useUi.setState({ view: "disk", projectRootDraft: null });
   useSettings.setState({
     view: {
-      settings: { projectRoots: [] },
+      settings: { projectRoots: [], protectedPaths: [] },
       effectiveProjectRoots: ["/home/u/code"],
       projectRootsConfigured: false,
       homeDir: "/home/u",
+      problem: null,
     },
     loading: false,
     saving: false,

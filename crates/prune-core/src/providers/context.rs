@@ -85,6 +85,11 @@ pub fn measure(
     } else {
         risk
     };
+    // The user's own protection is the reason that matters to them; say so on the item.
+    let description = match ctx.policy.user_protection(path) {
+        Some(reason) => Some(reason.to_string()),
+        None => description,
+    };
     Measured {
         target: Some(CleanupTarget {
             id: CleanupTarget::make_id(provider_id, path),

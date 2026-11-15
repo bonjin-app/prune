@@ -21,6 +21,20 @@ pub struct Settings {
     /// Setting this is how a user points Prune at where their code actually lives, and how they
     /// keep it away from a huge tree they never want walked.
     pub project_roots: Vec<PathBuf>,
+    /// Paths Prune must never remove, nor remove anything that contains them.
+    ///
+    /// Kept exactly as chosen even when one stops existing (an unplugged drive, a renamed
+    /// folder), so that it is protected again the moment it is back.
+    pub protected_paths: Vec<PathBuf>,
+}
+
+/// Settings as read from disk, and what went wrong reading them.
+#[derive(Debug, Clone, Default)]
+pub struct LoadedSettings {
+    pub settings: Settings,
+    /// Set when a settings file exists but could not be read. The protected paths in it are
+    /// then unknown, so nothing may be removed until the file is fixed or replaced.
+    pub problem: Option<String>,
 }
 
 /// Why a directory cannot be used as a project root.
@@ -64,21 +78,51 @@ pub fn validate_root(path: &Path, home: &Path) -> std::result::Result<PathBuf, R
     Ok(canonical)
 }
 
+/// Checks a path the user wants protected, returning it in canonical form. It must exist when
+/// it is added, so a typo cannot pass for a protection.
+pub fn validate_protected(path: &Path) -> std::result::Result<PathBuf, RootRejection> {
+    if !path.is_absolute() {
+        return Err(RootRejection::NotAbsolute);
+    }
+    std::fs::canonicalize(path).map_err(|_| RootRejection::Missing)
+}
+
 impl Settings {
-    /// Reads the settings file. A missing or unreadable file yields the defaults rather than an
-    /// error: settings are a convenience, and the app must still start without them.
-    pub fn load(dir: &Path) -> Self {
+    /// Reads the settings file. The app must start without one, so problems never fail this:
+    /// a missing file yields the defaults, and an unreadable one yields the defaults with the
+    /// problem described, for the caller to act on.
+    pub fn load_checked(dir: &Path) -> LoadedSettings {
         let path = dir.join(FILE_NAME);
-        let Ok(text) = std::fs::read_to_string(&path) else {
-            return Self::default();
+        let text = match std::fs::read_to_string(&path) {
+            Ok(text) => text,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return LoadedSettings::default(),
+            Err(e) => return LoadedSettings::unreadable(&path, e.to_string()),
         };
         match serde_json::from_str(&text) {
-            Ok(settings) => settings,
-            Err(e) => {
-                tracing::warn!(path = %path.display(), error = %e, "ignoring unreadable settings");
-                Self::default()
-            }
+            Ok(settings) => LoadedSettings {
+                settings,
+                problem: None,
+            },
+            Err(e) => LoadedSettings::unreadable(&path, e.to_string()),
         }
+    }
+
+    /// [`load_checked`](Self::load_checked) without the problem.
+    pub fn load(dir: &Path) -> Self {
+        Self::load_checked(dir).settings
+    }
+
+    /// Moves an unreadable settings file aside, so that saving new settings does not destroy
+    /// what the user had. Returns where it went.
+    pub fn set_aside_unreadable(dir: &Path) -> Result<Option<PathBuf>> {
+        let path = dir.join(FILE_NAME);
+        if !path.exists() {
+            return Ok(None);
+        }
+        let stamp = chrono::Utc::now().format("%Y%m%d-%H%M%S");
+        let aside = dir.join(format!("settings.unreadable-{stamp}.json"));
+        std::fs::rename(&path, &aside).map_err(|e| PruneError::io(&path, e))?;
+        Ok(Some(aside))
     }
 
     /// Writes the settings, replacing the file in one step.
@@ -119,6 +163,21 @@ impl Settings {
     }
 }
 
+impl LoadedSettings {
+    fn unreadable(path: &Path, error: String) -> Self {
+        tracing::warn!(path = %path.display(), %error, "settings could not be read");
+        Self {
+            settings: Settings::default(),
+            problem: Some(format!(
+                "The settings file {} could not be read ({error}), so the folders you protected \
+                 are unknown. Nothing will be removed until it is fixed, or until settings are \
+                 saved again, which keeps the unreadable file beside the new one.",
+                path.display()
+            )),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -137,10 +196,67 @@ mod tests {
     }
 
     #[test]
+    fn a_corrupt_file_is_reported_not_silently_replaced() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join(FILE_NAME), b"{ not json").unwrap();
+        let loaded = Settings::load_checked(dir.path());
+        let problem = loaded.problem.expect("an unreadable file is a problem");
+        assert!(problem.contains("could not be read"), "{problem}");
+        // A missing file is not one: that is a fresh install.
+        let fresh = tempfile::tempdir().unwrap();
+        assert!(Settings::load_checked(fresh.path()).problem.is_none());
+    }
+
+    #[test]
+    fn settings_from_before_protected_paths_still_load() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join(FILE_NAME),
+            br#"{ "projectRoots": ["/home/u/code"] }"#,
+        )
+        .unwrap();
+        let loaded = Settings::load_checked(dir.path());
+        assert!(loaded.problem.is_none());
+        assert_eq!(
+            loaded.settings.project_roots,
+            vec![PathBuf::from("/home/u/code")]
+        );
+        assert!(loaded.settings.protected_paths.is_empty());
+    }
+
+    #[test]
+    fn an_unreadable_file_is_set_aside_not_overwritten() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join(FILE_NAME), b"{ broken").unwrap();
+        let aside = Settings::set_aside_unreadable(dir.path())
+            .unwrap()
+            .expect("there was a file to set aside");
+        assert_eq!(std::fs::read(&aside).unwrap(), b"{ broken");
+        assert!(!dir.path().join(FILE_NAME).exists());
+    }
+
+    #[test]
+    fn protected_paths_must_exist_when_added() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("keep")).unwrap();
+        let canonical = std::fs::canonicalize(dir.path().join("keep")).unwrap();
+        assert_eq!(validate_protected(&dir.path().join("keep")), Ok(canonical));
+        assert_eq!(
+            validate_protected(&dir.path().join("typo")),
+            Err(RootRejection::Missing)
+        );
+        assert_eq!(
+            validate_protected(Path::new("relative")),
+            Err(RootRejection::NotAbsolute)
+        );
+    }
+
+    #[test]
     fn saving_replaces_the_file_in_one_step() {
         let dir = tempfile::tempdir().unwrap();
         let settings = Settings {
             project_roots: vec![PathBuf::from("/home/u/code")],
+            ..Default::default()
         };
         settings.save(dir.path()).unwrap();
 
@@ -159,11 +275,13 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let first = Settings {
             project_roots: vec![PathBuf::from("/home/u/one")],
+            ..Default::default()
         };
         first.save(dir.path()).unwrap();
 
         let second = Settings {
             project_roots: vec![PathBuf::from("/home/u/two")],
+            ..Default::default()
         };
         second.save(dir.path()).unwrap();
 
@@ -175,6 +293,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let settings = Settings {
             project_roots: vec![PathBuf::from("/home/u/code")],
+            ..Default::default()
         };
         settings.save(dir.path()).unwrap();
         assert_eq!(Settings::load(dir.path()), settings);
@@ -222,6 +341,7 @@ mod tests {
                 home.join("gone"),
                 home.join("work"),
             ],
+            ..Default::default()
         };
         let names: Vec<String> = settings
             .sanitized_roots(&home)
@@ -238,6 +358,7 @@ mod tests {
         std::fs::create_dir_all(home.join("code/app")).unwrap();
         let settings = Settings {
             project_roots: vec![home.join("code/app"), home.join("code")],
+            ..Default::default()
         };
         let roots = settings.sanitized_roots(&home);
         assert_eq!(roots.len(), 1);

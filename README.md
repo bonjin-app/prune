@@ -60,7 +60,9 @@ safety as the primary feature.
   Codex and Claude Code conversations, agent worktrees that may hold uncommitted changes — is
   shown with its size and never offered for removal.
 - **Safe by default.** A whitelist of removable roots, a list of protected paths, a mandatory
-  dry run, Trash before permanent deletion, and a local operation log. See
+  dry run, Trash before permanent deletion, and a local operation log. Folders and files you
+  protect in Settings are never removed by any route, and neither is anything containing them.
+  Build folders that hold files committed to Git are kept too. See
   [SECURITY.md](SECURITY.md) for the guarantees.
 - **Local and private.** No server, no account, no cloud, no telemetry, no network code at all.
 - **Native.** Tauri 2 + Rust. Small binary, low memory, fast parallel scans with progress and

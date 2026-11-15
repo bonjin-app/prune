@@ -30,10 +30,11 @@ beforeEach(() => {
   useUi.setState({ permissionNoticeDismissed: false });
   useSettings.setState({
     view: {
-      settings: { projectRoots: [] },
+      settings: { projectRoots: [], protectedPaths: [] },
       effectiveProjectRoots: [],
       projectRootsConfigured: true,
       homeDir: "/Users/u",
+      problem: null,
     },
   });
 });

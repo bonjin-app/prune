@@ -56,8 +56,22 @@ impl PruneEngine {
         if !configured.is_empty() {
             engine.known.project_roots = configured;
         }
+        engine.protect(&settings.protected_paths);
         engine.custom_issues = loaded.issues;
         engine
+    }
+
+    /// Never removes `paths`, anything inside them, or anything that contains one of them.
+    /// Replaces whatever was protected this way before.
+    pub fn protect(&mut self, paths: &[PathBuf]) {
+        self.policy = self.policy.clone().with_user_protected(paths);
+    }
+
+    /// Refuses every removal from now on, with `reason`. For when the settings that hold the
+    /// user's protections could not be read: what they protect is then unknown, and guessing
+    /// "nothing" could remove exactly what they meant to keep.
+    pub fn refuse_all_removal(&mut self, reason: impl Into<String>) {
+        self.policy = self.policy.clone().refusing_all(reason);
     }
 
     /// Anything wrong with the user's `providers.json`.
@@ -75,6 +89,7 @@ impl PruneEngine {
         if !configured.is_empty() {
             engine.known.project_roots = configured;
         }
+        engine.protect(&settings.protected_paths);
         engine
     }
 
@@ -440,6 +455,7 @@ mod tests {
                 PathBuf::from("/definitely/not/here"),
                 PathBuf::from("relative"),
             ],
+            ..Default::default()
         });
         assert_eq!(
             engine.known_paths().project_roots,
@@ -448,6 +464,7 @@ mod tests {
         );
         assert!(!engine.project_roots_are_configured(&Settings {
             project_roots: vec![PathBuf::from("/definitely/not/here")],
+            ..Default::default()
         }));
     }
 

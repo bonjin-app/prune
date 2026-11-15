@@ -449,6 +449,8 @@ export interface Permissions {
 
 export interface Settings {
   projectRoots: string[];
+  /** Never removed, and nothing containing one is removed either. */
+  protectedPaths: string[];
 }
 
 export interface SettingsView {
@@ -458,6 +460,8 @@ export interface SettingsView {
   /** False when Prune is guessing because nothing has been configured. */
   projectRootsConfigured: boolean;
   homeDir: string;
+  /** Why the settings file could not be read. Nothing is removed while this is set. */
+  problem: string | null;
 }
 
 // ---- Docker (crates/prune-core/src/docker) ----

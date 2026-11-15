@@ -21,11 +21,20 @@ fn main() -> ExitCode {
     let cli = Cli::parse();
 
     let dir = data_dir();
-    let settings = dir.as_deref().map(Settings::load).unwrap_or_default();
-    let engine = match dir.as_deref() {
-        Some(dir) => PruneEngine::configured(&settings, dir),
-        None => PruneEngine::with_settings(&settings),
+    let loaded = dir
+        .as_deref()
+        .map(Settings::load_checked)
+        .unwrap_or_default();
+    let mut engine = match dir.as_deref() {
+        Some(dir) => PruneEngine::configured(&loaded.settings, dir),
+        None => PruneEngine::with_settings(&loaded.settings),
     };
+    // The settings hold what the user protected. Unreadable, that is unknown, and the command
+    // line removes nothing until the app has saved them again.
+    if let Some(problem) = &loaded.problem {
+        eprintln!("warning: {problem}");
+        engine.refuse_all_removal(problem.clone());
+    }
     for issue in engine.custom_provider_issues() {
         eprintln!(
             "warning: providers.json: {}{}",

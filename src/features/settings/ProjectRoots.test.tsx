@@ -15,10 +15,11 @@ beforeEach(() => {
   vi.resetAllMocks();
   useSettings.setState({
     view: {
-      settings: { projectRoots: [] },
+      settings: { projectRoots: [], protectedPaths: [] },
       effectiveProjectRoots: ["/home/u/code"],
       projectRootsConfigured: false,
       homeDir: "/home/u",
+      problem: null,
     },
     loading: false,
     saving: false,
@@ -43,10 +44,11 @@ it("prefills and resets the draft for each new suggestion without saving", async
 
 it("adds the reviewed folder alongside guessed roots and clears the draft after saving", async () => {
   vi.mocked(backend.settingsSetProjectRoots).mockImplementation(async (roots) => ({
-    settings: { projectRoots: roots },
+    settings: { projectRoots: roots, protectedPaths: [] },
     effectiveProjectRoots: roots,
     projectRootsConfigured: true,
     homeDir: "/home/u",
+    problem: null,
   }));
   render(<ProjectRoots suggestedPath="/home/u/new" />);
   await userEvent.click(screen.getByRole("button", { name: "Add scan folder" }));

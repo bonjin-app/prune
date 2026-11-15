@@ -8,4 +8,4 @@
 pub mod git_tracked;
 mod policy;
 
-pub use policy::{SafetyPolicy, ValidatedPath};
+pub use policy::{SafetyPolicy, ValidatedPath, CONTAINS_USER_PROTECTED, USER_PROTECTED};
