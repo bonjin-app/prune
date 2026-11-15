@@ -13,13 +13,27 @@ interface SettingsState {
   setProjectRoots: (roots: string[]) => Promise<boolean>;
   addProjectRoot: (root: string) => Promise<boolean>;
   removeProjectRoot: (root: string) => Promise<boolean>;
-  /** Replaces the whole list of protected paths. Returns true when it was accepted. */
-  setProtectedPaths: (paths: string[]) => Promise<boolean>;
   addProtectedPath: (path: string) => Promise<boolean>;
   removeProtectedPath: (path: string) => Promise<boolean>;
   /** Lets the user choose a path in the system panel, then protects it. False if cancelled. */
   pickProtectedPath: (kind: "folder" | "file") => Promise<boolean>;
   clearError: () => void;
+}
+
+type Set = (partial: Partial<SettingsState>) => void;
+type Get = () => SettingsState;
+
+/** Runs one settings change. The reply is the settings as now saved, list and all. */
+async function saveWith(set: Set, get: Get, save: () => Promise<SettingsView>): Promise<boolean> {
+  if (get().saving) return false;
+  set({ saving: true, error: null });
+  try {
+    set({ view: await save(), saving: false });
+    return true;
+  } catch (e) {
+    set({ saving: false, error: errorMessage(e) });
+    return false;
+  }
 }
 
 export const useSettings = create<SettingsState>((set, get) => ({
@@ -67,18 +81,6 @@ export const useSettings = create<SettingsState>((set, get) => ({
     return get().setProjectRoots(current.filter((r) => r !== root));
   },
 
-  setProtectedPaths: async (paths) => {
-    if (get().saving) return false;
-    set({ saving: true, error: null });
-    try {
-      set({ view: await backend.settingsSetProtectedPaths(paths), saving: false });
-      return true;
-    } catch (e) {
-      set({ saving: false, error: errorMessage(e) });
-      return false;
-    }
-  },
-
   addProtectedPath: async (path) => {
     const { view, saving } = get();
     if (saving || !view) return false;
@@ -88,14 +90,12 @@ export const useSettings = create<SettingsState>((set, get) => ({
     if (trimmed === "~" || trimmed.startsWith("~/")) {
       trimmed = view.homeDir + trimmed.slice(1);
     }
-    const current = view.settings.protectedPaths;
-    if (current.includes(trimmed)) return true;
-    return get().setProtectedPaths([...current, trimmed]);
+    return saveWith(set, get, () => backend.settingsAddProtectedPath(trimmed));
   },
 
   removeProtectedPath: async (path) => {
-    const current = get().view?.settings.protectedPaths ?? [];
-    return get().setProtectedPaths(current.filter((p) => p !== path));
+    if (get().saving || !get().view) return false;
+    return saveWith(set, get, () => backend.settingsRemoveProtectedPath(path));
   },
 
   pickProtectedPath: async (kind) => {

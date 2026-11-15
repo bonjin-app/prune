@@ -67,6 +67,12 @@ pub fn record(dir: &Path, analysis: &DiskAnalysis) -> Result<bool> {
     let Some(saved) = summarise(analysis) else {
         return Ok(false);
     };
+    // Two analyses can finish at the same moment. Read, change and write one at a time, or
+    // the second would drop the first's record and both would use the same temporary file.
+    static RECORDING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _one_at_a_time = RECORDING
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let mut analyses = list(dir);
     analyses.retain(|a| a.root != saved.root);
     analyses.insert(0, saved);
@@ -178,6 +184,26 @@ mod tests {
         let roots: Vec<String> = list(data.path()).into_iter().map(|s| s.root).collect();
         assert_eq!(roots.len(), 2);
         assert!(Path::new(&roots[0]).ends_with(a.path().file_name().unwrap()));
+    }
+
+    #[test]
+    fn analyses_finishing_together_are_all_kept() {
+        let data = tempfile::tempdir().unwrap();
+        let roots: Vec<tempfile::TempDir> = (0..6).map(|_| tempfile::tempdir().unwrap()).collect();
+        let analyses: Vec<DiskAnalysis> = roots
+            .iter()
+            .map(|r| {
+                tree(r.path());
+                run(r.path(), false)
+            })
+            .collect();
+        std::thread::scope(|scope| {
+            for analysis in &analyses {
+                let dir = data.path();
+                scope.spawn(move || record(dir, analysis).unwrap());
+            }
+        });
+        assert_eq!(list(data.path()).len(), 6);
     }
 
     #[test]

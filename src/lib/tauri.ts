@@ -89,7 +89,9 @@ export interface Backend {
   appsRunUninstaller(appId: string): Promise<void>;
   settingsGet(): Promise<SettingsView>;
   settingsSetProjectRoots(roots: string[]): Promise<SettingsView>;
-  settingsSetProtectedPaths(paths: string[]): Promise<SettingsView>;
+  /** One path at a time, so a stale list on the page can never overwrite a newer file. */
+  settingsAddProtectedPath(path: string): Promise<SettingsView>;
+  settingsRemoveProtectedPath(path: string): Promise<SettingsView>;
   /** Opens the system's own panel. The chosen path, or null when cancelled. Saves nothing. */
   settingsPickProtectedPath(kind: "folder" | "file"): Promise<string | null>;
   startupList(): Promise<StartupItem[]>;
@@ -130,8 +132,10 @@ const tauriBackend: Backend = {
   appsRunUninstaller: (appId) => invoke<void>("apps_run_uninstaller", { appId }),
   settingsGet: () => invoke<SettingsView>("settings_get"),
   settingsSetProjectRoots: (roots) => invoke<SettingsView>("settings_set_project_roots", { roots }),
-  settingsSetProtectedPaths: (paths) =>
-    invoke<SettingsView>("settings_set_protected_paths", { paths }),
+  settingsAddProtectedPath: (path) =>
+    invoke<SettingsView>("settings_add_protected_path", { path }),
+  settingsRemoveProtectedPath: (path) =>
+    invoke<SettingsView>("settings_remove_protected_path", { path }),
   settingsPickProtectedPath: (kind) =>
     invoke<string | null>("settings_pick_protected_path", { kind }),
   startupList: () => invoke<StartupItem[]>("startup_list"),

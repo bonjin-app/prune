@@ -1506,12 +1506,20 @@ export const mockBackend: Backend = {
     mockProjectRoots = roots.filter((r) => r.trim().length > 0);
     return mockSettings();
   },
-  async settingsSetProtectedPaths(paths) {
-    const added = paths.find((p) => !mockProtectedPaths.includes(p) && !p.startsWith("/"));
-    if (added) throw { code: "invalid_path", message: `${added}: path must be absolute` };
-    mockProtectedPaths = [...new Set(paths.map((p) => p.trim()).filter(Boolean))];
+  async settingsAddProtectedPath(path) {
+    const trimmed = path.trim();
+    if (!trimmed.startsWith("/")) {
+      throw { code: "invalid_path", message: `${trimmed}: path must be absolute` };
+    }
+    if (!mockProtectedPaths.includes(trimmed))
+      mockProtectedPaths = [...mockProtectedPaths, trimmed];
     return mockSettings();
   },
+  async settingsRemoveProtectedPath(path) {
+    mockProtectedPaths = mockProtectedPaths.filter((p) => p !== path);
+    return mockSettings();
+  },
+
   async settingsPickProtectedPath(kind) {
     // The browser has no native panel; pretend the user picked something plausible.
     return kind === "folder" ? `${HOME}/Projects/site/public` : `${HOME}/.config/app/keys.json`;

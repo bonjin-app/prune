@@ -344,6 +344,18 @@ pub(crate) fn find_on_path(name: &str) -> Option<PathBuf> {
         .find(|path| path.is_file())
 }
 
+/// Folders another program keeps an index of, the same on every platform. Removing a file in
+/// one behind its back leaves the index pointing at data that is gone, so nothing inside may be
+/// removed by Prune; the program's own command removes things properly. Removing the whole
+/// folder (uninstalling the program) is still possible.
+///
+/// - `~/.ollama/models`: Ollama's manifests and the content-addressed files they name. Use
+///   `ollama rm`. Without this, the Storage view offered its multi-gigabyte files as large
+///   files to remove.
+pub(crate) fn managed_stores(home: &Path) -> Vec<PathBuf> {
+    vec![home.join(".ollama").join("models")]
+}
+
 /// The platform service for the OS this binary was compiled for.
 pub fn current() -> Box<dyn PlatformService> {
     #[cfg(target_os = "macos")]

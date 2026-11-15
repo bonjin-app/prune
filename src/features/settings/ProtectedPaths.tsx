@@ -24,9 +24,10 @@ export function ProtectedPaths() {
   const error = useSettings((s) => s.error);
   const [draft, setDraft] = useState("");
 
+  // Read again each time the card is shown: `prune protect` may have changed the list since.
   useEffect(() => {
-    if (!view) void load();
-  }, [view, load]);
+    void load();
+  }, [load]);
 
   const home = view?.homeDir;
   const paths = view?.settings.protectedPaths ?? [];

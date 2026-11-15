@@ -107,9 +107,13 @@ impl AppState {
     }
 
     /// Reloads settings and rebuilds the engine if the file changed since it was last read.
-    /// One `stat` when it has not.
+    /// One small read when it has not.
     fn sync_settings(&self) {
         let mut loaded_from = self.loaded_from.lock_recover();
+        self.reload_if_changed(&mut loaded_from);
+    }
+
+    fn reload_if_changed(&self, loaded_from: &mut Option<Fingerprint>) {
         let now = Settings::fingerprint(&self.data_dir);
         if *loaded_from == now {
             return;
@@ -125,14 +129,22 @@ impl AppState {
         *loaded_from = now;
     }
 
-    /// Persists new settings and rebuilds the engine around them.
+    /// Changes the settings: reads what is on disk now, applies `change`, saves, and rebuilds the
+    /// engine, all under one lock. A change is always made to the latest settings, so it cannot
+    /// undo one the command line saved before it, and two changes from the app cannot interleave.
     ///
     /// If the file on disk could not be read, a copy of it is kept aside first: the user may
     /// still want what was in it, and the settings they save now become the ones that count.
     /// The original stays until the save replaces it, so a failed save cannot leave no file.
-    pub fn apply_settings(&self, settings: Settings) -> prune_core::Result<()> {
-        // Held throughout, so a reload cannot slip in between saving and recording what was saved.
+    pub fn update_settings<E: From<prune_core::PruneError>>(
+        &self,
+        change: impl FnOnce(&mut Settings) -> Result<(), E>,
+    ) -> Result<(), E> {
         let mut loaded_from = self.loaded_from.lock_recover();
+        self.reload_if_changed(&mut loaded_from);
+        let mut settings = self.settings.lock_recover().clone();
+        change(&mut settings)?;
+
         let mut problem = self.settings_problem.lock_recover();
         if problem.is_some() {
             if let Some(aside) = Settings::set_aside_unreadable(&self.data_dir)? {
@@ -142,8 +154,7 @@ impl AppState {
         settings.save(&self.data_dir)?;
         *problem = None;
         *loaded_from = Settings::fingerprint(&self.data_dir);
-        let engine = Arc::new(build_engine(&settings, None, &self.data_dir));
-        *self.engine.write_recover() = engine;
+        *self.engine.write_recover() = Arc::new(build_engine(&settings, None, &self.data_dir));
         *self.settings.lock_recover() = settings;
         Ok(())
     }
@@ -199,10 +210,13 @@ mod tests {
         let victim = removable_folder();
         protect_from_elsewhere(dir.path(), victim.path());
 
-        // The app changes something else, starting from what is on disk now.
-        let mut settings = state.current_settings();
-        settings.project_roots = vec![std::env::temp_dir()];
-        state.apply_settings(settings).unwrap();
+        // The app changes something else; the change is made to what is on disk now.
+        state
+            .update_settings(|s| -> prune_core::Result<()> {
+                s.project_roots = vec![std::env::temp_dir()];
+                Ok(())
+            })
+            .unwrap();
 
         let saved = Settings::load(dir.path());
         assert_eq!(saved.protected_paths.len(), 1);
@@ -242,7 +256,12 @@ mod tests {
             "{refused:?}"
         );
 
-        state.apply_settings(Settings::default()).unwrap();
+        state
+            .update_settings(|s| -> prune_core::Result<()> {
+                *s = Settings::default();
+                Ok(())
+            })
+            .unwrap();
         assert!(state.settings_problem.lock_recover().is_none());
         assert!(state.engine().policy().validate(victim.path()).is_ok());
         let kept: Vec<String> = std::fs::read_dir(dir.path())

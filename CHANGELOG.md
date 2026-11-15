@@ -44,8 +44,10 @@ All notable changes to Prune are documented here. The format follows
   - **Files no model uses.** Files no model names get one row of their own. On the machine this
     was checked on, that was 442 files and 2.4 GB.
   - **No double counting.** The rows add up to the folder, so nothing is counted twice.
-  - **Still read-only.** Nothing changes about removal: all of it remains protected and is shown
-    only.
+  - **Still read-only.** All of it remains protected and is shown only.
+  - **Protected in Storage too.** Ollama's model files can no longer be removed from the Storage
+    view either. Its large-files list used to offer them, and removing one there left Ollama
+    pointing at data that was gone. Removing the whole `~/.ollama` folder is still possible.
 
 ## [0.2.6] - 2026-11-15
 

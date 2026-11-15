@@ -69,7 +69,11 @@ pub const CONTAINS_USER_PROTECTED: &str = "contains something you protected";
 impl SafetyPolicy {
     /// Policy for the running OS.
     pub fn for_platform(platform: &dyn PlatformService, known: &KnownPaths) -> Self {
-        Self::from_protected(platform.protected_paths(known))
+        let mut protected = platform.protected_paths(known);
+        protected
+            .trees
+            .extend(crate::platform::managed_stores(&known.home));
+        Self::from_protected(protected)
     }
 
     /// Build a policy from explicit lists (used by tests and by the sandbox).

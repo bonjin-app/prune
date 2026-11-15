@@ -96,23 +96,29 @@ pub fn validate_protected(path: &Path) -> std::result::Result<PathBuf, RootRejec
     Ok(parent.join(name))
 }
 
-/// What identifies one version of the settings file: when it was written and how long it is.
-/// `None` when there is no file. The file is always replaced whole (written aside, then
-/// renamed), so a change of either means another program saved it.
+/// What identifies one version of the settings file: its length and a hash of its content.
+/// `None` when there is no file.
+///
+/// Content rather than modification time: on volumes that keep times to the second or two
+/// (HFS+, FAT, exFAT), removing one path and adding another of the same length within that
+/// second would look like no change. The file is a few hundred bytes, so reading it is cheap.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Fingerprint {
-    modified: Option<std::time::SystemTime>,
     len: u64,
+    hash: u64,
 }
 
 impl Settings {
     /// The settings file's current [`Fingerprint`], for noticing that the command line, or a
     /// second copy of the app, saved it.
     pub fn fingerprint(dir: &Path) -> Option<Fingerprint> {
-        let meta = std::fs::metadata(dir.join(FILE_NAME)).ok()?;
+        use std::hash::{Hash, Hasher};
+        let bytes = std::fs::read(dir.join(FILE_NAME)).ok()?;
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        bytes.hash(&mut hasher);
         Some(Fingerprint {
-            modified: meta.modified().ok(),
-            len: meta.len(),
+            len: bytes.len() as u64,
+            hash: hasher.finish(),
         })
     }
 

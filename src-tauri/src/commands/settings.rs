@@ -70,44 +70,50 @@ pub fn settings_set_project_roots(
             }
         }
     }
-    // Only the project folders change; everything else, protections included, is kept.
-    let mut settings = state.current_settings();
-    settings.project_roots = validated;
-    state.apply_settings(settings).map_err(CommandError::from)?;
+    // Only the project folders change; everything else, protections included, is kept as it
+    // is on disk now.
+    state.update_settings(|settings| -> CommandResult<()> {
+        settings.project_roots = validated;
+        Ok(())
+    })?;
     Ok(view(&state))
 }
 
-/// Replaces the list of paths Prune must never remove, nor remove anything containing.
+/// Adds one path Prune must never remove, nor remove anything containing.
 ///
-/// A path new to the list must exist, so a typo cannot pass for a protection. One already on it
-/// is kept as it is even if it has gone missing, so it can still be removed from the list — and
-/// stays protected until it is.
+/// One path, not the whole list: the list the page shows can be older than the file, which the
+/// command line may have changed meanwhile, and writing that list back would drop what it
+/// added. The path must exist, so a typo cannot pass for a protection.
 #[tauri::command]
-pub fn settings_set_protected_paths(
+pub fn settings_add_protected_path(
     state: State<'_, AppState>,
-    paths: Vec<String>,
+    path: String,
 ) -> CommandResult<SettingsView> {
-    let mut settings = state.current_settings();
-    let mut validated: Vec<PathBuf> = Vec::new();
-    for raw in &paths {
-        let trimmed = raw.trim();
-        if trimmed.is_empty() {
-            continue;
+    let trimmed = path.trim();
+    let path = settings::validate_protected(&PathBuf::from(trimmed)).map_err(|reason| {
+        CommandError::new("invalid_path", format!("{trimmed}: {}", reason.message()))
+    })?;
+    state.update_settings(|settings| -> CommandResult<()> {
+        if !settings.protected_paths.contains(&path) {
+            settings.protected_paths.push(path);
         }
-        let path = PathBuf::from(trimmed);
-        let path = if settings.protected_paths.contains(&path) {
-            path
-        } else {
-            settings::validate_protected(&path).map_err(|reason| {
-                CommandError::new("invalid_path", format!("{trimmed}: {}", reason.message()))
-            })?
-        };
-        if !validated.contains(&path) {
-            validated.push(path);
-        }
-    }
-    settings.protected_paths = validated;
-    state.apply_settings(settings).map_err(CommandError::from)?;
+        Ok(())
+    })?;
+    Ok(view(&state))
+}
+
+/// Stops protecting one path, exactly as it is listed. It need not exist any more. Removing one
+/// that is no longer on the list (the command line removed it first) is not an error.
+#[tauri::command]
+pub fn settings_remove_protected_path(
+    state: State<'_, AppState>,
+    path: String,
+) -> CommandResult<SettingsView> {
+    let path = PathBuf::from(path);
+    state.update_settings(|settings| -> CommandResult<()> {
+        settings.protected_paths.retain(|p| *p != path);
+        Ok(())
+    })?;
     Ok(view(&state))
 }
 

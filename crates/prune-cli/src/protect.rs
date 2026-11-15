@@ -183,11 +183,27 @@ fn resolve(raw: &str, home: Option<&Path>, cwd: &Path) -> PathBuf {
 /// stores it, which only works while it exists.
 fn stored_entry(stored: &[PathBuf], raw: &str, home: Option<&Path>, cwd: &Path) -> Option<PathBuf> {
     let path = resolve(raw, home, cwd);
-    if let Some(found) = stored.iter().find(|p| **p == path) {
+    if let Some(found) = stored.iter().find(|p| same_entry(p, &path)) {
         return Some(found.clone());
     }
     let canonical = settings::validate_protected(&path).ok()?;
-    stored.iter().find(|p| **p == canonical).cloned()
+    stored.iter().find(|p| same_entry(p, &canonical)).cloned()
+}
+
+/// Whether two spellings name the same list entry. On Windows the stored form is usually
+/// `\\?\C:\…` and names are not case-sensitive, so `C:\Keep` must match `\\?\c:\keep`
+/// even after the folder is gone and can no longer be resolved.
+fn same_entry(a: &Path, b: &Path) -> bool {
+    fn plain(p: &Path) -> String {
+        let s = p.to_string_lossy();
+        let s = s.strip_prefix(r"\\?\").unwrap_or(&s).to_string();
+        if cfg!(windows) {
+            s.to_lowercase()
+        } else {
+            s
+        }
+    }
+    a == b || plain(a) == plain(b)
 }
 
 /// Drops `.` components and a trailing separator, so `dist/` and `./dist` match `dist`.
@@ -201,6 +217,13 @@ fn lexically_normal(path: &Path) -> PathBuf {
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_windows_entry_matches_without_its_prefix_and_in_any_case_there() {
+        assert!(same_entry(Path::new(r"\\?\C:\Keep"), Path::new(r"C:\Keep")));
+        assert!(same_entry(Path::new("/a/b"), Path::new("/a/b")));
+        assert!(!same_entry(Path::new("/a/b"), Path::new("/a/c")));
+    }
 
     #[test]
     fn resolve_expands_home_and_relative_paths() {

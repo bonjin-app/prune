@@ -552,3 +552,60 @@ fn a_scan_can_be_started_read_back_and_cancelled() {
         assert_eq!(result["providerId"], "maven_repo");
     }
 }
+
+#[test]
+fn protecting_from_the_app_keeps_what_the_command_line_protected_meanwhile() {
+    let dir = tempfile::tempdir().unwrap();
+    let data_dir = dir.path().join("appdata");
+    let first = dir.path().join("keep-from-app");
+    let second = dir.path().join("keep-from-cli");
+    std::fs::create_dir_all(&first).unwrap();
+    std::fs::create_dir_all(&second).unwrap();
+    let (_app, webview) = build_app(&data_dir);
+
+    let view = ok(
+        &webview,
+        "settings_add_protected_path",
+        json!({ "path": first.to_string_lossy() }),
+    );
+    let from_app = view["settings"]["protectedPaths"][0]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    // `prune protect add` while the app is open: it rewrites the file the app reads.
+    let mut on_disk = prune_core::settings::Settings::load(&data_dir);
+    on_disk
+        .protected_paths
+        .push(std::fs::canonicalize(&second).unwrap());
+    on_disk.save(&data_dir).unwrap();
+
+    // The page only knows the first path. Removing it must not drop the second.
+    let view = ok(
+        &webview,
+        "settings_remove_protected_path",
+        json!({ "path": from_app }),
+    );
+    let listed: Vec<&str> = view["settings"]["protectedPaths"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|p| p.as_str().unwrap())
+        .collect();
+    assert_eq!(listed.len(), 1);
+    assert!(listed[0].ends_with("keep-from-cli"), "{listed:?}");
+
+    // Removing what is already gone is not an error; adding a typo is.
+    ok(
+        &webview,
+        "settings_remove_protected_path",
+        json!({ "path": from_app }),
+    );
+    let err = invoke(
+        &webview,
+        "settings_add_protected_path",
+        json!({ "path": dir.path().join("typo").to_string_lossy() }),
+    )
+    .unwrap_err();
+    assert_eq!(err["code"], "invalid_path");
+}

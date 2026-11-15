@@ -373,3 +373,36 @@ fn ollama_is_broken_down_by_model_without_counting_shared_files_twice() {
         files_before
     );
 }
+
+#[test]
+fn ollamas_files_cannot_be_removed_from_the_storage_view_either() {
+    let dir = tempfile::tempdir().unwrap();
+    let platform = SandboxPlatform::new(dir.path());
+    platform.prepare().unwrap();
+    let home = platform.home().to_path_buf();
+    ollama_model(&home, "library", "qwen", "7b", &[("weights", 2_000_000)]);
+    write(&home.join("Downloads-ish/big.iso"), 2_000_000);
+    let engine = engine(platform);
+
+    // The large-files list of a disk analysis goes through the same policy.
+    let analysis = prune_core::analyzer::analyze(
+        "storage",
+        &home,
+        engine.policy(),
+        &AtomicBool::new(false),
+        &|_| {},
+    );
+    let large = analysis.large_files(1_000_000, 10);
+    let risk_of = |name: &str| {
+        large
+            .iter()
+            .find(|f| f.path.ends_with(name))
+            .unwrap_or_else(|| panic!("{name} not listed: {large:?}"))
+            .risk
+    };
+    assert_eq!(risk_of("sha256-weights"), RiskLevel::Protected);
+    assert_ne!(risk_of("big.iso"), RiskLevel::Protected);
+
+    // Uninstalling Ollama, the whole folder, is still the user's call.
+    assert!(engine.policy().validate(&home.join(".ollama")).is_ok());
+}
