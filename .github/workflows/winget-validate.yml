@@ -52,6 +52,35 @@ jobs:
       - name: Allow installing from a local manifest
         run: winget settings --enable LocalManifestFiles
 
+      # DIAGNOSTIC (issue #1): run the NSIS installer through winget at user scope, and list
+      # every process that appears while it runs, so a hang shows what is still alive.
+      - name: Install the NSIS installer (user scope)
+        timeout-minutes: 6
+        shell: pwsh
+        run: |
+          $before = @{}; Get-Process | ForEach-Object { $before[$_.Id] = $true }
+          $a = 'install','--manifest','packaging/winget','--scope','user','--silent','--verbose-logs',
+               '--accept-package-agreements','--accept-source-agreements','--disable-interactivity'
+          $p = Start-Process winget -ArgumentList $a -PassThru -NoNewWindow
+          for ($i = 1; $i -le 15; $i++) {
+            if ($p.WaitForExit(10000)) { break }
+            Write-Host "--- still running after $($i * 10)s; processes started since:"
+            Get-CimInstance Win32_Process | Where-Object { -not $before[[int]$_.ProcessId] } |
+              Format-Table ProcessId, ParentProcessId, Name, CommandLine -AutoSize -Wrap |
+              Out-String -Width 400 | Write-Host
+          }
+          $installed = Test-Path "$env:LOCALAPPDATA\Prune\prune-desktop.exe"
+          Write-Host "prune-desktop.exe present: $installed"
+          if (-not $p.HasExited) {
+            Stop-Process -Id $p.Id -Force
+            throw "winget did not return within 150s (installed: $installed)"
+          }
+          Write-Host "winget exited with $($p.ExitCode)"
+          if ($p.ExitCode -ne 0) { throw "winget exited with $($p.ExitCode)" }
+
+      - name: Uninstall the NSIS install
+        run: winget uninstall --name Prune --scope user --silent --disable-interactivity
+
       # Installing proves the manifest points at something that actually installs, which is the
       # half of the pull request checklist that validation alone does not cover.
       # --silent, not the default SilentWithProgress: the runner has no interactive desktop for

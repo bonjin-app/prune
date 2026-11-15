@@ -24,5 +24,11 @@ Installers:
   InstallerUrl: https://github.com/bonjin-app/prune/releases/download/v0.2.3/Prune_0.2.3_x64_en-US.msi
   InstallerSha256: 39D2B4FE9343EBBC820C7D6F94DCB6496AA9F94E008482E6B0AA495DF64448AE
   ProductCode: '{A3912EEA-97EB-432B-BD03-14C65DA99D19}'
+- Architecture: x64
+  InstallerType: nullsoft
+  Scope: user
+  InstallerLocale: en-US
+  InstallerUrl: https://github.com/bonjin-app/prune/releases/download/v0.2.3/Prune_0.2.3_x64-setup.exe
+  InstallerSha256: A75115C8B16D81FB84D0EF86729EC2748776D989573F12A3380726831F9F0EB0
 ManifestType: installer
 ManifestVersion: 1.10.0
