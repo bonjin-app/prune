@@ -18,6 +18,7 @@ import type {
   ScanResult,
   ScanSession,
   StartupItem,
+  SavedAnalysis,
 } from "@/types/models";
 import type { Backend, EventMap } from "./tauri";
 
@@ -1391,6 +1392,27 @@ export const mockBackend: Backend = {
     const d = diskScans.get(scanId);
     if (!d) throw { code: "unknown_scan", message: scanId };
     return mockNode(d.root, path ?? d.root);
+  },
+  async diskListSaved(): Promise<SavedAnalysis[]> {
+    return [
+      {
+        root: HOME,
+        finishedAt: new Date(Date.now() - 3 * 86400e3).toISOString(),
+        totalBytes: 412_000_000_000,
+        fileCount: 1_240_000,
+        dirCount: 210_000,
+        durationMs: 142_000,
+        issueCount: 0,
+        folders: [
+          { name: "Library", sizeBytes: 168_000_000_000 },
+          { name: "Projects", sizeBytes: 96_000_000_000 },
+          { name: ".ollama", sizeBytes: 61_000_000_000 },
+          { name: "Documents", sizeBytes: 38_000_000_000 },
+          { name: "Downloads", sizeBytes: 21_000_000_000 },
+          { name: "Movies", sizeBytes: 9_000_000_000 },
+        ],
+      },
+    ];
   },
   async diskLargeFiles(scanId, minBytes, limit = 200) {
     const d = diskScans.get(scanId);

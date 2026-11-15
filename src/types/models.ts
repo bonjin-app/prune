@@ -355,6 +355,22 @@ export interface DiskProgress {
   currentPath?: string;
 }
 
+/**
+ * The last finished analysis of a folder, as remembered between runs. A record only: it has no
+ * ids, so nothing can be previewed or removed from it.
+ */
+export interface SavedAnalysis {
+  root: string;
+  finishedAt: string;
+  totalBytes: number;
+  fileCount: number;
+  dirCount: number;
+  durationMs: number;
+  issueCount: number;
+  /** The largest folders directly inside `root`, largest first. */
+  folders: { name: string; sizeBytes: number }[];
+}
+
 export interface DiskSummary {
   scanId: string;
   root: string;

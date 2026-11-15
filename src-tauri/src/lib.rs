@@ -60,6 +60,7 @@ pub fn register_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri
         commands::disk_get_summary,
         commands::disk_get_node,
         commands::disk_large_files,
+        commands::disk_list_saved,
         commands::docker_status,
         commands::docker_prune,
         commands::apps_start_scan,

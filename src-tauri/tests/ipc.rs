@@ -134,6 +134,13 @@ fn disk_scan_preview_and_execute_round_trip() {
     assert_eq!(summary["totalBytes"].as_u64().unwrap(), 52_010);
     assert_eq!(summary["fileCount"].as_u64().unwrap(), 3);
 
+    // A finished analysis is remembered, without ids: totals and the largest folders only.
+    let saved = ok(&webview, "disk_list_saved", json!({}));
+    let saved = &saved.as_array().unwrap()[0];
+    assert_eq!(saved["totalBytes"].as_u64().unwrap(), 52_010);
+    assert_eq!(saved["folders"][0]["name"], "big");
+    assert!(saved.get("scanId").is_none());
+
     let node = ok(&webview, "disk_get_node", json!({ "scanId": scan_id }));
     assert_eq!(node["issueCount"], 0);
     assert_eq!(node["issues"], json!([]));

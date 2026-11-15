@@ -23,6 +23,14 @@ All notable changes to Prune are documented here. The format follows
     saved.
   - **An unreadable settings file is left alone.** Nothing is changed until it is fixed or saved
     again from the app, which keeps a copy of it.
+- **Storage remembers its last analyses.** Until a new analysis finishes, the Storage view shows
+  what earlier ones found, so it is not blank for the minutes a home folder takes.
+  - **What is kept.** The last finished analysis of up to 8 folders: the total and the 12
+    largest folders inside, with when it ran. Kept in `disk-history.json`, a few kilobytes.
+  - **A record only.** It offers nothing but Analyze again, so a stale figure can never be the
+    reason something is removed.
+  - **Finished analyses only.** One that was stopped early is not kept, so a partial total is
+    never shown as the whole.
 
 ### Changed
 

@@ -7,6 +7,8 @@
 //! Read-only. Removal of large files goes through the normal cleanup pipeline: the analyzer
 //! exposes them as [`CleanupTarget`]s so `PruneEngine::plan` / `execute` apply unchanged.
 
+pub mod history;
+
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashMap};
 use std::ffi::OsStr;

@@ -264,9 +264,10 @@ Everything is local, in one directory:
 | macOS | `~/Library/Application Support/app.bonjin.prune/` |
 | Windows | `%APPDATA%\app.bonjin.prune\` |
 
-It holds `settings.json` (the folders searched for project artifacts), `operations.jsonl` (what
-was removed and when), `providers.json` if you added your own cache locations, and the window
-position. Removing that directory resets Prune completely; removing the application and that
+It holds `settings.json` (the folders searched for project artifacts and the paths you
+protected), `operations.jsonl` (what was removed and when), `disk-history.json` (the totals and
+largest folders of your last few storage analyses), `providers.json` if you added your own cache
+locations, and the window position. Removing that directory resets Prune completely; removing the application and that
 directory leaves nothing behind.
 
 ## Development

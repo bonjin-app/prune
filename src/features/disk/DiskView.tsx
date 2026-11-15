@@ -17,6 +17,7 @@ import { useSettings } from "@/stores/settings";
 import { DeleteModeToggle } from "../cleaner/DeleteModeToggle";
 import { StorageOverview } from "./StorageOverview";
 import { FolderExplorer } from "./FolderExplorer";
+import { SavedAnalyses } from "./SavedAnalyses";
 
 export function DiskView() {
   const scanning = useDisk((s) => s.scanning);
@@ -226,6 +227,16 @@ export function DiskView() {
           </div>
         </>
       ) : null}
+      {!summary && (
+        <SavedAnalyses
+          home={home}
+          disabled={scanning}
+          onAnalyze={(path) => {
+            setRoot(path);
+            void startScan(path);
+          }}
+        />
+      )}
     </div>
   );
 }

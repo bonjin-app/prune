@@ -76,6 +76,11 @@ pub fn disk_start_scan<R: Runtime>(
         let analysis = analyzer::analyze(&id, &root, engine.policy(), &cancel, &on_progress);
         let summary = analysis.summary();
         if let Some(state) = app.try_state::<AppState>() {
+            // Remembered before the result is published, so that anyone who sees it finished
+            // can also find it in the history. A failure costs only the convenience.
+            if let Err(e) = analyzer::history::record(&state.data_dir, &analysis) {
+                tracing::warn!(error = %e, "could not remember the disk analysis");
+            }
             // Expose the large files as a scan session so the normal preview/execute pipeline
             // (target ids → validated paths) applies to them.
             let session = large_files_session(&analysis);
@@ -194,4 +199,13 @@ mod tests {
             completed.results[0].targets[0].id
         );
     }
+}
+
+/// The last finished analysis of each recently analysed folder, newest first. Read-only: it
+/// carries no ids, so nothing can be previewed or removed from it.
+#[tauri::command]
+pub fn disk_list_saved(
+    state: State<'_, AppState>,
+) -> CommandResult<Vec<analyzer::history::SavedAnalysis>> {
+    Ok(analyzer::history::list(&state.data_dir))
 }
