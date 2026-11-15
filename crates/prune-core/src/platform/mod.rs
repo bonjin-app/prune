@@ -315,6 +315,10 @@ pub trait PlatformService: Send + Sync {
     fn git(&self) -> Option<PathBuf> {
         find_on_path("git")
     }
+    /// The battery, read-only. Default: none, which the Monitor shows as "no battery".
+    fn battery(&self) -> Option<crate::models::BatteryStatus> {
+        None
+    }
     /// Programs that start by themselves. Default: not implemented.
     fn startup_items(&self, known: &KnownPaths) -> Result<Vec<StartupItem>> {
         let _ = known;

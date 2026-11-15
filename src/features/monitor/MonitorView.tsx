@@ -6,6 +6,7 @@ import { Ban, Lock } from "lucide-react";
 import { formatBytes, formatPercent } from "@/lib/format";
 import { startPolling, startSnapshotPolling, useSystem } from "@/stores/system";
 import type { ProcessInfo } from "@/types/models";
+import { PowerCard } from "./PowerCard";
 import { StopProcessDialog } from "./StopProcessDialog";
 
 export function MonitorView() {
@@ -28,7 +29,7 @@ export function MonitorView() {
     <div className="pb-8">
       <PageHeader
         title="Monitor"
-        description="Live CPU, memory, disk and process activity. Stopping a process always asks first."
+        description="Live CPU, memory, disk, battery and process activity. Stopping a process always asks first."
       />
       <div className="grid grid-cols-2 gap-3 px-7">
         <Card>
@@ -93,38 +94,41 @@ export function MonitorView() {
         </Card>
       </div>
 
-      <div className="mt-3 grid grid-cols-[1fr_1.6fr] gap-3 px-7">
-        <Card>
-          <CardHeader title="Disks" />
-          <div className="space-y-3 px-4 pb-4">
-            {(snapshot?.disks ?? []).map((d) => {
-              const used = d.totalBytes - d.availableBytes;
-              return (
-                <Row
-                  key={d.mountPoint}
-                  label={`${d.name || d.mountPoint}${d.isRemovable ? " · removable" : ""}`}
-                  value={`${formatBytes(used)} / ${formatBytes(d.totalBytes)}`}
-                  pct={(used / d.totalBytes) * 100}
-                />
-              );
-            })}
-            {snapshot?.network && (
-              <div className="border-t border-line pt-3">
-                <div className="flex justify-between text-[12px]">
-                  <span className="text-fg-muted">Network</span>
-                  <span className="tnum">
-                    ↓ {formatBytes(snapshot.network.downBytesPerSec)}/s · ↑{" "}
-                    {formatBytes(snapshot.network.upBytesPerSec)}/s
-                  </span>
+      <div className="mt-3 grid grid-cols-[1fr_1.6fr] items-start gap-3 px-7">
+        <div className="flex min-w-0 flex-col gap-3">
+          <Card>
+            <CardHeader title="Disks" />
+            <div className="space-y-3 px-4 pb-4">
+              {(snapshot?.disks ?? []).map((d) => {
+                const used = d.totalBytes - d.availableBytes;
+                return (
+                  <Row
+                    key={d.mountPoint}
+                    label={`${d.name || d.mountPoint}${d.isRemovable ? " · removable" : ""}`}
+                    value={`${formatBytes(used)} / ${formatBytes(d.totalBytes)}`}
+                    pct={(used / d.totalBytes) * 100}
+                  />
+                );
+              })}
+              {snapshot?.network && (
+                <div className="border-t border-line pt-3">
+                  <div className="flex justify-between text-[12px]">
+                    <span className="text-fg-muted">Network</span>
+                    <span className="tnum">
+                      ↓ {formatBytes(snapshot.network.downBytesPerSec)}/s · ↑{" "}
+                      {formatBytes(snapshot.network.upBytesPerSec)}/s
+                    </span>
+                  </div>
+                  <div className="mt-0.5 text-right text-[11px] text-fg-faint tnum">
+                    {formatBytes(snapshot.network.totalReceivedBytes)} in,{" "}
+                    {formatBytes(snapshot.network.totalTransmittedBytes)} out since boot
+                  </div>
                 </div>
-                <div className="mt-0.5 text-right text-[11px] text-fg-faint tnum">
-                  {formatBytes(snapshot.network.totalReceivedBytes)} in,{" "}
-                  {formatBytes(snapshot.network.totalTransmittedBytes)} out since boot
-                </div>
-              </div>
-            )}
-          </div>
-        </Card>
+              )}
+            </div>
+          </Card>
+          <PowerCard battery={snapshot?.battery} temperatures={snapshot?.temperatures} />
+        </div>
 
         <Card>
           <CardHeader title="Top Processes" subtitle={`${snapshot?.processCount ?? 0} running`} />
@@ -144,7 +148,9 @@ export function MonitorView() {
                 {processes.map((p) => (
                   <tr key={p.pid} className="border-t border-line/50 hover:bg-surface-2/60">
                     <td className="max-w-[220px] truncate px-2.5 py-1.5">{p.name}</td>
-                    <td className="px-2.5 py-1.5 text-right tnum">{formatPercent(p.cpuPercent, 1)}</td>
+                    <td className="px-2.5 py-1.5 text-right tnum">
+                      {formatPercent(p.cpuPercent, 1)}
+                    </td>
                     <td className="px-2.5 py-1.5 text-right tnum">{formatBytes(p.memoryBytes)}</td>
                     <td className="px-2.5 py-1.5 text-right text-fg-faint tnum">{p.pid}</td>
                     <td className="px-2.5 py-1.5 text-fg-faint">{p.user ?? ""}</td>

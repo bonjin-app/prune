@@ -8,6 +8,7 @@ use crate::models::Platform;
 use crate::Result;
 
 mod apps;
+mod battery;
 mod git;
 mod open_files;
 mod rules;
@@ -23,6 +24,10 @@ fn env_path(name: &str) -> Option<PathBuf> {
 }
 
 impl PlatformService for WindowsPlatform {
+    fn battery(&self) -> Option<crate::models::BatteryStatus> {
+        battery::read()
+    }
+
     fn platform(&self) -> Platform {
         Platform::Windows
     }

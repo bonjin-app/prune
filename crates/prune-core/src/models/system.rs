@@ -92,6 +92,41 @@ pub struct SystemSnapshot {
     pub network: NetworkStatus,
     pub uptime_seconds: u64,
     pub process_count: usize,
+    /// `None` on a machine without a battery, or where it cannot be read.
+    pub battery: Option<BatteryStatus>,
+    pub temperatures: Temperatures,
+}
+
+/// The battery as the operating system reports it. Every field the OS may withhold is optional,
+/// and shown as unknown rather than guessed.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatteryStatus {
+    /// Charge, 0–100.
+    pub percent: f32,
+    /// On mains power. Plugged in is not the same as charging: a full or held battery is not.
+    pub plugged_in: bool,
+    pub charging: bool,
+    /// Minutes until empty when discharging, until full when charging. `None` while the OS is
+    /// still estimating, or when neither applies.
+    pub minutes_remaining: Option<u32>,
+    pub cycle_count: Option<u32>,
+    /// The cycle count the battery is designed for, where the OS says.
+    pub design_cycle_count: Option<u32>,
+    /// What a full charge holds now, as a share of what it held new, 0–100.
+    pub capacity_percent: Option<f32>,
+}
+
+/// Readings from the machine's own temperature sensors, in °C. Each is `None` where there is no
+/// such sensor or it cannot be read without elevated rights (most Windows machines).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Temperatures {
+    /// The hottest processor sensor.
+    pub cpu_celsius: Option<f32>,
+    pub battery_celsius: Option<f32>,
+    /// The hottest internal storage sensor.
+    pub storage_celsius: Option<f32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

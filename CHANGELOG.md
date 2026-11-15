@@ -8,6 +8,11 @@ All notable changes to Prune are documented here. The format follows
 
 ### Added
 
+- **Battery and temperatures in the Monitor and `prune status`.**
+  - **Battery.** Charge, whether it is charging or only plugged in, and time left or time to full. Also how much a full charge holds compared with new, and charge cycles out of the design count.
+  - **Temperatures.** The hottest processor, battery and storage sensors.
+  - **Unknowns stay unknown.** Anything the system does not report is shown as unknown, never as zero. On Windows that means charge cycles, wear and, on most machines, temperatures.
+  - **How it is read.** All of it is read-only. On macOS the battery comes from `ioreg`, and on Windows from `GetSystemPowerStatus`. Readings are reused for 30 s (battery) and 10 s (sensors), so the Monitor costs no more than before.
 - **Choose a folder or file to protect in the system's own panel.** Settings → Protected folders
   and files has Choose a folder… and Choose a file…, so a path no longer has to be typed. The
   panel is opened by the app itself; the page is given no file access by it.

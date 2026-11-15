@@ -40,6 +40,7 @@ function snapshot(availableBytes = 2_000_000_000): SystemSnapshot {
     },
     uptimeSeconds: 100,
     processCount: 10,
+    temperatures: {},
   };
 }
 

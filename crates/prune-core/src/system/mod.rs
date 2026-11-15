@@ -8,16 +8,48 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use sysinfo::{
-    Disks, Networks, Pid, ProcessRefreshKind, ProcessesToUpdate, Signal, System, UpdateKind, Users,
+    Components, Disks, Networks, Pid, ProcessRefreshKind, ProcessesToUpdate, Signal, System,
+    UpdateKind, Users,
 };
 
 use crate::models::{
-    CpuStatus, DiskStatus, MemoryStatus, NetworkStatus, Platform, ProcessInfo, StopMode,
-    SystemInfo, SystemSnapshot,
+    BatteryStatus, CpuStatus, DiskStatus, MemoryStatus, NetworkStatus, Platform, ProcessInfo,
+    StopMode, SystemInfo, SystemSnapshot, Temperatures,
 };
 use crate::{PruneError, Result};
 
 pub mod protection;
+
+/// Folds raw sensor readings into the three figures the Monitor shows, taking the hottest of
+/// each kind. Labels differ by machine, so each kind is recognised by the words in its label.
+pub(crate) fn summarise_sensors<'a>(
+    readings: impl Iterator<Item = (&'a str, Option<f32>)>,
+) -> Temperatures {
+    let mut out = Temperatures::default();
+    let hottest = |slot: &mut Option<f32>, value: f32| {
+        *slot = Some(slot.map_or(value, |seen| seen.max(value)));
+    };
+    for (label, value) in readings {
+        let Some(value) = value.filter(|v| PLAUSIBLE_CELSIUS.contains(v)) else {
+            continue;
+        };
+        let label = label.to_ascii_lowercase();
+        if label.contains("battery") {
+            hottest(&mut out.battery_celsius, value);
+        } else if ["nand", "nvme", "ssd", "drive"]
+            .iter()
+            .any(|w| label.contains(w))
+        {
+            hottest(&mut out.storage_celsius, value);
+        } else if ["tdie", "cpu", "package", "core", "tctl", "soc"]
+            .iter()
+            .any(|w| label.contains(w))
+        {
+            hottest(&mut out.cpu_celsius, value);
+        }
+    }
+    out
+}
 
 use crate::sync::LockExt;
 use protection::Candidate;
@@ -50,6 +82,18 @@ const USERS_TTL: Duration = Duration::from_secs(60);
 /// which refreshes the same table, so most snapshots can simply use what that left behind.
 const PROCESS_COUNT_TTL: Duration = Duration::from_secs(4);
 
+/// How long a battery reading is reused. Reading it runs `ioreg` on macOS, and charge moves by
+/// a percent in minutes, not seconds.
+const BATTERY_TTL: Duration = Duration::from_secs(30);
+
+/// How long temperature readings are reused. Reading every sensor costs about 80 ms on an
+/// Apple silicon Mac, which every two seconds would be Prune's own largest cost.
+const SENSOR_TTL: Duration = Duration::from_secs(10);
+
+/// Readings outside this range are a sensor that is absent or not reporting (Apple silicon has
+/// several that read about -9200 °C), not a temperature.
+const PLAUSIBLE_CELSIUS: std::ops::RangeInclusive<f32> = -40.0..=150.0;
+
 /// What a process listing actually reads. Asking for everything else costs 40% more.
 fn process_fields() -> ProcessRefreshKind {
     ProcessRefreshKind::nothing()
@@ -67,6 +111,9 @@ pub struct SystemMonitor {
     users: Mutex<(Users, Instant)>,
     /// When the process table was last walked, by either entry point.
     processes_read_at: Mutex<Option<Instant>>,
+    battery: Mutex<Option<(Option<BatteryStatus>, Instant)>>,
+    /// Created on first use: listing the sensors is itself the slow part.
+    sensors: Mutex<Option<(Components, Temperatures, Instant)>>,
     home: std::path::PathBuf,
 }
 
@@ -107,6 +154,8 @@ impl SystemMonitor {
             }),
             users: Mutex::new((supported(Users::new(), "users"), Instant::now() - USERS_TTL)),
             processes_read_at: Mutex::new(None),
+            battery: Mutex::new(None),
+            sensors: Mutex::new(None),
             home: home.to_path_buf(),
         }
     }
@@ -179,6 +228,47 @@ impl SystemMonitor {
             network: self.network(),
             uptime_seconds: System::uptime().unwrap_or_default(),
             process_count: sys.processes().len(),
+            battery: self.battery(),
+            temperatures: self.temperatures(),
+        }
+    }
+
+    /// The battery, re-read at most once per [`BATTERY_TTL`].
+    fn battery(&self) -> Option<BatteryStatus> {
+        let mut cache = self.battery.lock_recover();
+        if let Some((reading, at)) = &*cache {
+            if at.elapsed() < BATTERY_TTL {
+                return reading.clone();
+            }
+        }
+        let reading = crate::platform::current().battery();
+        *cache = Some((reading.clone(), Instant::now()));
+        reading
+    }
+
+    /// The temperature sensors, re-read at most once per [`SENSOR_TTL`].
+    fn temperatures(&self) -> Temperatures {
+        let mut cache = self.sensors.lock_recover();
+        match &mut *cache {
+            Some((_, summary, at)) if at.elapsed() < SENSOR_TTL => summary.clone(),
+            Some((components, summary, at)) => {
+                components.refresh(false);
+                *summary =
+                    summarise_sensors(components.iter().map(|c| (c.label(), c.temperature())));
+                *at = Instant::now();
+                summary.clone()
+            }
+            None => {
+                // A platform sysinfo cannot read sensors on reports none, which is what an
+                // empty summary already says.
+                let Ok(components) = Components::new_with_refreshed_list() else {
+                    return Temperatures::default();
+                };
+                let summary =
+                    summarise_sensors(components.iter().map(|c| (c.label(), c.temperature())));
+                *cache = Some((components, summary.clone(), Instant::now()));
+                summary
+            }
         }
     }
 
@@ -428,6 +518,51 @@ fn current_user_name(sys: &System, users: &Users) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sensors_fold_into_the_hottest_of_each_kind_and_absent_ones_are_dropped() {
+        // Labels as an Apple silicon MacBook reports them, absent sensors included.
+        let readings = [
+            ("PMU tdie2", Some(56.8)),
+            ("PMU tdie6", Some(58.3)),
+            ("PMU tdev1", Some(-9201.1)),
+            ("gas gauge battery", Some(34.0)),
+            ("NAND CH0 temp", Some(42.0)),
+            ("als-temp", None),
+            ("PMU tcal", Some(51.8)),
+        ];
+        let t = summarise_sensors(readings.into_iter());
+        assert_eq!(t.cpu_celsius, Some(58.3));
+        assert_eq!(t.battery_celsius, Some(34.0));
+        assert_eq!(t.storage_celsius, Some(42.0));
+    }
+
+    #[test]
+    fn no_sensors_means_unknown_not_zero() {
+        assert_eq!(
+            summarise_sensors(std::iter::empty()),
+            Temperatures::default()
+        );
+    }
+
+    #[test]
+    fn a_snapshot_reads_battery_and_sensors_without_failing() {
+        let monitor = SystemMonitor::new(&std::env::temp_dir());
+        let snapshot = monitor.snapshot();
+        if let Some(b) = snapshot.battery {
+            assert!((0.0..=100.0).contains(&b.percent));
+        }
+        for t in [
+            snapshot.temperatures.cpu_celsius,
+            snapshot.temperatures.battery_celsius,
+            snapshot.temperatures.storage_celsius,
+        ]
+        .into_iter()
+        .flatten()
+        {
+            assert!(PLAUSIBLE_CELSIUS.contains(&t));
+        }
+    }
 
     /// These read the machine the tests run on, which is fine: everything here is read-only and
     /// touches no path. What they assert is the caching, not the values.

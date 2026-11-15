@@ -8,6 +8,7 @@ use crate::models::Platform;
 use crate::Result;
 
 mod apps;
+mod battery;
 mod git;
 mod open_files;
 mod startup;
@@ -21,6 +22,10 @@ impl PlatformService for MacosPlatform {
 
     fn applications(&self, known: &KnownPaths) -> Result<Vec<ApplicationInfo>> {
         Ok(apps::list(known))
+    }
+
+    fn battery(&self) -> Option<crate::models::BatteryStatus> {
+        battery::read()
     }
 
     fn app_related_paths(&self, app: &ApplicationInfo, known: &KnownPaths) -> Vec<RelatedPath> {

@@ -1007,6 +1007,16 @@ export const mockBackend: Backend = {
       },
       uptimeSeconds: 3 * 86400 + 4 * 3600,
       processCount: 612,
+      battery: {
+        percent: 82,
+        pluggedIn: false,
+        charging: false,
+        minutesRemaining: 312,
+        cycleCount: 135,
+        designCycleCount: 1000,
+        capacityPercent: 92.4,
+      },
+      temperatures: { cpuCelsius: 52 + Math.random() * 6, batteryCelsius: 31, storageCelsius: 41 },
     };
   },
   async systemStopProcess(pid, mode, name) {

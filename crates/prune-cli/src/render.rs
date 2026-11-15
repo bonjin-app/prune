@@ -4,8 +4,60 @@ use std::io::Write;
 
 use prune_core::analyzer::{DiskAnalysis, DiskSummary};
 use prune_core::apps::AppDetail;
-use prune_core::models::{CleanupPlan, RiskLevel, ScanResult, ScanSession};
+use prune_core::models::{
+    BatteryStatus, CleanupPlan, RiskLevel, ScanResult, ScanSession, Temperatures,
+};
 use prune_core::PruneEngine;
+
+/// One line about the battery, saying "unknown" for anything the OS did not report.
+pub fn battery(battery: Option<&BatteryStatus>) -> String {
+    let Some(b) = battery else {
+        return "none".into();
+    };
+    let state = if b.charging {
+        "charging"
+    } else if b.plugged_in {
+        "plugged in, not charging"
+    } else {
+        "on battery"
+    };
+    let mut line = format!("{:.0}%, {state}", b.percent);
+    if let Some(minutes) = b.minutes_remaining {
+        let until = if b.charging { "until full" } else { "left" };
+        line.push_str(&format!(
+            " ({}h {:02}m {until})",
+            minutes / 60,
+            minutes % 60
+        ));
+    }
+    if let Some(capacity) = b.capacity_percent {
+        line.push_str(&format!(", holds about {capacity:.0}% of new"));
+    }
+    if let Some(cycles) = b.cycle_count {
+        match b.design_cycle_count {
+            Some(design) => line.push_str(&format!(", {cycles} of {design} cycles")),
+            None => line.push_str(&format!(", {cycles} cycles")),
+        }
+    }
+    line
+}
+
+/// The sensors that reported, or a plain statement that none did.
+pub fn temperatures(t: &Temperatures) -> String {
+    let parts: Vec<String> = [
+        ("processor", t.cpu_celsius),
+        ("battery", t.battery_celsius),
+        ("storage", t.storage_celsius),
+    ]
+    .into_iter()
+    .filter_map(|(name, value)| value.map(|v| format!("{name} {v:.0} °C")))
+    .collect();
+    if parts.is_empty() {
+        "not reported by this system".into()
+    } else {
+        parts.join(", ")
+    }
+}
 
 /// Decimal units, matching Finder and Windows Settings.
 pub fn human_bytes(bytes: u64) -> String {
@@ -370,6 +422,44 @@ pub fn app_detail(out: &mut impl Write, detail: &AppDetail) -> std::io::Result<(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn describes_a_battery_and_what_is_unknown() {
+        let b = BatteryStatus {
+            percent: 82.4,
+            plugged_in: false,
+            charging: false,
+            minutes_remaining: Some(312),
+            cycle_count: Some(135),
+            design_cycle_count: Some(1000),
+            capacity_percent: Some(92.4),
+        };
+        assert_eq!(
+            battery(Some(&b)),
+            "82%, on battery (5h 12m left), holds about 92% of new, 135 of 1000 cycles"
+        );
+        let bare = BatteryStatus {
+            percent: 40.0,
+            plugged_in: true,
+            charging: true,
+            minutes_remaining: None,
+            cycle_count: None,
+            design_cycle_count: None,
+            capacity_percent: None,
+        };
+        assert_eq!(battery(Some(&bare)), "40%, charging");
+        assert_eq!(battery(None), "none");
+        assert_eq!(
+            temperatures(&Temperatures::default()),
+            "not reported by this system"
+        );
+        let t = Temperatures {
+            cpu_celsius: Some(56.6),
+            battery_celsius: None,
+            storage_celsius: Some(42.0),
+        };
+        assert_eq!(temperatures(&t), "processor 57 °C, storage 42 °C");
+    }
 
     #[test]
     fn formats_sizes_in_decimal_units() {

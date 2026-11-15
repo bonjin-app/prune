@@ -210,6 +210,7 @@ pub(crate) fn write_json(
 fn status(engine: &PruneEngine, json: bool, out: &mut impl Write) -> std::io::Result<i32> {
     let known = engine.known_paths();
     let permissions = engine.permissions();
+    let snapshot = SystemMonitor::new(&known.home).snapshot();
     if json {
         write_json(
             out,
@@ -219,6 +220,8 @@ fn status(engine: &PruneEngine, json: bool, out: &mut impl Write) -> std::io::Re
                 "home": known.home,
                 "projectRoots": known.project_roots,
                 "permissions": permissions,
+                "battery": snapshot.battery,
+                "temperatures": snapshot.temperatures,
             }),
         )?;
         return Ok(EXIT_OK);
@@ -240,6 +243,16 @@ fn status(engine: &PruneEngine, json: bool, out: &mut impl Write) -> std::io::Re
             permissions.how_to_grant.unwrap_or_default()
         )?;
     }
+    writeln!(
+        out,
+        "  battery        {}",
+        render::battery(snapshot.battery.as_ref())
+    )?;
+    writeln!(
+        out,
+        "  temperatures   {}",
+        render::temperatures(&snapshot.temperatures)
+    )?;
     Ok(EXIT_OK)
 }
 

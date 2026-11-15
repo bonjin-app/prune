@@ -207,6 +207,29 @@ export interface SystemSnapshot {
   network: NetworkStatus;
   uptimeSeconds: number;
   processCount: number;
+  /** Absent on a machine without a battery, or where it cannot be read. */
+  battery?: BatteryStatus | null;
+  temperatures: Temperatures;
+}
+
+export interface BatteryStatus {
+  /** 0–100. */
+  percent: number;
+  pluggedIn: boolean;
+  charging: boolean;
+  /** Until empty when discharging, until full when charging; null while the OS estimates. */
+  minutesRemaining?: number | null;
+  cycleCount?: number | null;
+  designCycleCount?: number | null;
+  /** What a full charge holds now, as a share of what it held new. 0–100. */
+  capacityPercent?: number | null;
+}
+
+/** °C. Each is null where there is no such sensor or it cannot be read. */
+export interface Temperatures {
+  cpuCelsius?: number | null;
+  batteryCelsius?: number | null;
+  storageCelsius?: number | null;
 }
 
 export interface ProcessInfo {
