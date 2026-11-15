@@ -55,23 +55,27 @@ jobs:
       # DIAGNOSTIC (issue #1), part 1: no winget. Mark the installer as downloaded from the
       # internet, the way winget does (zone 3), and start it the way winget does (ShellExecute).
       - name: "Diagnose: the installer with Mark of the Web, without winget"
+        continue-on-error: true
         timeout-minutes: 4
         shell: pwsh
         run: |
           Invoke-WebRequest https://github.com/bonjin-app/prune/releases/download/v0.2.3/Prune_0.2.3_x64-setup.exe -OutFile $env:RUNNER_TEMP\motw-setup.exe
           Set-Content -Path "$env:RUNNER_TEMP\motw-setup.exe" -Stream Zone.Identifier -Value "[ZoneTransfer]`r`nZoneId=3"
           Get-Content -Path "$env:RUNNER_TEMP\motw-setup.exe" -Stream Zone.Identifier
-          $p = Start-Process "$env:RUNNER_TEMP\motw-setup.exe" -ArgumentList '/S' -PassThru
-          $done = $p.WaitForExit(60000)
+          # Start-Process is ShellExecute, which does not return until SmartScreen lets go, so it
+          # runs in a job that can be abandoned.
+          $j = Start-Job { Start-Process "$env:RUNNER_TEMP\motw-setup.exe" -ArgumentList '/S' -Wait }
+          $done = [bool](Wait-Job $j -Timeout 60)
           Get-CimInstance Win32_Process | Where-Object { $_.Name -match 'setup|SmartScreen' } |
             Format-Table ProcessId, ParentProcessId, Name -AutoSize | Out-String | Write-Host
-          Write-Host "exited within 60s: $done; installed: $(Test-Path "$env:LOCALAPPDATA\Prune\prune-desktop.exe")"
-          if (-not $done) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }
-          Get-Process smartscreen, CHXSmartScreen -ErrorAction SilentlyContinue | Stop-Process -Force
+          Write-Host "returned within 60s: $done; installed: $(Test-Path "$env:LOCALAPPDATA\Prune\prune-desktop.exe")"
+          Stop-Job $j; Remove-Job $j -Force
+          Get-Process smartscreen, CHXSmartScreen, motw-setup -ErrorAction SilentlyContinue | Stop-Process -Force
           if (Test-Path "$env:LOCALAPPDATA\Prune\uninstall.exe") { Start-Process "$env:LOCALAPPDATA\Prune\uninstall.exe" '/S' -Wait }
 
       # DIAGNOSTIC, part 2: with both installers listed and no --scope, which one does winget pick?
       - name: "Diagnose: winget install with no scope"
+        continue-on-error: true
         timeout-minutes: 4
         shell: pwsh
         run: |
