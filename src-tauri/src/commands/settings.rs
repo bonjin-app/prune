@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use prune_core::settings::{self, Settings};
 use prune_core::sync::LockExt;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::State;
 
 use crate::error::{CommandError, CommandResult};
@@ -109,4 +109,49 @@ pub fn settings_set_protected_paths(
     settings.protected_paths = validated;
     state.apply_settings(settings).map_err(CommandError::from)?;
     Ok(view(&state))
+}
+
+/// What the native panel lets the user choose.
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PickKind {
+    Folder,
+    File,
+}
+
+/// Opens the system's own panel for choosing a folder or file to protect, starting in the home
+/// folder. Returns the chosen path, or nothing if the panel was cancelled.
+///
+/// Choosing saves nothing: the path still goes through `settings_set_protected_paths` and its
+/// checks. The panel is opened here rather than from the page so the webview is granted no
+/// dialog permissions of its own.
+#[tauri::command]
+pub async fn settings_pick_protected_path<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    kind: PickKind,
+) -> CommandResult<Option<String>> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let mut panel = app.dialog().file().set_title(match kind {
+        PickKind::Folder => "Choose a folder to protect",
+        PickKind::File => "Choose a file to protect",
+    });
+    if let Some(home) = dirs_home(&app) {
+        panel = panel.set_directory(home);
+    }
+    // The blocking pickers must not run on the thread that drives the window.
+    let picked = tauri::async_runtime::spawn_blocking(move || match kind {
+        PickKind::Folder => panel.blocking_pick_folder(),
+        PickKind::File => panel.blocking_pick_file(),
+    })
+    .await
+    .map_err(|e| CommandError::new("other", e.to_string()))?;
+    Ok(picked
+        .and_then(|p| p.into_path().ok())
+        .map(|p| p.to_string_lossy().into_owned()))
+}
+
+fn dirs_home<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Option<PathBuf> {
+    use tauri::Manager;
+    app.path().home_dir().ok()
 }

@@ -39,6 +39,9 @@ tauri = { version = "2", features = [] }
 # Remembering the window and refusing a second copy are desktop-app manners, not access:
 # neither plugin can see anything the user's data.
 tauri-plugin-window-state = "2"
+# Only for the native "choose a folder" panel, opened from Rust. The webview is granted none of
+# its permissions, so the page cannot open dialogs or read what they return on its own.
+tauri-plugin-dialog = "2"
 
 [target.'cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))'.dependencies]
 tauri-plugin-single-instance = "2"

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, Shield, ShieldPlus, X } from "lucide-react";
+import { AlertTriangle, File, Folder, Shield, ShieldPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Spinner } from "@/components/ui/Spinner";
@@ -20,6 +20,7 @@ export function ProtectedPaths() {
   const saving = useSettings((s) => s.saving);
   const add = useSettings((s) => s.addProtectedPath);
   const remove = useSettings((s) => s.removeProtectedPath);
+  const pick = useSettings((s) => s.pickProtectedPath);
   const error = useSettings((s) => s.error);
   const [draft, setDraft] = useState("");
 
@@ -99,6 +100,25 @@ export function ProtectedPaths() {
             disabled={!draft.trim() || saving || !view}
           >
             {saving ? <Spinner size={12} /> : <ShieldPlus size={13} />} Protect
+          </Button>
+        </div>
+
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => void pick("folder")}
+            disabled={saving || !view}
+          >
+            <Folder size={12} /> Choose a folder…
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => void pick("file")}
+            disabled={saving || !view}
+          >
+            <File size={12} /> Choose a file…
           </Button>
         </div>
 

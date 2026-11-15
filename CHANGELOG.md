@@ -8,6 +8,9 @@ All notable changes to Prune are documented here. The format follows
 
 ### Added
 
+- **Choose a folder or file to protect in the system's own panel.** Settings → Protected folders
+  and files has Choose a folder… and Choose a file…, so a path no longer has to be typed. The
+  panel is opened by the app itself; the page is given no file access by it.
 - **`prune protect` edits the protected list from the command line.** `prune protect add <PATH>`,
   `prune protect remove <PATH>`, and `prune protect` to list. It is the same list the app shows
   in Settings. `~` and relative paths work.

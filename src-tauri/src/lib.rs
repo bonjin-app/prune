@@ -28,11 +28,15 @@ pub mod events {
 /// Tauri's mock runtime and exercise the real IPC path.
 /// The plugins that make Prune behave like a desktop application rather than a process.
 ///
-/// Neither can see anything of the user's: one remembers where the window was, the other keeps
-/// a second copy from scanning the same machine in parallel and disagreeing with the first.
+/// None can see anything of the user's: one remembers where the window was, one keeps a second
+/// copy from scanning the same machine in parallel and disagreeing with the first, and the
+/// dialog plugin opens the native file panel when a command asks it to. The webview holds no
+/// dialog permission, so only those commands can.
 /// Separated from `run` so the tests can build an app with the same plugin stack.
 pub fn register_plugins<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
-    builder.plugin(tauri_plugin_window_state::Builder::default().build())
+    builder
+        .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(tauri_plugin_dialog::init())
 }
 
 pub fn register_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
@@ -64,6 +68,7 @@ pub fn register_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri
         commands::settings_get,
         commands::settings_set_project_roots,
         commands::settings_set_protected_paths,
+        commands::settings_pick_protected_path,
         commands::startup_list,
         commands::startup_set_enabled,
         commands::ops_list,

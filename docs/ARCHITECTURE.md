@@ -462,6 +462,12 @@ anything of the user's. Single instance is registered only in `run`, never in
 `register_plugins`, because it exits the process when another copy exists — which a test
 harness must never do.
 
+The dialog plugin is there only for the native "choose a folder" panel on the protected-paths
+card, and the webview is granted none of its permissions. `settings_pick_protected_path` opens
+the panel from Rust, off the main thread, and returns the chosen path and nothing else. That path
+still goes through `settings_set_protected_paths` and its checks. So the page can neither open
+dialogs on its own nor gain any file access from them.
+
 Nothing is allowed to break permanently either. A thread that panics while holding a `Mutex`
 poisons it, and `lock().unwrap()` would then panic on every later use — one bug in one scan
 leaving the whole application dead until the user quits and reopens. `sync::LockExt` recovers

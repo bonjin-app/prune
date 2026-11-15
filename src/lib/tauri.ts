@@ -88,6 +88,8 @@ export interface Backend {
   settingsGet(): Promise<SettingsView>;
   settingsSetProjectRoots(roots: string[]): Promise<SettingsView>;
   settingsSetProtectedPaths(paths: string[]): Promise<SettingsView>;
+  /** Opens the system's own panel. The chosen path, or null when cancelled. Saves nothing. */
+  settingsPickProtectedPath(kind: "folder" | "file"): Promise<string | null>;
   startupList(): Promise<StartupItem[]>;
   startupSetEnabled(itemId: string, enabled: boolean): Promise<StartupItem>;
   opsList(limit?: number): Promise<OperationRecord[]>;
@@ -127,6 +129,8 @@ const tauriBackend: Backend = {
   settingsSetProjectRoots: (roots) => invoke<SettingsView>("settings_set_project_roots", { roots }),
   settingsSetProtectedPaths: (paths) =>
     invoke<SettingsView>("settings_set_protected_paths", { paths }),
+  settingsPickProtectedPath: (kind) =>
+    invoke<string | null>("settings_pick_protected_path", { kind }),
   startupList: () => invoke<StartupItem[]>("startup_list"),
   startupSetEnabled: (itemId, enabled) =>
     invoke<StartupItem>("startup_set_enabled", { itemId, enabled }),

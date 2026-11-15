@@ -17,6 +17,8 @@ interface SettingsState {
   setProtectedPaths: (paths: string[]) => Promise<boolean>;
   addProtectedPath: (path: string) => Promise<boolean>;
   removeProtectedPath: (path: string) => Promise<boolean>;
+  /** Lets the user choose a path in the system panel, then protects it. False if cancelled. */
+  pickProtectedPath: (kind: "folder" | "file") => Promise<boolean>;
   clearError: () => void;
 }
 
@@ -94,6 +96,18 @@ export const useSettings = create<SettingsState>((set, get) => ({
   removeProtectedPath: async (path) => {
     const current = get().view?.settings.protectedPaths ?? [];
     return get().setProtectedPaths(current.filter((p) => p !== path));
+  },
+
+  pickProtectedPath: async (kind) => {
+    if (get().saving || !get().view) return false;
+    let picked: string | null;
+    try {
+      picked = await backend.settingsPickProtectedPath(kind);
+    } catch (e) {
+      set({ error: errorMessage(e) });
+      return false;
+    }
+    return picked ? get().addProtectedPath(picked) : false;
   },
 
   clearError: () => set({ error: null }),

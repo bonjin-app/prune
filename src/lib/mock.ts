@@ -1431,6 +1431,10 @@ export const mockBackend: Backend = {
     mockProtectedPaths = [...new Set(paths.map((p) => p.trim()).filter(Boolean))];
     return mockSettings();
   },
+  async settingsPickProtectedPath(kind) {
+    // The browser has no native panel; pretend the user picked something plausible.
+    return kind === "folder" ? `${HOME}/Projects/site/public` : `${HOME}/.config/app/keys.json`;
+  },
   async startupList() {
     await new Promise((r) => setTimeout(r, 200));
     return MOCK_STARTUP;

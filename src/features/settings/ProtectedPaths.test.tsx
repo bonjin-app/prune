@@ -7,7 +7,11 @@ import type { SettingsView } from "@/types/models";
 import { ProtectedPaths } from "./ProtectedPaths";
 
 vi.mock("@/lib/tauri", () => ({
-  backend: { settingsGet: vi.fn(), settingsSetProtectedPaths: vi.fn() },
+  backend: {
+    settingsGet: vi.fn(),
+    settingsSetProtectedPaths: vi.fn(),
+    settingsPickProtectedPath: vi.fn(),
+  },
   errorMessage: (error: unknown) => (error as { message?: string }).message ?? String(error),
 }));
 
@@ -104,4 +108,23 @@ it("explains an empty list instead of showing nothing", () => {
   });
   render(<ProtectedPaths />);
   expect(screen.getByText(/Nothing is protected yet/)).toBeInTheDocument();
+});
+
+it("protects what is chosen in the system panel", async () => {
+  vi.mocked(backend.settingsPickProtectedPath).mockResolvedValue("/home/u/Documents/keys");
+  render(<ProtectedPaths />);
+  await userEvent.click(screen.getByRole("button", { name: /Choose a folder/ }));
+  expect(backend.settingsPickProtectedPath).toHaveBeenCalledWith("folder");
+  expect(backend.settingsSetProtectedPaths).toHaveBeenCalledWith([
+    "/home/u/code/site/dist",
+    "/home/u/Documents/keys",
+  ]);
+});
+
+it("saves nothing when the panel is cancelled", async () => {
+  vi.mocked(backend.settingsPickProtectedPath).mockResolvedValue(null);
+  render(<ProtectedPaths />);
+  await userEvent.click(screen.getByRole("button", { name: /Choose a file/ }));
+  expect(backend.settingsPickProtectedPath).toHaveBeenCalledWith("file");
+  expect(backend.settingsSetProtectedPaths).not.toHaveBeenCalled();
 });
