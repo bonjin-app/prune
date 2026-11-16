@@ -21,11 +21,23 @@ const TRAY: &str = "prune";
 const OPEN: &str = "tray-open";
 const QUIT: &str = "tray-quit";
 
-/// Set while a menu is being rebuilt, so a pointer moving over the icon does not queue more.
+/// Set while fresh figures are being read, so a pointer moving over the icon does not start
+/// more readings than one at a time.
 static REFRESHING: AtomicBool = AtomicBool::new(false);
+/// Set when the pointer came back while a reading was under way: read again once it is done,
+/// so the menu is never left showing the figures from an earlier visit.
+static AGAIN: AtomicBool = AtomicBool::new(false);
 
-/// Shows or removes the icon to match the setting.
+/// Shows or removes the icon to match the setting. Callable from any thread: the work is done
+/// on the main thread, where the tray icon has to be touched.
 pub fn apply<R: Runtime>(app: &AppHandle<R>, show: bool) {
+    let handle = app.clone();
+    if let Err(e) = app.run_on_main_thread(move || apply_now(&handle, show)) {
+        tracing::warn!(error = %e, "could not change the menu bar icon");
+    }
+}
+
+fn apply_now<R: Runtime>(app: &AppHandle<R>, show: bool) {
     let exists = app.tray_by_id(TRAY).is_some();
     if show && !exists {
         if let Err(e) = create(app) {
@@ -37,6 +49,7 @@ pub fn apply<R: Runtime>(app: &AppHandle<R>, show: bool) {
 }
 
 /// Whether the icon is showing, so closing the window can leave Prune somewhere to be found.
+/// Main thread only, as window events are.
 pub fn is_shown<R: Runtime>(app: &AppHandle<R>) -> bool {
     app.tray_by_id(TRAY).is_some()
 }
@@ -93,27 +106,58 @@ fn create<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     Ok(())
 }
 
-/// Rebuilds the menu with fresh figures, off the main thread: reading them runs `ioreg` and
-/// can take tens of milliseconds.
+/// Reads fresh figures off the main thread (it takes [`SystemMonitor::glance`]'s moment and
+/// runs `ioreg`), then puts them in the menu on the main thread.
+///
+/// The tray icon itself is only ever touched on the main thread. Tauri's `TrayIcon` wraps a
+/// non-atomic `Rc`, and its `Send` is sound only on that condition: looking it up or dropping it
+/// on a worker thread while the main thread handles a pointer event would race on the count.
+///
+/// [`SystemMonitor::glance`]: prune_core::system::SystemMonitor::glance
 fn refresh<R: Runtime>(app: &AppHandle<R>) {
     if REFRESHING.swap(true, Ordering::AcqRel) {
+        AGAIN.store(true, Ordering::Release);
         return;
     }
     let app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let lines = app
-            .try_state::<AppState>()
-            .map(|state| lines(&state.monitor.snapshot()))
-            .unwrap_or_default();
-        match (app.tray_by_id(TRAY), menu(&app, &lines)) {
-            (Some(tray), Ok(menu)) => {
-                let _ = tray.set_menu(Some(menu));
+        /// Clears `REFRESHING` however the reading ends, a panic included, so one failure
+        /// cannot stop the menu from ever updating again.
+        struct Done;
+        impl Drop for Done {
+            fn drop(&mut self) {
+                REFRESHING.store(false, Ordering::Release);
             }
-            (_, Err(e)) => tracing::warn!(error = %e, "could not update the menu bar menu"),
-            _ => {}
         }
-        REFRESHING.store(false, Ordering::Release);
+        loop {
+            let done = Done;
+            AGAIN.store(false, Ordering::Release);
+            let lines = app
+                .try_state::<AppState>()
+                .map(|state| lines(&state.monitor.glance()))
+                .unwrap_or_default();
+            let handle = app.clone();
+            let _ = app.run_on_main_thread(move || set_lines(&handle, &lines));
+            drop(done);
+            // Read again if the pointer came back meanwhile and nothing else has started to.
+            if !AGAIN.load(Ordering::Acquire) || REFRESHING.swap(true, Ordering::AcqRel) {
+                break;
+            }
+        }
     });
+}
+
+/// Puts `lines` in the menu. Main thread only.
+fn set_lines<R: Runtime>(app: &AppHandle<R>, lines: &[String]) {
+    let Some(tray) = app.tray_by_id(TRAY) else {
+        return;
+    };
+    match menu(app, lines) {
+        Ok(menu) => {
+            let _ = tray.set_menu(Some(menu));
+        }
+        Err(e) => tracing::warn!(error = %e, "could not update the menu bar menu"),
+    }
 }
 
 fn menu<R: Runtime>(app: &AppHandle<R>, lines: &[String]) -> tauri::Result<Menu<R>> {

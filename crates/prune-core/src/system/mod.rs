@@ -94,6 +94,10 @@ const SENSOR_TTL: Duration = Duration::from_secs(10);
 /// as well; one `ioreg` run (or one counter read on Windows) serves both.
 const GPU_TTL: Duration = Duration::from_millis(1500);
 
+/// How long [`SystemMonitor::glance`] measures over. sysinfo needs at least
+/// `MINIMUM_CPU_UPDATE_INTERVAL` between CPU reads for the figure to mean anything.
+const GLANCE_WINDOW: Duration = Duration::from_millis(300);
+
 /// Readings outside this range are a sensor that is absent or not reporting (Apple silicon has
 /// several that read about -9200 °C), not a temperature.
 const PLAUSIBLE_CELSIUS: std::ops::RangeInclusive<f32> = -40.0..=150.0;
@@ -238,6 +242,25 @@ impl SystemMonitor {
             temperatures: self.temperatures(),
             gpus: self.gpus(),
         }
+    }
+
+    /// A snapshot whose processor and graphics load cover the last moment, for a reading
+    /// taken now and then rather than on a steady timer (the menu bar). Both are measured
+    /// between two reads, so a plain [`snapshot`](Self::snapshot) taken long after the previous
+    /// one would show the average since then. This primes both, waits [`GLANCE_WINDOW`] and
+    /// reads again. It blocks for that long, so it belongs off the main thread.
+    pub fn glance(&self) -> SystemSnapshot {
+        self.inner.lock_recover().refresh_cpu_usage();
+        self.read_gpus_now();
+        std::thread::sleep(GLANCE_WINDOW);
+        self.read_gpus_now();
+        self.snapshot()
+    }
+
+    /// Reads the graphics processors now, whatever the cache holds.
+    fn read_gpus_now(&self) {
+        let reading = crate::platform::current().gpus();
+        *self.gpus.lock_recover() = Some((reading, Instant::now()));
     }
 
     /// The graphics processors, re-read at most once per [`GPU_TTL`].
@@ -563,6 +586,21 @@ mod tests {
             summarise_sensors(std::iter::empty()),
             Temperatures::default()
         );
+    }
+
+    #[test]
+    fn a_glance_measures_over_its_own_moment() {
+        let home = std::env::temp_dir();
+        let monitor = SystemMonitor::new(&home);
+        let started = Instant::now();
+        let glance = monitor.glance();
+        assert!(started.elapsed() >= GLANCE_WINDOW);
+        assert!((0.0..=100.0).contains(&glance.cpu.usage_percent));
+        for gpu in &glance.gpus {
+            assert!(gpu
+                .usage_percent
+                .map_or(true, |p| (0.0..=100.0).contains(&p)));
+        }
     }
 
     #[test]
