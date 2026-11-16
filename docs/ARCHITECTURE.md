@@ -655,6 +655,7 @@ individually rather than taken together every tick:
 | mounted volumes | ~140ms | at most every 10s, or at once after a removal |
 | process list with details | ~55ms | only while the Monitor view is open |
 | graphics (`ioreg` on macOS, performance counters on Windows) | ~20ms | at most every 1.5s |
+| accessory batteries (`ioreg` + `system_profiler` on macOS, setupapi on Windows) | ~190ms | at most every 60s |
 
 That takes a snapshot from 439ms to under a millisecond in the steady state. On top of it,
 `startPolling` in the frontend stops the timers entirely while the window is hidden and takes a

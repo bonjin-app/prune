@@ -5,7 +5,8 @@ use std::io::Write;
 use prune_core::analyzer::{DiskAnalysis, DiskSummary};
 use prune_core::apps::AppDetail;
 use prune_core::models::{
-    BatteryStatus, CleanupPlan, GpuStatus, RiskLevel, ScanResult, ScanSession, Temperatures,
+    AccessoryBattery, BatteryStatus, CleanupPlan, GpuStatus, RiskLevel, ScanResult, ScanSession,
+    Temperatures,
 };
 use prune_core::PruneEngine;
 
@@ -40,6 +41,29 @@ pub fn battery(battery: Option<&BatteryStatus>) -> String {
         }
     }
     line
+}
+
+/// One line per accessory, its parts together: `AirPods Pro: left 80%, right 79%, case 50%`.
+/// Empty when none reports a charge.
+pub fn accessories(batteries: &[AccessoryBattery]) -> Vec<String> {
+    let mut lines: Vec<(String, Vec<String>)> = Vec::new();
+    for b in batteries {
+        let figure = match &b.part {
+            Some(part) => format!("{part} {:.0}%", b.percent),
+            None => format!("{:.0}%", b.percent),
+        };
+        match lines.iter_mut().find(|(name, _)| *name == b.name) {
+            Some((_, figures)) => figures.push(figure),
+            None => lines.push((b.name.clone(), vec![figure])),
+        }
+    }
+    lines
+        .into_iter()
+        .map(|(name, figures)| {
+            let sep = if figures.len() > 1 { ": " } else { " " };
+            format!("{name}{sep}{}", figures.join(", "))
+        })
+        .collect()
 }
 
 /// One line per graphics processor, or a plain statement that the system reported none.
@@ -491,6 +515,24 @@ mod tests {
             storage_celsius: Some(42.0),
         };
         assert_eq!(temperatures(&t), "processor 57 °C, storage 42 °C");
+    }
+
+    #[test]
+    fn groups_an_accessorys_parts_on_one_line() {
+        let b = |name: &str, part: Option<&str>, percent: f32| AccessoryBattery {
+            name: name.into(),
+            part: part.map(str::to_string),
+            percent,
+        };
+        assert_eq!(
+            accessories(&[
+                b("AirPods Pro", Some("left"), 80.0),
+                b("Magic Mouse", None, 64.0),
+                b("AirPods Pro", Some("right"), 79.0),
+            ]),
+            ["AirPods Pro: left 80%, right 79%", "Magic Mouse 64%"]
+        );
+        assert!(accessories(&[]).is_empty());
     }
 
     #[test]

@@ -209,6 +209,22 @@ pub(crate) fn lines(s: &SystemSnapshot) -> Vec<String> {
         };
         lines.push(format!("Battery {:.0}%{state}", b.percent));
     }
+    // Accessories, each on one line with its parts: `AirPods Pro: left 80%, right 79%`.
+    let mut accessories: Vec<(&str, Vec<String>)> = Vec::new();
+    for a in &s.accessories {
+        let figure = match &a.part {
+            Some(part) => format!("{part} {:.0}%", a.percent),
+            None => format!("{:.0}%", a.percent),
+        };
+        match accessories.iter_mut().find(|(name, _)| *name == a.name) {
+            Some((_, figures)) => figures.push(figure),
+            None => accessories.push((&a.name, vec![figure])),
+        }
+    }
+    for (name, figures) in accessories {
+        let sep = if figures.len() > 1 { ": " } else { " " };
+        lines.push(format!("{name}{sep}{}", figures.join(", ")));
+    }
     lines
 }
 
@@ -237,7 +253,8 @@ fn bytes(n: u64) -> String {
 #[cfg(test)]
 mod tests {
     use prune_core::models::{
-        BatteryStatus, CpuStatus, DiskStatus, GpuStatus, MemoryStatus, NetworkStatus,
+        AccessoryBattery, BatteryStatus, CpuStatus, DiskStatus, GpuStatus, MemoryStatus,
+        NetworkStatus,
     };
 
     use super::*;
@@ -286,6 +303,18 @@ mod tests {
                 usage_percent: Some(7.0),
                 ..Default::default()
             }],
+            accessories: vec![
+                AccessoryBattery {
+                    name: "AirPods Pro".into(),
+                    part: Some("left".into()),
+                    percent: 80.0,
+                },
+                AccessoryBattery {
+                    name: "AirPods Pro".into(),
+                    part: Some("case".into()),
+                    percent: 50.0,
+                },
+            ],
         }
     }
 
@@ -299,6 +328,7 @@ mod tests {
                 "Graphics 7%",
                 "220 GB free on Macintosh HD",
                 "Battery 99%, charging",
+                "AirPods Pro: left 80%, case 50%",
             ]
         );
     }
@@ -309,6 +339,7 @@ mod tests {
         s.battery = None;
         s.gpus = vec![GpuStatus::default()];
         s.disks.clear();
+        s.accessories.clear();
         assert_eq!(
             lines(&s),
             ["Processor 12%", "Memory 18.2 GB of 64.0 GB in use"]

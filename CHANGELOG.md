@@ -6,6 +6,18 @@ All notable changes to Prune are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Accessory batteries in the Monitor, the menu bar and `prune status`.** Connected wireless
+  mice, keyboards and headphones that report their charge are listed. For earbuds, the left
+  bud, the right bud and the case each have their own figure.
+  - **macOS.** From the same registry and Bluetooth report System Settings uses. Apple's own
+    accessories are covered, as are headphones and other Bluetooth devices that report a charge.
+  - **Windows.** The charge Settings → Bluetooth & devices shows.
+  - **What is not covered.** An accessory whose maker reports its charge only to its own
+    software is not listed.
+  - **Cost.** Read-only, and read at most once a minute.
+
 ## [0.2.8] - 2026-11-16
 
 Prune now sits in the menu bar while it runs, and the Monitor shows how busy each graphics

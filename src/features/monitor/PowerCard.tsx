@@ -2,7 +2,7 @@ import { BatteryCharging, BatteryFull, Plug, Thermometer } from "lucide-react";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Meter } from "@/components/ui/Meter";
 import { formatDuration, formatPercent } from "@/lib/format";
-import type { BatteryStatus, Temperatures } from "@/types/models";
+import type { AccessoryBattery, BatteryStatus, Temperatures } from "@/types/models";
 
 /**
  * Battery and temperatures, read-only. Anything the operating system does not report is shown
@@ -12,9 +12,11 @@ import type { BatteryStatus, Temperatures } from "@/types/models";
 export function PowerCard({
   battery,
   temperatures,
+  accessories,
 }: {
   battery: BatteryStatus | null | undefined;
   temperatures: Temperatures | undefined;
+  accessories?: AccessoryBattery[];
 }) {
   const sensors: [string, number | null | undefined][] = [
     ["Processor", temperatures?.cpuCelsius],
@@ -52,8 +54,49 @@ export function PowerCard({
             <p className="text-fg-faint">This system does not report temperatures to Prune.</p>
           )}
         </div>
+
+        {accessories && accessories.length > 0 && (
+          <div className="border-t border-line pt-3">
+            <Accessories batteries={accessories} />
+          </div>
+        )}
       </div>
     </Card>
+  );
+}
+
+/** One row per accessory, its parts (left, right, case) side by side. */
+function Accessories({ batteries }: { batteries: AccessoryBattery[] }) {
+  const byName = new Map<string, AccessoryBattery[]>();
+  for (const b of batteries) byName.set(b.name, [...(byName.get(b.name) ?? []), b]);
+  return (
+    <ul aria-label="Accessories" className="space-y-1">
+      {[...byName].map(([name, parts]) => {
+        const only = parts.length === 1 && !parts[0]?.part ? parts[0] : undefined;
+        return (
+          <li key={name}>
+            {only ? (
+              <div className="flex justify-between gap-2">
+                <span className="min-w-0 truncate text-fg-muted">{name}</span>
+                <span className="shrink-0 tnum">{formatPercent(only.percent)}</span>
+              </div>
+            ) : (
+              <>
+                <div className="truncate text-fg-muted">{name}</div>
+                {/* Earbuds and their case: each part on the line below, so none is cut off. */}
+                <div className="mt-0.5 flex flex-wrap justify-end gap-x-3 tnum">
+                  {parts.map((p) => (
+                    <span key={p.part ?? ""}>
+                      {p.part} {formatPercent(p.percent)}
+                    </span>
+                  ))}
+                </div>
+              </>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

@@ -212,6 +212,16 @@ export interface SystemSnapshot {
   temperatures: Temperatures;
   /** Empty where the system reports no graphics processor. */
   gpus?: GpuStatus[];
+  /** Wireless accessories reporting a charge; one entry per part for earbuds. */
+  accessories?: AccessoryBattery[];
+}
+
+export interface AccessoryBattery {
+  name: string;
+  /** "left", "right" or "case" for accessories reporting several parts. */
+  part?: string | null;
+  /** 0–100. */
+  percent: number;
 }
 
 /** A graphics processor. Null fields are ones the OS did not report. */

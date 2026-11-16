@@ -319,6 +319,10 @@ pub trait PlatformService: Send + Sync {
     fn battery(&self) -> Option<crate::models::BatteryStatus> {
         None
     }
+    /// Connected wireless accessories that report their charge, read-only. Default: none.
+    fn accessory_batteries(&self) -> Vec<crate::models::AccessoryBattery> {
+        Vec::new()
+    }
     /// Graphics processors and how busy they are, read-only. Default: none known.
     fn gpus(&self) -> Vec<crate::models::GpuStatus> {
         Vec::new()

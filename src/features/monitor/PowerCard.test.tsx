@@ -48,3 +48,22 @@ it("says so plainly on a desktop without sensors", () => {
   expect(screen.getByText("No battery.")).toBeInTheDocument();
   expect(screen.getByText(/does not report temperatures/)).toBeInTheDocument();
 });
+
+it("lists accessories with their parts on one row", () => {
+  render(
+    <PowerCard
+      battery={null}
+      temperatures={{}}
+      accessories={[
+        { name: "Magic Mouse", percent: 64 },
+        { name: "AirPods Pro", part: "left", percent: 80 },
+        { name: "AirPods Pro", part: "case", percent: 50 },
+      ]}
+    />,
+  );
+  expect(screen.getByText("Magic Mouse")).toBeInTheDocument();
+  expect(screen.getByText("64%")).toBeInTheDocument();
+  expect(screen.getByText("AirPods Pro")).toBeInTheDocument();
+  expect(screen.getByText("left 80%")).toBeInTheDocument();
+  expect(screen.getByText("case 50%")).toBeInTheDocument();
+});

@@ -128,7 +128,11 @@ export function MonitorView() {
               )}
             </div>
           </Card>
-          <PowerCard battery={snapshot?.battery} temperatures={snapshot?.temperatures} />
+          <PowerCard
+            battery={snapshot?.battery}
+            temperatures={snapshot?.temperatures}
+            accessories={snapshot?.accessories}
+          />
           <GpuCard gpus={snapshot?.gpus} />
         </div>
 

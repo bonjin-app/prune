@@ -7,6 +7,7 @@ use super::{
 use crate::models::Platform;
 use crate::Result;
 
+mod accessories;
 mod apps;
 mod battery;
 mod git;
@@ -31,6 +32,10 @@ impl PlatformService for MacosPlatform {
 
     fn gpus(&self) -> Vec<crate::models::GpuStatus> {
         gpu::read()
+    }
+
+    fn accessory_batteries(&self) -> Vec<crate::models::AccessoryBattery> {
+        accessories::read()
     }
 
     fn app_related_paths(&self, app: &ApplicationInfo, known: &KnownPaths) -> Vec<RelatedPath> {

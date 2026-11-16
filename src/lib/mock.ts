@@ -1072,6 +1072,12 @@ export const mockBackend: Backend = {
         capacityPercent: 92.4,
       },
       temperatures: { cpuCelsius: 52 + Math.random() * 6, batteryCelsius: 31, storageCelsius: 41 },
+      accessories: [
+        { name: "Magic Mouse", part: null, percent: 64 },
+        { name: "AirPods Pro", part: "left", percent: 80 },
+        { name: "AirPods Pro", part: "right", percent: 79 },
+        { name: "AirPods Pro", part: "case", percent: 50 },
+      ],
       gpus: [
         {
           name: "Apple M3 Pro",

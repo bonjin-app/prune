@@ -98,6 +98,21 @@ pub struct SystemSnapshot {
     /// Graphics processors, as the OS reports them. Empty where none can be read.
     #[serde(default)]
     pub gpus: Vec<GpuStatus>,
+    /// Wireless accessories that report their charge: mice, keyboards, headphones.
+    #[serde(default)]
+    pub accessories: Vec<AccessoryBattery>,
+}
+
+/// The charge of a connected accessory, or of one part of it (an earbud, its case).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccessoryBattery {
+    /// As the system names it, which is usually what the user named it.
+    pub name: String,
+    /// Which part, for accessories that report several: `left`, `right`, `case`.
+    pub part: Option<String>,
+    /// Charge, 0–100.
+    pub percent: f32,
 }
 
 /// A graphics processor. Every field the OS may withhold is optional and shown as unknown.

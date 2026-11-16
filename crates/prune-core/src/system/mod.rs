@@ -13,8 +13,8 @@ use sysinfo::{
 };
 
 use crate::models::{
-    BatteryStatus, CpuStatus, DiskStatus, GpuStatus, MemoryStatus, NetworkStatus, Platform,
-    ProcessInfo, StopMode, SystemInfo, SystemSnapshot, Temperatures,
+    AccessoryBattery, BatteryStatus, CpuStatus, DiskStatus, GpuStatus, MemoryStatus, NetworkStatus,
+    Platform, ProcessInfo, StopMode, SystemInfo, SystemSnapshot, Temperatures,
 };
 use crate::{PruneError, Result};
 
@@ -90,6 +90,10 @@ const BATTERY_TTL: Duration = Duration::from_secs(30);
 /// Apple silicon Mac, which every two seconds would be Prune's own largest cost.
 const SENSOR_TTL: Duration = Duration::from_secs(10);
 
+/// How long accessory batteries are reused. On macOS they come partly from `system_profiler`
+/// (about 170 ms), and an accessory's charge moves over hours.
+const ACCESSORY_TTL: Duration = Duration::from_secs(60);
+
 /// How long a GPU reading is reused. The Monitor asks every two seconds and the menu bar may ask
 /// as well; one `ioreg` run (or one counter read on Windows) serves both.
 const GPU_TTL: Duration = Duration::from_millis(1500);
@@ -123,6 +127,7 @@ pub struct SystemMonitor {
     /// Created on first use: listing the sensors is itself the slow part.
     sensors: Mutex<Option<(Components, Temperatures, Instant)>>,
     gpus: Mutex<Option<(Vec<GpuStatus>, Instant)>>,
+    accessories: Mutex<Option<(Vec<AccessoryBattery>, Instant)>>,
     home: std::path::PathBuf,
 }
 
@@ -166,6 +171,7 @@ impl SystemMonitor {
             battery: Mutex::new(None),
             sensors: Mutex::new(None),
             gpus: Mutex::new(None),
+            accessories: Mutex::new(None),
             home: home.to_path_buf(),
         }
     }
@@ -241,7 +247,21 @@ impl SystemMonitor {
             battery: self.battery(),
             temperatures: self.temperatures(),
             gpus: self.gpus(),
+            accessories: self.accessories(),
         }
+    }
+
+    /// Accessory batteries, re-read at most once per [`ACCESSORY_TTL`].
+    fn accessories(&self) -> Vec<AccessoryBattery> {
+        let mut cache = self.accessories.lock_recover();
+        if let Some((reading, at)) = &*cache {
+            if at.elapsed() < ACCESSORY_TTL {
+                return reading.clone();
+            }
+        }
+        let reading = crate::platform::current().accessory_batteries();
+        *cache = Some((reading.clone(), Instant::now()));
+        reading
     }
 
     /// A snapshot whose processor and graphics load cover the last moment, for a reading

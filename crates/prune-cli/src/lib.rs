@@ -223,6 +223,7 @@ fn status(engine: &PruneEngine, json: bool, out: &mut impl Write) -> std::io::Re
                 "battery": snapshot.battery,
                 "temperatures": snapshot.temperatures,
                 "gpus": snapshot.gpus,
+                "accessories": snapshot.accessories,
             }),
         )?;
         return Ok(EXIT_OK);
@@ -256,6 +257,14 @@ fn status(engine: &PruneEngine, json: bool, out: &mut impl Write) -> std::io::Re
     )?;
     for (i, line) in render::gpus(&snapshot.gpus).iter().enumerate() {
         let label = if i == 0 { "graphics" } else { "" };
+        writeln!(out, "  {label:<14} {line}")?;
+    }
+    let accessories = render::accessories(&snapshot.accessories);
+    if accessories.is_empty() {
+        writeln!(out, "  accessories    none reporting a charge")?;
+    }
+    for (i, line) in accessories.iter().enumerate() {
+        let label = if i == 0 { "accessories" } else { "" };
         writeln!(out, "  {label:<14} {line}")?;
     }
     Ok(EXIT_OK)
