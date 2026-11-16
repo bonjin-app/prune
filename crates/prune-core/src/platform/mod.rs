@@ -376,7 +376,8 @@ pub fn current() -> Box<dyn PlatformService> {
     }
 }
 
-/// Candidate project directories shared by all platforms; only existing ones are returned.
+/// Candidate project directories shared by all platforms; only existing ones are returned,
+/// and each folder once however many candidate spellings reach it.
 pub(crate) fn existing_project_roots(home: &std::path::Path) -> Vec<PathBuf> {
     const CANDIDATES: &[&str] = &[
         "Projects",
@@ -400,11 +401,20 @@ pub(crate) fn existing_project_roots(home: &std::path::Path) -> Vec<PathBuf> {
         "Documents/code",
         "Desktop",
     ];
-    CANDIDATES
-        .iter()
-        .map(|c| home.join(c))
-        .filter(|p| p.is_dir())
-        .collect()
+    let mut roots: Vec<PathBuf> = Vec::new();
+    for path in CANDIDATES.iter().map(|c| home.join(c)) {
+        // On a case-insensitive volume (the macOS and Windows default) `Projects` and
+        // `projects` are one folder. Scanning it twice listed every artifact twice, doubled
+        // the total, and left a plan whose second copy of each item failed as missing.
+        if path.is_dir()
+            && !roots
+                .iter()
+                .any(|kept| same_file::is_same_file(kept, &path).unwrap_or(false))
+        {
+            roots.push(path);
+        }
+    }
+    roots
 }
 
 /// Helper shared by platform implementations.
@@ -504,5 +514,31 @@ mod in_use_tests {
         let candidates = vec![dir.path().join("cache")];
         let open = vec![(dir.path().join("cache-2/file"), None)];
         assert!(match_open_paths(&candidates, open).is_empty());
+    }
+}
+
+#[cfg(test)]
+mod project_root_tests {
+    use super::*;
+
+    #[test]
+    fn one_folder_reached_by_two_spellings_is_one_root() {
+        let home = tempfile::tempdir().unwrap();
+        std::fs::create_dir(home.path().join("Projects")).unwrap();
+        std::fs::create_dir(home.path().join("code")).unwrap();
+        let roots = existing_project_roots(home.path());
+        // On a case-insensitive volume `projects` also exists, as the same folder.
+        assert_eq!(roots.len(), 2, "{roots:?}");
+        assert!(roots[0].ends_with("Projects"));
+        assert!(roots[1].ends_with("code"));
+    }
+
+    #[test]
+    fn distinct_folders_stay_distinct() {
+        let home = tempfile::tempdir().unwrap();
+        for name in ["Projects", "workspace", "Documents/workspace"] {
+            std::fs::create_dir_all(home.path().join(name)).unwrap();
+        }
+        assert_eq!(existing_project_roots(home.path()).len(), 3);
     }
 }

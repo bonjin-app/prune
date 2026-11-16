@@ -333,6 +333,11 @@ impl CleanupProvider for ProjectArtifacts {
                         target.risk = RiskLevel::Protected;
                         // In parentheses, because the kinds of a project are listed with commas.
                         target.description = Some(format!("{} ({reason})", c.kind));
+                    } else if target.risk < RiskLevel::High && SHARED_NAMES.contains(&c.kind) {
+                        if let Some(found) = kept_files(&c.path, ctx.cancel) {
+                            target.risk = RiskLevel::High;
+                            target.description = Some(format!("{} (holds {found})", c.kind));
+                        }
                     }
                 }
                 (measured, evidence)
@@ -368,6 +373,127 @@ impl CleanupProvider for ProjectArtifacts {
         out.targets.sort_by(|a, b| a.path.cmp(&b.path));
         out
     }
+}
+
+/// Folder names build tools use that people also use to keep things: release notes and
+/// evidence, database dumps before a deploy, signing material. A build writes none of those, so
+/// finding one means the folder is not only build output.
+const SHARED_NAMES: &[&str] = &["dist", "build", "out"];
+
+/// How many entries to look at before deciding a folder holds only build output. Enough for any
+/// real `dist/`; a folder bigger than that is checked as far as this goes.
+const KEPT_FILES_LOOK: usize = 50_000;
+
+/// What `dir` holds that a build does not make, described for the user, or `None`.
+///
+/// Two signs, both of things people put there by hand or by script:
+/// - folders named by date (`2026-10-14`, `run-20261021`), which build tools never create;
+/// - files that are data or secrets rather than output: database dumps and backups, signing
+///   keys, and `.env` files (not `.env.example`). Names with `.private.` count
+///   too, as a person marking a file private is plainly keeping it.
+pub(crate) fn kept_files(dir: &Path, cancel: &std::sync::atomic::AtomicBool) -> Option<String> {
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if entry.file_type().is_ok_and(|t| t.is_dir()) && is_dated(&name) {
+                return Some(format!("folders named by date, such as {name}"));
+            }
+        }
+    }
+    let mut walker = WalkDir::new(dir)
+        .follow_links(false)
+        .max_depth(8)
+        .into_iter();
+    let mut looked = 0;
+    while let Some(entry) = walker.next() {
+        let Ok(entry) = entry else { continue };
+        looked += 1;
+        if looked > KEPT_FILES_LOOK || cancel.load(std::sync::atomic::Ordering::Relaxed) {
+            break;
+        }
+        let name = entry.file_name().to_string_lossy();
+        if entry.file_type().is_dir() {
+            if name == "node_modules" {
+                walker.skip_current_dir();
+            }
+            continue;
+        }
+        if is_kept_file(&name) {
+            let shown = entry
+                .path()
+                .strip_prefix(dir)
+                .unwrap_or(entry.path())
+                .display()
+                .to_string();
+            return Some(format!("files a build does not make, such as {shown}"));
+        }
+    }
+    None
+}
+
+/// A date in a folder name: `2026-10-14`, or eight digits from `20` such as `20261021`,
+/// optionally followed by the time as six more (`20260417215624`).
+fn is_dated(name: &str) -> bool {
+    let b = name.as_bytes();
+    let digits = |s: &[u8]| s.iter().all(u8::is_ascii_digit);
+    (0..b.len()).any(|i| {
+        let rest = &b[i..];
+        let plausible = |y: &[u8], m: &[u8], d: &[u8]| {
+            y.starts_with(b"20")
+                && digits(y)
+                && digits(m)
+                && digits(d)
+                && (b"01".as_slice()..=b"12".as_slice()).contains(&m)
+                && (b"01".as_slice()..=b"31".as_slice()).contains(&d)
+        };
+        let boundary = |at: usize| at >= b.len() || !b[at].is_ascii_digit();
+        let starts = i == 0 || !b[i - 1].is_ascii_digit();
+        starts
+            && ((rest.len() >= 10
+                && rest[4] == b'-'
+                && rest[7] == b'-'
+                && plausible(&rest[..4], &rest[5..7], &rest[8..10])
+                && boundary(i + 10))
+                || (rest.len() >= 8
+                    && plausible(&rest[..4], &rest[4..6], &rest[6..8])
+                    && (boundary(i + 8)
+                        || (rest.len() >= 14 && digits(&rest[8..14]) && boundary(i + 14)))))
+    })
+}
+
+fn is_kept_file(name: &str) -> bool {
+    // Builds copy database files too (migrations into `resources/`, a local cache's
+    // `metadata.sqlite`), so a database file counts only when its name says it is a copy kept
+    // on purpose. Dumps and backups count whatever they are called.
+    const DATABASE: &[&str] = &["sql", "sqlite", "sqlite3", "db"];
+    const KEPT_WORDS: &[&str] = &["backup", "dump", "before", "snapshot", "export", "prod"];
+    const ALWAYS: &[&str] = &["dump", "backup"];
+    // Signing material. Not `.pem`: bundled certificate stores are public and builds ship them.
+    const SECRETS: &[&str] = &["key", "p12", "pfx", "keystore", "jks", "mobileprovision"];
+    let lower = name.to_ascii_lowercase();
+    if lower == ".env" || (lower.starts_with(".env.") && !is_env_template(&lower)) {
+        return true;
+    }
+    let Some((stem, ext)) = lower.rsplit_once('.') else {
+        return false;
+    };
+    // Compilers name some of their own output `.private.` (Swift's private module interface).
+    const COMPILER_OUTPUT: &[&str] = &["swiftinterface", "modulemap", "swiftmodule", "swiftdoc"];
+    if lower.contains(".private.") && !COMPILER_OUTPUT.contains(&ext) {
+        return true;
+    }
+    if stem.is_empty() {
+        return false;
+    }
+    ALWAYS.contains(&ext)
+        || SECRETS.contains(&ext)
+        || (DATABASE.contains(&ext) && KEPT_WORDS.iter().any(|w| stem.contains(w)))
+}
+
+fn is_env_template(lower: &str) -> bool {
+    [".example", ".sample", ".template", ".dist", ".defaults"]
+        .iter()
+        .any(|s| lower.ends_with(s))
 }
 
 /// Why a build folder is kept instead of offered, or `None` when Git has no objection.
@@ -533,6 +659,88 @@ impl ProjectArtifacts {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dates_in_folder_names() {
+        for yes in [
+            "2026-10-14",
+            "run-20261021",
+            "admin-ops-2026-10-15",
+            "x_20260417215624",
+        ] {
+            assert!(is_dated(yes), "{yes}");
+        }
+        for no in [
+            "assets",
+            "v2",
+            "2026",
+            "chunk-1234567890",
+            "20261399",
+            "build-123",
+        ] {
+            assert!(!is_dated(no), "{no}");
+        }
+    }
+
+    #[test]
+    fn data_and_secrets_are_not_build_output() {
+        for yes in [
+            "d1-before.private.sql",
+            "backup.sqlite",
+            "prod.db",
+            "nightly-dump.sql",
+            "users.dump",
+            "release.keystore",
+            ".env",
+            ".env.production",
+            "deploy.private.log",
+            "cert.p12",
+        ] {
+            assert!(is_kept_file(yes), "{yes}");
+        }
+        for no in [
+            "index.js",
+            "app.js.map",
+            ".env.example",
+            ".env.sample",
+            "main.css",
+            "db",
+            "bundle.aab",
+            // What builds copy into their output, seen in real build folders:
+            "V20__add_column.sql",
+            "data.sql",
+            "Thumbs.db",
+            "metadata.sqlite",
+            "cacert.pem",
+            "module.modulemap.bak",
+            "arm64-apple-ios-simulator.private.swiftinterface",
+            "module.private.modulemap",
+        ] {
+            assert!(!is_kept_file(no), "{no}");
+        }
+    }
+
+    #[test]
+    fn a_dist_folder_used_to_keep_things_is_found() {
+        let cancel = std::sync::atomic::AtomicBool::new(false);
+        let built = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(built.path().join("assets")).unwrap();
+        std::fs::write(built.path().join("assets/index-3f2a.js"), "x").unwrap();
+        std::fs::write(built.path().join(".env.example"), "x").unwrap();
+        assert_eq!(kept_files(built.path(), &cancel), None);
+
+        let dated = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dated.path().join("release-evidence-20261031")).unwrap();
+        assert!(kept_files(dated.path(), &cancel)
+            .unwrap()
+            .contains("by date"));
+
+        let dump = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dump.path().join("deploy")).unwrap();
+        std::fs::write(dump.path().join("deploy/d1-before.private.sql"), "x").unwrap();
+        let found = kept_files(dump.path(), &cancel).unwrap();
+        assert!(found.contains("d1-before.private.sql"), "{found}");
+    }
 
     #[test]
     fn rule_requires_marker() {

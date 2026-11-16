@@ -6,6 +6,22 @@ All notable changes to Prune are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **A `dist`, `build` or `out` folder used to keep things is no longer offered as build
+  output.** Some projects keep release evidence, deploy logs or database dumps taken before a
+  deploy in `dist/`. Prune treated all of it as regenerable build output.
+  - **What counts.** A folder holding dated folders (`2026-10-14`, `deploy-20261020`) or files
+    a build does not make is now high risk, and says what it found. Files a build does not make
+    are dumps, backups, signing keys and `.env` files.
+  - **Not offered automatically.** `prune clean` never takes high risk on its own.
+  - **On the machine this was checked on,** it caught two such folders (37 GB). Folders whose
+    build copies migrations or certificates into its output were left as they were.
+- **A projects folder is no longer scanned twice.** On a case-insensitive disk (the macOS and
+  Windows default), the guessed `~/Projects` and `~/projects` are the same folder. Each build
+  folder in it was listed twice, the total was doubled, and the second removal of each failed as
+  missing.
+
 ### Added
 
 - **Graphics in the Monitor and `prune status`.** Each graphics processor, with how busy it is

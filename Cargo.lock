@@ -3007,6 +3007,7 @@ dependencies = [
  "dirs",
  "plist",
  "rayon",
+ "same-file",
  "serde",
  "serde_json",
  "sysinfo",
