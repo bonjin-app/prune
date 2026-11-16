@@ -222,6 +222,7 @@ fn status(engine: &PruneEngine, json: bool, out: &mut impl Write) -> std::io::Re
                 "permissions": permissions,
                 "battery": snapshot.battery,
                 "temperatures": snapshot.temperatures,
+                "gpus": snapshot.gpus,
             }),
         )?;
         return Ok(EXIT_OK);
@@ -253,6 +254,10 @@ fn status(engine: &PruneEngine, json: bool, out: &mut impl Write) -> std::io::Re
         "  temperatures   {}",
         render::temperatures(&snapshot.temperatures)
     )?;
+    for (i, line) in render::gpus(&snapshot.gpus).iter().enumerate() {
+        let label = if i == 0 { "graphics" } else { "" };
+        writeln!(out, "  {label:<14} {line}")?;
+    }
     Ok(EXIT_OK)
 }
 

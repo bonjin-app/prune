@@ -6,6 +6,18 @@ All notable changes to Prune are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Graphics in the Monitor and `prune status`.** Each graphics processor, with how busy it is
+  and the memory it is using. Read-only, and read at most every 1.5 s.
+  - **macOS.** From the same registry Activity Monitor uses. The model and core count come with
+    it. On Apple silicon the memory is the share of memory it shares with the processor.
+  - **Windows.** From the performance counters Task Manager's GPU graphs use. As there, an
+    adapter is as busy as its busiest engine. Those counters do not name the adapter, so it is
+    shown as GPU 1, GPU 2.
+  - **Unknowns stay unknown.** A load the system does not report is said to be unknown, never
+    shown as 0%.
+
 ## [0.2.7] - 2026-11-16
 
 The Monitor and `prune status` now show the battery and temperatures. Ollama is broken down model

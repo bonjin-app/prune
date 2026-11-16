@@ -5,7 +5,7 @@ use std::io::Write;
 use prune_core::analyzer::{DiskAnalysis, DiskSummary};
 use prune_core::apps::AppDetail;
 use prune_core::models::{
-    BatteryStatus, CleanupPlan, RiskLevel, ScanResult, ScanSession, Temperatures,
+    BatteryStatus, CleanupPlan, GpuStatus, RiskLevel, ScanResult, ScanSession, Temperatures,
 };
 use prune_core::PruneEngine;
 
@@ -40,6 +40,38 @@ pub fn battery(battery: Option<&BatteryStatus>) -> String {
         }
     }
     line
+}
+
+/// One line per graphics processor, or a plain statement that the system reported none.
+pub fn gpus(gpus: &[GpuStatus]) -> Vec<String> {
+    if gpus.is_empty() {
+        return vec!["not reported by this system".into()];
+    }
+    gpus.iter()
+        .enumerate()
+        .map(|(i, g)| {
+            let mut line = g.name.clone().unwrap_or_else(|| format!("GPU {}", i + 1));
+            if let Some(cores) = g.core_count {
+                line.push_str(&format!(" ({cores} cores)"));
+            }
+            match g.usage_percent {
+                Some(p) => line.push_str(&format!(", {p:.0}% busy")),
+                None => line.push_str(", load unknown"),
+            }
+            match (g.memory_used_bytes, g.memory_total_bytes) {
+                (Some(used), Some(total)) => line.push_str(&format!(
+                    ", {} of {} memory",
+                    human_bytes(used),
+                    human_bytes(total)
+                )),
+                (Some(used), None) => {
+                    line.push_str(&format!(", {} memory in use", human_bytes(used)))
+                }
+                _ => {}
+            }
+            line
+        })
+        .collect()
 }
 
 /// The sensors that reported, or a plain statement that none did.
@@ -459,6 +491,32 @@ mod tests {
             storage_celsius: Some(42.0),
         };
         assert_eq!(temperatures(&t), "processor 57 °C, storage 42 °C");
+    }
+
+    #[test]
+    fn describes_each_gpu_and_what_is_unknown() {
+        let apple = GpuStatus {
+            name: Some("Apple M3 Pro".into()),
+            usage_percent: Some(17.4),
+            memory_used_bytes: Some(1_300_000_000),
+            memory_total_bytes: None,
+            core_count: Some(18),
+        };
+        let card = GpuStatus {
+            usage_percent: None,
+            memory_used_bytes: Some(1_000_000_000),
+            memory_total_bytes: Some(8_000_000_000),
+            ..Default::default()
+        };
+        let lines = gpus(&[apple, card]);
+        assert!(
+            lines[0].starts_with("Apple M3 Pro (18 cores), 17% busy, "),
+            "{lines:?}"
+        );
+        assert!(lines[0].ends_with(" memory in use"), "{lines:?}");
+        assert!(lines[1].starts_with("GPU 2, load unknown, "), "{lines:?}");
+        assert!(lines[1].contains(" of "), "{lines:?}");
+        assert_eq!(gpus(&[]), ["not reported by this system"]);
     }
 
     #[test]

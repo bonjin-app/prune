@@ -1067,6 +1067,15 @@ export const mockBackend: Backend = {
         capacityPercent: 92.4,
       },
       temperatures: { cpuCelsius: 52 + Math.random() * 6, batteryCelsius: 31, storageCelsius: 41 },
+      gpus: [
+        {
+          name: "Apple M3 Pro",
+          usagePercent: 8 + Math.random() * 20,
+          memoryUsedBytes: 1.3e9,
+          memoryTotalBytes: null,
+          coreCount: 18,
+        },
+      ],
     };
   },
   async systemStopProcess(pid, mode, name) {

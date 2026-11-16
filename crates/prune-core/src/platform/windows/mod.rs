@@ -10,6 +10,7 @@ use crate::Result;
 mod apps;
 mod battery;
 mod git;
+mod gpu;
 mod open_files;
 mod rules;
 mod startup;
@@ -26,6 +27,10 @@ fn env_path(name: &str) -> Option<PathBuf> {
 impl PlatformService for WindowsPlatform {
     fn battery(&self) -> Option<crate::models::BatteryStatus> {
         battery::read()
+    }
+
+    fn gpus(&self) -> Vec<crate::models::GpuStatus> {
+        gpu::read()
     }
 
     fn platform(&self) -> Platform {

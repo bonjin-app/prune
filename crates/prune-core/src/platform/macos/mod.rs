@@ -10,6 +10,7 @@ use crate::Result;
 mod apps;
 mod battery;
 mod git;
+mod gpu;
 mod open_files;
 mod startup;
 
@@ -26,6 +27,10 @@ impl PlatformService for MacosPlatform {
 
     fn battery(&self) -> Option<crate::models::BatteryStatus> {
         battery::read()
+    }
+
+    fn gpus(&self) -> Vec<crate::models::GpuStatus> {
+        gpu::read()
     }
 
     fn app_related_paths(&self, app: &ApplicationInfo, known: &KnownPaths) -> Vec<RelatedPath> {

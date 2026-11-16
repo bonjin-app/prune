@@ -210,6 +210,20 @@ export interface SystemSnapshot {
   /** Absent on a machine without a battery, or where it cannot be read. */
   battery?: BatteryStatus | null;
   temperatures: Temperatures;
+  /** Empty where the system reports no graphics processor. */
+  gpus?: GpuStatus[];
+}
+
+/** A graphics processor. Null fields are ones the OS did not report. */
+export interface GpuStatus {
+  name?: string | null;
+  /** 0–100: the busiest of its engines. */
+  usagePercent?: number | null;
+  /** On Apple silicon, its share of the memory it shares with the processor. */
+  memoryUsedBytes?: number | null;
+  /** Memory of its own, on a discrete card. */
+  memoryTotalBytes?: number | null;
+  coreCount?: number | null;
 }
 
 export interface BatteryStatus {

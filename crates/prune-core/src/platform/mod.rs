@@ -319,6 +319,10 @@ pub trait PlatformService: Send + Sync {
     fn battery(&self) -> Option<crate::models::BatteryStatus> {
         None
     }
+    /// Graphics processors and how busy they are, read-only. Default: none known.
+    fn gpus(&self) -> Vec<crate::models::GpuStatus> {
+        Vec::new()
+    }
     /// Programs that start by themselves. Default: not implemented.
     fn startup_items(&self, known: &KnownPaths) -> Result<Vec<StartupItem>> {
         let _ = known;

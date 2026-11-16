@@ -6,6 +6,7 @@ import { Ban, Lock } from "lucide-react";
 import { formatBytes, formatPercent } from "@/lib/format";
 import { startPolling, startSnapshotPolling, useSystem } from "@/stores/system";
 import type { ProcessInfo } from "@/types/models";
+import { GpuCard } from "./GpuCard";
 import { PowerCard } from "./PowerCard";
 import { StopProcessDialog } from "./StopProcessDialog";
 
@@ -128,6 +129,7 @@ export function MonitorView() {
             </div>
           </Card>
           <PowerCard battery={snapshot?.battery} temperatures={snapshot?.temperatures} />
+          <GpuCard gpus={snapshot?.gpus} />
         </div>
 
         <Card>

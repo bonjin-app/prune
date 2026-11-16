@@ -95,6 +95,24 @@ pub struct SystemSnapshot {
     /// `None` on a machine without a battery, or where it cannot be read.
     pub battery: Option<BatteryStatus>,
     pub temperatures: Temperatures,
+    /// Graphics processors, as the OS reports them. Empty where none can be read.
+    #[serde(default)]
+    pub gpus: Vec<GpuStatus>,
+}
+
+/// A graphics processor. Every field the OS may withhold is optional and shown as unknown.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GpuStatus {
+    /// The model, where the OS names it (`Apple M3 Pro`).
+    pub name: Option<String>,
+    /// How busy it is, 0–100: the busiest of its engines.
+    pub usage_percent: Option<f32>,
+    /// Memory it is using. On Apple silicon this is shared with the processor.
+    pub memory_used_bytes: Option<u64>,
+    /// Memory of its own, where it has some (a discrete card).
+    pub memory_total_bytes: Option<u64>,
+    pub core_count: Option<u32>,
 }
 
 /// The battery as the operating system reports it. Every field the OS may withhold is optional,

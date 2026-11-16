@@ -13,8 +13,8 @@ use sysinfo::{
 };
 
 use crate::models::{
-    BatteryStatus, CpuStatus, DiskStatus, MemoryStatus, NetworkStatus, Platform, ProcessInfo,
-    StopMode, SystemInfo, SystemSnapshot, Temperatures,
+    BatteryStatus, CpuStatus, DiskStatus, GpuStatus, MemoryStatus, NetworkStatus, Platform,
+    ProcessInfo, StopMode, SystemInfo, SystemSnapshot, Temperatures,
 };
 use crate::{PruneError, Result};
 
@@ -90,6 +90,10 @@ const BATTERY_TTL: Duration = Duration::from_secs(30);
 /// Apple silicon Mac, which every two seconds would be Prune's own largest cost.
 const SENSOR_TTL: Duration = Duration::from_secs(10);
 
+/// How long a GPU reading is reused. The Monitor asks every two seconds and the menu bar may ask
+/// as well; one `ioreg` run (or one counter read on Windows) serves both.
+const GPU_TTL: Duration = Duration::from_millis(1500);
+
 /// Readings outside this range are a sensor that is absent or not reporting (Apple silicon has
 /// several that read about -9200 °C), not a temperature.
 const PLAUSIBLE_CELSIUS: std::ops::RangeInclusive<f32> = -40.0..=150.0;
@@ -114,6 +118,7 @@ pub struct SystemMonitor {
     battery: Mutex<Option<(Option<BatteryStatus>, Instant)>>,
     /// Created on first use: listing the sensors is itself the slow part.
     sensors: Mutex<Option<(Components, Temperatures, Instant)>>,
+    gpus: Mutex<Option<(Vec<GpuStatus>, Instant)>>,
     home: std::path::PathBuf,
 }
 
@@ -156,6 +161,7 @@ impl SystemMonitor {
             processes_read_at: Mutex::new(None),
             battery: Mutex::new(None),
             sensors: Mutex::new(None),
+            gpus: Mutex::new(None),
             home: home.to_path_buf(),
         }
     }
@@ -230,7 +236,21 @@ impl SystemMonitor {
             process_count: sys.processes().len(),
             battery: self.battery(),
             temperatures: self.temperatures(),
+            gpus: self.gpus(),
         }
+    }
+
+    /// The graphics processors, re-read at most once per [`GPU_TTL`].
+    fn gpus(&self) -> Vec<GpuStatus> {
+        let mut cache = self.gpus.lock_recover();
+        if let Some((reading, at)) = &*cache {
+            if at.elapsed() < GPU_TTL {
+                return reading.clone();
+            }
+        }
+        let reading = crate::platform::current().gpus();
+        *cache = Some((reading.clone(), Instant::now()));
+        reading
     }
 
     /// The battery, re-read at most once per [`BATTERY_TTL`].
