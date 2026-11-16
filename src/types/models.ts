@@ -504,6 +504,10 @@ export interface Settings {
   projectRoots: string[];
   /** Never removed, and nothing containing one is removed either. */
   protectedPaths: string[];
+  /** Prune's icon in the menu bar (notification area on Windows) while it runs. */
+  menuBarIcon: boolean;
+  /** Closing the window leaves Prune in the menu bar. Only takes effect with the icon on. */
+  keepInMenuBar: boolean;
 }
 
 export interface SettingsView {

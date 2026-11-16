@@ -35,7 +35,8 @@ tempfile = "3"
 
 [dependencies]
 prune-core = { path = "../crates/prune-core" }
-tauri = { version = "2", features = [] }
+# The menu bar icon (`src/tray.rs`), and decoding its PNG.
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
 # Remembering the window and refusing a second copy are desktop-app manners, not access:
 # neither plugin can see anything the user's data.
 tauri-plugin-window-state = "2"

@@ -9,7 +9,7 @@ vi.mock("@/lib/tauri", () => ({
 }));
 
 const guessed: SettingsView = {
-  settings: { projectRoots: [], protectedPaths: [] },
+  settings: { projectRoots: [], protectedPaths: [], menuBarIcon: true, keepInMenuBar: false },
   effectiveProjectRoots: ["/home/u/Projects", "/home/u/code"],
   projectRootsConfigured: false,
   homeDir: "/home/u",
@@ -21,7 +21,7 @@ beforeEach(() => {
   useSettings.setState({ view: guessed, saving: false, loading: false, error: null });
   vi.mocked(backend.settingsSetProjectRoots).mockImplementation(async (roots) => ({
     ...guessed,
-    settings: { projectRoots: roots, protectedPaths: [] },
+    settings: { projectRoots: roots, protectedPaths: [], menuBarIcon: true, keepInMenuBar: false },
     effectiveProjectRoots: roots,
     projectRootsConfigured: true,
   }));
@@ -42,7 +42,12 @@ describe("project scan folders", () => {
       view: {
         ...guessed,
         projectRootsConfigured: true,
-        settings: { projectRoots: ["/home/u/explicit"], protectedPaths: [] },
+        settings: {
+          projectRoots: ["/home/u/explicit"],
+          protectedPaths: [],
+          menuBarIcon: true,
+          keepInMenuBar: false,
+        },
       },
     });
     await useSettings.getState().addProjectRoot("/home/u/new");

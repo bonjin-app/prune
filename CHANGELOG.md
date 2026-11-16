@@ -17,6 +17,15 @@ All notable changes to Prune are documented here. The format follows
     shown as GPU 1, GPU 2.
   - **Unknowns stay unknown.** A load the system does not report is said to be unknown, never
     shown as 0%.
+- **Prune in the menu bar.** While Prune runs, its icon in the menu bar (the notification area
+  on Windows) shows processor, memory, graphics, free space and battery. The menu also has Open
+  Prune and Quit Prune.
+  - **No timer.** The figures are read when the pointer reaches the icon, so an icon nobody
+    looks at costs nothing.
+  - **Optional.** Settings → Menu bar turns the icon off.
+  - **Staying open.** It can also keep Prune there when its window is closed. That is off by
+    default, so closing the window still quits.
+  - **No background service.** Prune never starts by itself and adds no helper or login item.
 
 ## [0.2.7] - 2026-11-16
 

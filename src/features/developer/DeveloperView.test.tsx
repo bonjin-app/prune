@@ -27,7 +27,7 @@ beforeEach(() => {
   useUi.setState({ view: "disk", projectRootDraft: null });
   useSettings.setState({
     view: {
-      settings: { projectRoots: [], protectedPaths: [] },
+      settings: { projectRoots: [], protectedPaths: [], menuBarIcon: true, keepInMenuBar: false },
       effectiveProjectRoots: ["/home/u/code"],
       projectRootsConfigured: false,
       homeDir: "/home/u",

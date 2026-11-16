@@ -1,7 +1,8 @@
 //! User settings, stored as one JSON file in the application data directory.
 //!
-//! Only choices the engine needs live here. Anything that is purely a matter of appearance
-//! (the theme) stays in the frontend, because the engine has no use for it. The delete mode is
+//! Only choices the engine or the desktop app's own process needs live here. Anything that is
+//! purely a matter of appearance (the theme) stays in the frontend, because neither has a use
+//! for it. The menu bar choices are here because the app needs them before any page loads. The delete mode is
 //! kept nowhere: it is per run, so permanent deletion is never inherited from an earlier one.
 
 use std::path::{Path, PathBuf};
@@ -12,7 +13,7 @@ use crate::{PruneError, Result};
 
 const FILE_NAME: &str = "settings.json";
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
     /// Directories searched for project artifacts (`node_modules`, `target/`, …).
@@ -26,6 +27,30 @@ pub struct Settings {
     /// Kept exactly as chosen even when one stops existing (an unplugged drive, a renamed
     /// folder), so that it is protected again the moment it is back.
     pub protected_paths: Vec<PathBuf>,
+    /// Show Prune's icon in the menu bar (the notification area on Windows) while it runs.
+    pub menu_bar_icon: bool,
+    /// Closing the window leaves Prune in the menu bar instead of quitting. Only while
+    /// `menu_bar_icon` is on: a running app with no window and no icon could not be found.
+    /// Prune never starts itself; this only keeps the copy the user opened.
+    pub keep_in_menu_bar: bool,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            project_roots: Vec::new(),
+            protected_paths: Vec::new(),
+            menu_bar_icon: true,
+            keep_in_menu_bar: false,
+        }
+    }
+}
+
+impl Settings {
+    /// Whether closing the window should leave Prune running in the menu bar.
+    pub fn stays_in_menu_bar(&self) -> bool {
+        self.menu_bar_icon && self.keep_in_menu_bar
+    }
 }
 
 /// Settings as read from disk, and what went wrong reading them.
@@ -243,6 +268,25 @@ mod tests {
         // A missing file is not one: that is a fresh install.
         let fresh = tempfile::tempdir().unwrap();
         assert!(Settings::load_checked(fresh.path()).problem.is_none());
+    }
+
+    #[test]
+    fn settings_from_before_the_menu_bar_show_the_icon_and_quit_on_close() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join(FILE_NAME), br#"{ "protectedPaths": [] }"#).unwrap();
+        let settings = Settings::load(dir.path());
+        assert!(settings.menu_bar_icon);
+        assert!(!settings.stays_in_menu_bar());
+    }
+
+    #[test]
+    fn staying_in_the_menu_bar_needs_the_icon() {
+        let settings = Settings {
+            menu_bar_icon: false,
+            keep_in_menu_bar: true,
+            ..Settings::default()
+        };
+        assert!(!settings.stays_in_menu_bar());
     }
 
     #[test]

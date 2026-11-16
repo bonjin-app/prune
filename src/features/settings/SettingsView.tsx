@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { CustomProviders } from "./CustomProviders";
+import { MenuBar } from "./MenuBar";
 import { ProjectRoots } from "./ProjectRoots";
 import { ProtectedPaths } from "./ProtectedPaths";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -50,6 +51,8 @@ export function SettingsView() {
             />
           </div>
         </Card>
+
+        <MenuBar platform={platform} />
 
         <ProjectRoots />
 

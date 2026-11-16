@@ -465,8 +465,23 @@ harness must never do.
 The dialog plugin is there only for the native "choose a folder" panel on the protected-paths
 card, and the webview is granted none of its permissions. `settings_pick_protected_path` opens
 the panel from Rust, off the main thread, and returns the chosen path and nothing else. That path
-still goes through `settings_set_protected_paths` and its checks. So the page can neither open
+still goes through `settings_add_protected_path` and its checks. So the page can neither open
 dialogs on its own nor gain any file access from them.
+
+The menu bar icon (`src/tray.rs`, the notification area on Windows) is part of the app's own
+process. It is not a helper, it is not started at login, and Quit in its menu ends the app.
+Its menu shows a few figures from the same `SystemMonitor` the Monitor view uses. They are read
+when the pointer reaches the icon, off the main thread, rather than on a timer, so an icon nobody
+looks at costs nothing. Two settings govern it, both kept in `settings.json` because the process
+needs them before any page loads:
+
+- **`menuBarIcon`** (on by default) shows or hides the icon.
+- **`keepInMenuBar`** (off by default) makes closing the window hide it, and on macOS the Dock
+  icon, instead of quitting. It only takes effect while the icon is shown, so a running Prune
+  can always be found. A hidden window stops the frontend's polling as any hidden window does,
+  so Prune left in the menu bar reads nothing until it is looked at. This is what keeps it from
+  being the background daemon the principles rule out: the user opened it, can see it, and can
+  quit it from the icon.
 
 Nothing is allowed to break permanently either. A thread that panics while holding a `Mutex`
 poisons it, and `lock().unwrap()` would then panic on every later use — one bug in one scan
@@ -639,6 +654,7 @@ individually rather than taken together every tick:
 | process table walk | ~60ms | at most every 4s, and reused by the process list |
 | mounted volumes | ~140ms | at most every 10s, or at once after a removal |
 | process list with details | ~55ms | only while the Monitor view is open |
+| graphics (`ioreg` on macOS, performance counters on Windows) | ~20ms | at most every 1.5s |
 
 That takes a snapshot from 439ms to under a millisecond in the steady state. On top of it,
 `startPolling` in the frontend stops the timers entirely while the window is hidden and takes a

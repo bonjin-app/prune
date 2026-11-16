@@ -161,3 +161,20 @@ fn dirs_home<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Option<PathBuf> {
     use tauri::Manager;
     app.path().home_dir().ok()
 }
+
+/// Shows or hides the menu bar icon, and whether closing the window leaves Prune there.
+#[tauri::command]
+pub fn settings_set_menu_bar<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    state: State<'_, AppState>,
+    icon: bool,
+    keep: bool,
+) -> CommandResult<SettingsView> {
+    state.update_settings(|settings| -> CommandResult<()> {
+        settings.menu_bar_icon = icon;
+        settings.keep_in_menu_bar = keep;
+        Ok(())
+    })?;
+    crate::tray::apply(&app, icon);
+    Ok(view(&state))
+}

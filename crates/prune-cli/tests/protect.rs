@@ -66,6 +66,7 @@ fn adds_home_relative_and_relative_paths_and_keeps_other_settings() {
     Settings {
         project_roots: vec![h.home.join("code")],
         protected_paths: vec![],
+        ..Settings::default()
     }
     .save(&h.settings)
     .unwrap();

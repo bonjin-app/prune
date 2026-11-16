@@ -571,6 +571,7 @@ function mockDockerUsage(scale: number) {
 
 let mockProjectRoots: string[] = [];
 let mockProtectedPaths: string[] = [];
+let mockMenuBar = { menuBarIcon: true, keepInMenuBar: false };
 
 /** The backend's rule: a path is kept if it is, is inside, or contains a protected path. */
 function mockProtection(path: string): string | null {
@@ -592,7 +593,11 @@ function withMockProtections(results: ScanResult[]): ScanResult[] {
 }
 function mockSettings() {
   return {
-    settings: { projectRoots: mockProjectRoots, protectedPaths: mockProtectedPaths },
+    settings: {
+      projectRoots: mockProjectRoots,
+      protectedPaths: mockProtectedPaths,
+      ...mockMenuBar,
+    },
     effectiveProjectRoots: mockProjectRoots.length
       ? mockProjectRoots
       : [`${HOME}/Projects`, `${HOME}/Desktop`],
@@ -1513,6 +1518,10 @@ export const mockBackend: Backend = {
     const bad = roots.find((r) => !r.startsWith(HOME));
     if (bad) throw { code: "invalid_path", message: `${bad}: must be inside your home folder` };
     mockProjectRoots = roots.filter((r) => r.trim().length > 0);
+    return mockSettings();
+  },
+  async settingsSetMenuBar(icon, keep) {
+    mockMenuBar = { menuBarIcon: icon, keepInMenuBar: keep };
     return mockSettings();
   },
   async settingsAddProtectedPath(path) {

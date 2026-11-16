@@ -94,6 +94,7 @@ export interface Backend {
   settingsRemoveProtectedPath(path: string): Promise<SettingsView>;
   /** Opens the system's own panel. The chosen path, or null when cancelled. Saves nothing. */
   settingsPickProtectedPath(kind: "folder" | "file"): Promise<string | null>;
+  settingsSetMenuBar(icon: boolean, keep: boolean): Promise<SettingsView>;
   startupList(): Promise<StartupItem[]>;
   startupSetEnabled(itemId: string, enabled: boolean): Promise<StartupItem>;
   opsList(limit?: number): Promise<OperationRecord[]>;
@@ -109,8 +110,7 @@ const tauriBackend: Backend = {
   systemGetInfo: () => invoke<SystemInfo>("system_get_info"),
   systemGetSnapshot: () => invoke<SystemSnapshot>("system_get_snapshot"),
   systemListProcesses: (limit) => invoke<ProcessInfo[]>("system_list_processes", { limit }),
-  systemStopProcess: (pid, mode, name) =>
-    invoke<void>("system_stop_process", { pid, mode, name }),
+  systemStopProcess: (pid, mode, name) => invoke<void>("system_stop_process", { pid, mode, name }),
   cleanerListProviders: () => invoke<ProviderInfo[]>("cleaner_list_providers"),
   cleanerStartScan: (providerIds) => invoke<string>("cleaner_start_scan", { providerIds }),
   cleanerCancelScan: (scanId) => invoke<void>("cleaner_cancel_scan", { scanId }),
@@ -132,12 +132,12 @@ const tauriBackend: Backend = {
   appsRunUninstaller: (appId) => invoke<void>("apps_run_uninstaller", { appId }),
   settingsGet: () => invoke<SettingsView>("settings_get"),
   settingsSetProjectRoots: (roots) => invoke<SettingsView>("settings_set_project_roots", { roots }),
-  settingsAddProtectedPath: (path) =>
-    invoke<SettingsView>("settings_add_protected_path", { path }),
+  settingsAddProtectedPath: (path) => invoke<SettingsView>("settings_add_protected_path", { path }),
   settingsRemoveProtectedPath: (path) =>
     invoke<SettingsView>("settings_remove_protected_path", { path }),
   settingsPickProtectedPath: (kind) =>
     invoke<string | null>("settings_pick_protected_path", { kind }),
+  settingsSetMenuBar: (icon, keep) => invoke<SettingsView>("settings_set_menu_bar", { icon, keep }),
   startupList: () => invoke<StartupItem[]>("startup_list"),
   startupSetEnabled: (itemId, enabled) =>
     invoke<StartupItem>("startup_set_enabled", { itemId, enabled }),

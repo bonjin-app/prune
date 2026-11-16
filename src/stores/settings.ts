@@ -17,6 +17,7 @@ interface SettingsState {
   removeProtectedPath: (path: string) => Promise<boolean>;
   /** Lets the user choose a path in the system panel, then protects it. False if cancelled. */
   pickProtectedPath: (kind: "folder" | "file") => Promise<boolean>;
+  setMenuBar: (icon: boolean, keep: boolean) => Promise<boolean>;
   clearError: () => void;
 }
 
@@ -108,6 +109,11 @@ export const useSettings = create<SettingsState>((set, get) => ({
       return false;
     }
     return picked ? get().addProtectedPath(picked) : false;
+  },
+
+  setMenuBar: async (icon, keep) => {
+    if (get().saving || !get().view) return false;
+    return saveWith(set, get, () => backend.settingsSetMenuBar(icon, keep));
   },
 
   clearError: () => set({ error: null }),

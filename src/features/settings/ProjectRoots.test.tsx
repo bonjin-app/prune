@@ -15,7 +15,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   useSettings.setState({
     view: {
-      settings: { projectRoots: [], protectedPaths: [] },
+      settings: { projectRoots: [], protectedPaths: [], menuBarIcon: true, keepInMenuBar: false },
       effectiveProjectRoots: ["/home/u/code"],
       projectRootsConfigured: false,
       homeDir: "/home/u",
@@ -44,7 +44,7 @@ it("prefills and resets the draft for each new suggestion without saving", async
 
 it("adds the reviewed folder alongside guessed roots and clears the draft after saving", async () => {
   vi.mocked(backend.settingsSetProjectRoots).mockImplementation(async (roots) => ({
-    settings: { projectRoots: roots, protectedPaths: [] },
+    settings: { projectRoots: roots, protectedPaths: [], menuBarIcon: true, keepInMenuBar: false },
     effectiveProjectRoots: roots,
     projectRootsConfigured: true,
     homeDir: "/home/u",

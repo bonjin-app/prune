@@ -5,6 +5,7 @@ mod commands;
 mod error;
 mod recent;
 mod state;
+mod tray;
 
 use tauri::Manager;
 
@@ -71,6 +72,7 @@ pub fn register_commands<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri
         commands::settings_add_protected_path,
         commands::settings_remove_protected_path,
         commands::settings_pick_protected_path,
+        commands::settings_set_menu_bar,
         commands::startup_list,
         commands::startup_set_enabled,
         commands::ops_list,
@@ -93,10 +95,7 @@ pub fn run() {
     // the process when another copy is already running, which a test harness must never do.
     let builder =
         tauri::Builder::default().plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.unminimize();
-                let _ = window.set_focus();
-            }
+            tray::show_window(app);
         }));
 
     register_commands(register_plugins(builder))
@@ -107,7 +106,10 @@ pub fn run() {
                 tracing::warn!(error = %e, "no application data directory; settings and history will not persist");
                 std::env::temp_dir().join("app.bonjin.prune")
             });
-            app.manage(AppState::new(&data_dir));
+            let state = AppState::new(&data_dir);
+            let menu_bar_icon = state.current_settings().menu_bar_icon;
+            app.manage(state);
+            tray::apply(app.handle(), menu_bar_icon);
             tracing::info!(
                 version = env!("CARGO_PKG_VERSION"),
                 data_dir = %data_dir.display(),
@@ -115,6 +117,26 @@ pub fn run() {
             );
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running Prune");
+        .on_window_event(|window, event| {
+            // Closing the window leaves Prune in the menu bar only when the user chose that and
+            // the icon is there to bring it back.
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                let stays = window
+                    .try_state::<AppState>()
+                    .is_some_and(|s| s.current_settings().stays_in_menu_bar());
+                if stays && tray::is_shown(window.app_handle()) {
+                    api.prevent_close();
+                    tray::hide_window(window);
+                }
+            }
+        })
+        .build(tauri::generate_context!())
+        .expect("error while building Prune")
+        .run(|_app, _event| {
+            // Opening Prune again from Finder or the Dock while its window is hidden.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { .. } = _event {
+                tray::show_window(_app);
+            }
+        });
 }

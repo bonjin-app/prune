@@ -17,7 +17,12 @@ vi.mock("@/lib/tauri", () => ({
 }));
 
 const base: SettingsView = {
-  settings: { projectRoots: ["/home/u/code"], protectedPaths: ["/home/u/code/site/dist"] },
+  settings: {
+    projectRoots: ["/home/u/code"],
+    protectedPaths: ["/home/u/code/site/dist"],
+    menuBarIcon: true,
+    keepInMenuBar: false,
+  },
   effectiveProjectRoots: ["/home/u/code"],
   projectRootsConfigured: true,
   homeDir: "/home/u",
@@ -29,7 +34,15 @@ beforeEach(() => {
   useSettings.setState({ view: base, loading: false, saving: false, error: null });
   // The backend answers with what is on disk, which the page may not have seen yet.
   let onDisk = [...base.settings.protectedPaths];
-  const answer = () => ({ ...base, settings: { ...base.settings, protectedPaths: [...onDisk] } });
+  const answer = () => ({
+    ...base,
+    settings: {
+      ...base.settings,
+      protectedPaths: [...onDisk],
+      menuBarIcon: true,
+      keepInMenuBar: false,
+    },
+  });
   vi.mocked(backend.settingsGet).mockImplementation(async () => answer());
   vi.mocked(backend.settingsAddProtectedPath).mockImplementation(async (path) => {
     if (!onDisk.includes(path)) onDisk.push(path);
@@ -103,7 +116,7 @@ it("says plainly when the settings could not be read", () => {
   useSettings.setState({
     view: {
       ...base,
-      settings: { projectRoots: [], protectedPaths: [] },
+      settings: { projectRoots: [], protectedPaths: [], menuBarIcon: true, keepInMenuBar: false },
       problem: "The settings file could not be read. Nothing will be removed until it is fixed.",
     },
   });
@@ -113,7 +126,10 @@ it("says plainly when the settings could not be read", () => {
 
 it("explains an empty list instead of showing nothing", () => {
   useSettings.setState({
-    view: { ...base, settings: { ...base.settings, protectedPaths: [] } },
+    view: {
+      ...base,
+      settings: { ...base.settings, protectedPaths: [], menuBarIcon: true, keepInMenuBar: false },
+    },
   });
   render(<ProtectedPaths />);
   expect(screen.getByText(/Nothing is protected yet/)).toBeInTheDocument();
