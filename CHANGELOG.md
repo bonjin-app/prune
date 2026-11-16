@@ -6,6 +6,12 @@ All notable changes to Prune are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-11-16
+
+The Monitor and `prune status` now show the battery and temperatures. Ollama is broken down model
+by model. Storage remembers its last analyses. The protected list can be edited from the command
+line, and the open app follows those changes without a restart.
+
 ### Added
 
 - **Battery and temperatures in the Monitor and `prune status`.**
@@ -491,7 +497,8 @@ rather than regressions anyone shipped.
 - IPC integration tests on Tauri's mock runtime covering the real command surface, including a full disk scan → preview → execute → operation log cycle.
 - A `prune` command line built on the same engine: `status`, `providers`, `scan`, `clean`, `disk`, `apps`, `startup` and `log`, each with `--json` for scripting and meaningful exit codes. `clean` is a dry run unless `--yes` is passed and never selects anything riskier than low on its own. The read-only example prototypes it replaces have been removed.
 
-[unreleased]: https://github.com/bonjin-app/prune/compare/v0.2.6...HEAD
+[unreleased]: https://github.com/bonjin-app/prune/compare/v0.2.7...HEAD
+[0.2.7]: https://github.com/bonjin-app/prune/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/bonjin-app/prune/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/bonjin-app/prune/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/bonjin-app/prune/compare/v0.2.3...v0.2.4
