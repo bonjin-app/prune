@@ -6,21 +6,11 @@ All notable changes to Prune are documented here. The format follows
 
 ## [Unreleased]
 
-### Fixed
+## [0.2.8] - 2026-11-16
 
-- **A `dist`, `build` or `out` folder used to keep things is no longer offered as build
-  output.** Some projects keep release evidence, deploy logs or database dumps taken before a
-  deploy in `dist/`. Prune treated all of it as regenerable build output.
-  - **What counts.** A folder holding dated folders (`2026-10-14`, `deploy-20261020`) or files
-    a build does not make is now high risk, and says what it found. Files a build does not make
-    are dumps, backups, signing keys and `.env` files.
-  - **Not offered automatically.** `prune clean` never takes high risk on its own.
-  - **On the machine this was checked on,** it caught two such folders (37 GB). Folders whose
-    build copies migrations or certificates into its output were left as they were.
-- **A projects folder is no longer scanned twice.** On a case-insensitive disk (the macOS and
-  Windows default), the guessed `~/Projects` and `~/projects` are the same folder. Each build
-  folder in it was listed twice, the total was doubled, and the second removal of each failed as
-  missing.
+Prune now sits in the menu bar while it runs, and the Monitor shows how busy each graphics
+processor is. A `dist` or `build` folder used to keep release evidence or database dumps is no
+longer offered as build output, and a projects folder is no longer scanned twice.
 
 ### Added
 
@@ -42,6 +32,22 @@ All notable changes to Prune are documented here. The format follows
   - **Staying open.** It can also keep Prune there when its window is closed. That is off by
     default, so closing the window still quits.
   - **No background service.** Prune never starts by itself and adds no helper or login item.
+
+### Fixed
+
+- **A `dist`, `build` or `out` folder used to keep things is no longer offered as build
+  output.** Some projects keep release evidence, deploy logs or database dumps taken before a
+  deploy in `dist/`. Prune treated all of it as regenerable build output.
+  - **What counts.** A folder holding dated folders (`2026-10-14`, `deploy-20261020`) or files
+    a build does not make is now high risk, and says what it found. Files a build does not make
+    are dumps, backups, signing keys and `.env` files.
+  - **Not offered automatically.** `prune clean` never takes high risk on its own.
+  - **On the machine this was checked on,** it caught two such folders (37 GB). Folders whose
+    build copies migrations or certificates into its output were left as they were.
+- **A projects folder is no longer scanned twice.** On a case-insensitive disk (the macOS and
+  Windows default), the guessed `~/Projects` and `~/projects` are the same folder. Each build
+  folder in it was listed twice, the total was doubled, and the second removal of each failed as
+  missing.
 
 ## [0.2.7] - 2026-11-16
 
@@ -534,7 +540,8 @@ rather than regressions anyone shipped.
 - IPC integration tests on Tauri's mock runtime covering the real command surface, including a full disk scan → preview → execute → operation log cycle.
 - A `prune` command line built on the same engine: `status`, `providers`, `scan`, `clean`, `disk`, `apps`, `startup` and `log`, each with `--json` for scripting and meaningful exit codes. `clean` is a dry run unless `--yes` is passed and never selects anything riskier than low on its own. The read-only example prototypes it replaces have been removed.
 
-[unreleased]: https://github.com/bonjin-app/prune/compare/v0.2.7...HEAD
+[unreleased]: https://github.com/bonjin-app/prune/compare/v0.2.8...HEAD
+[0.2.8]: https://github.com/bonjin-app/prune/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/bonjin-app/prune/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/bonjin-app/prune/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/bonjin-app/prune/compare/v0.2.4...v0.2.5
