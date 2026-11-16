@@ -1,14 +1,14 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.10.0.schema.json
 
 PackageIdentifier: PruneContributors.Prune
-PackageVersion: 0.2.6
+PackageVersion: 0.2.7
 Platform:
 - Windows.Desktop
 # The compatibility table in the README says Windows 10, and nothing narrower has been tested,
 # so this claims no more than that.
 MinimumOSVersion: 10.0.0.0
 UpgradeBehavior: install
-ReleaseDate: 2026-11-15
+ReleaseDate: 2026-11-16
 # Only the MSI is listed. winget marks the NSIS installer as downloaded from the internet and
 # starts it through ShellExecute, which holds an unsigned program at a security prompt; on an
 # unattended install nobody answers it, so the installer never starts and winget waits forever.
@@ -23,8 +23,8 @@ Installers:
   InstallerType: wix
   Scope: machine
   InstallerLocale: en-US
-  InstallerUrl: https://github.com/bonjin-app/prune/releases/download/v0.2.6/Prune_0.2.6_x64_en-US.msi
-  InstallerSha256: 22A78B718188ADCCA60F7D1A13F05428A17A5A446355180C8534AE524BFEB7AC
-  ProductCode: '{E528AC68-D504-4E9E-8586-25B0A4643F84}'
+  InstallerUrl: https://github.com/bonjin-app/prune/releases/download/v0.2.7/Prune_0.2.7_x64_en-US.msi
+  InstallerSha256: F6DAC7FD6D4A6DCFFE2469ACFC0476F9A194A6FED90CBA310A7C643C04643C82
+  ProductCode: '{C85AF7CE-6D27-470D-BC95-3961784A08A9}'
 ManifestType: installer
 ManifestVersion: 1.10.0
