@@ -38,11 +38,13 @@ pub fn read() -> Vec<AccessoryBattery> {
 /// Accessories the registry did not already report. The registry wins for a device both know:
 /// it is read more directly, and naming it twice would list it twice.
 fn merge(found: &mut Vec<AccessoryBattery>, more: Vec<AccessoryBattery>) {
-    for battery in more {
-        if !found.iter().any(|f| f.name == battery.name) {
-            found.push(battery);
-        }
-    }
+    // Checked against what the registry reported, not the growing list: an accessory the
+    // registry did not know must keep every part (left, right, case), not only the first.
+    let from_registry: Vec<String> = found.iter().map(|f| f.name.clone()).collect();
+    found.extend(
+        more.into_iter()
+            .filter(|battery| !from_registry.contains(&battery.name)),
+    );
 }
 
 fn run_with_limit(program: &str, args: &[&str]) -> Option<Vec<u8>> {
@@ -234,6 +236,22 @@ mod tests {
         );
         assert_eq!(found.len(), 2);
         assert_eq!(found[0].percent, 64.0);
+    }
+
+    #[test]
+    fn an_accessory_only_the_profiler_knows_keeps_every_part() {
+        let part = |p: &str, percent: f32| AccessoryBattery {
+            name: "AirPods Pro".into(),
+            part: Some(p.into()),
+            percent,
+        };
+        let mut found = Vec::new();
+        merge(
+            &mut found,
+            vec![part("left", 80.0), part("right", 79.0), part("case", 50.0)],
+        );
+        let parts: Vec<_> = found.iter().map(|b| b.part.as_deref()).collect();
+        assert_eq!(parts, [Some("left"), Some("right"), Some("case")]);
     }
 
     #[test]
