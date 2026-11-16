@@ -6,11 +6,14 @@ export function Meter({
   className,
   tone = "auto",
   height = 6,
+  label,
 }: {
   value: number;
   className?: string;
   tone?: "auto" | "accent" | "info" | "warn" | "danger";
   height?: number;
+  /** What is being measured, for screen readers when a view shows several meters. */
+  label?: string;
 }) {
   const v = Math.max(0, Math.min(100, value));
   const t = tone === "auto" ? (v >= 90 ? "danger" : v >= 75 ? "warn" : "accent") : tone;
@@ -28,6 +31,7 @@ export function Meter({
       )}
       style={{ height }}
       role="meter"
+      aria-label={label}
       aria-valuenow={Math.round(v)}
       aria-valuemin={0}
       aria-valuemax={100}

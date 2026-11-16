@@ -13,6 +13,7 @@ it("shows each GPU's load and memory as reported", () => {
   );
   expect(screen.getByText("Apple M3 Pro, 18 cores")).toBeInTheDocument();
   expect(screen.getByText("17%")).toBeInTheDocument();
+  expect(screen.getByRole("meter", { name: "Apple M3 Pro load" })).toBeInTheDocument();
   expect(screen.getByText(/memory in use$/)).toBeInTheDocument();
   // An unnamed adapter gets a number, and an unknown load is said, not shown as 0%.
   expect(screen.getByText("GPU 2")).toBeInTheDocument();

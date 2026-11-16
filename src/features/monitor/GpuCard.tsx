@@ -46,7 +46,13 @@ function GpuRow({ gpu, fallbackName }: { gpu: GpuStatus; fallbackName: string })
         </span>
       </div>
       {gpu.usagePercent != null && (
-        <Meter value={gpu.usagePercent} className="mt-1" tone="info" height={5} />
+        <Meter
+          value={gpu.usagePercent}
+          label={`${name} load`}
+          className="mt-1"
+          tone="info"
+          height={5}
+        />
       )}
       {memory && <div className="mt-0.5 text-right text-[11px] text-fg-faint tnum">{memory}</div>}
     </div>

@@ -10,7 +10,7 @@
 
 use std::collections::BTreeMap;
 use std::sync::Mutex;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::models::GpuStatus;
 use crate::sync::LockExt;
@@ -72,13 +72,32 @@ impl Drop for Query {
     }
 }
 
-/// `None` until first used; `Some(None)` once it turned out there are no GPU counters.
-static STATE: Mutex<Option<Option<Query>>> = Mutex::new(None);
+/// How long to wait before trying again when the counters could not be opened. Opening can
+/// fail for a passing reason (memory, a driver restarting), so it is not given up for good;
+/// on a machine that has no GPU counters at all, this keeps the retries rare.
+const RETRY_AFTER: Duration = Duration::from_secs(60);
+
+struct State {
+    query: Option<Query>,
+    /// When opening last failed.
+    failed_at: Option<Instant>,
+}
+
+static STATE: Mutex<State> = Mutex::new(State {
+    query: None,
+    failed_at: None,
+});
 
 pub fn read() -> Vec<GpuStatus> {
     let mut state = STATE.lock_recover();
-    let query = state.get_or_insert_with(open);
-    let Some(query) = query else {
+    if state.query.is_none() {
+        if state.failed_at.is_some_and(|at| at.elapsed() < RETRY_AFTER) {
+            return Vec::new();
+        }
+        state.query = open();
+        state.failed_at = state.query.is_none().then(Instant::now);
+    }
+    let Some(query) = &state.query else {
         return Vec::new();
     };
     // SAFETY: `query.query` is an open query.

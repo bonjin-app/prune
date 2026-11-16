@@ -49,9 +49,10 @@ fn gpu(entry: &Dictionary) -> GpuStatus {
     let usage_percent = stat("Device Utilization %")
         .or_else(|| stat("GPU Activity(%)"))
         .map(|p| p.min(100) as f32);
-    // A discrete card reports its own memory, used and free. Apple silicon has none of its own
-    // and reports what it is using of the shared memory.
-    let vram_used = stat("vramUsedBytes");
+    // A discrete card reports its own memory, used and free; some AMD drivers name the used
+    // figure `inUseVidMemoryBytes`. Apple silicon has none of its own and reports what it is
+    // using of the shared memory.
+    let vram_used = stat("vramUsedBytes").or_else(|| stat("inUseVidMemoryBytes"));
     let vram_free = stat("vramFreeBytes");
     let memory_used_bytes = vram_used.or_else(|| stat("In use system memory"));
     let memory_total_bytes = vram_used.zip(vram_free).map(|(u, f)| u + f);
@@ -137,6 +138,16 @@ mod tests {
         assert_eq!(gpus[0].memory_total_bytes, Some(4000));
         assert_eq!(gpus[0].name, None);
         assert_eq!(gpus[1], GpuStatus::default());
+    }
+
+    #[test]
+    fn reads_the_amd_name_for_memory_in_use() {
+        let gpus = parse(&plist(
+            r#"<dict><key>PerformanceStatistics</key><dict>
+                <key>inUseVidMemoryBytes</key><integer>5000</integer>
+            </dict></dict>"#,
+        ));
+        assert_eq!(gpus[0].memory_used_bytes, Some(5000));
     }
 
     #[test]
